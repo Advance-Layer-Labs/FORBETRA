@@ -8,9 +8,19 @@
 
 <section class="mx-auto max-w-3xl px-6 py-16 text-text-primary">
 	<h1 class="mb-2 text-3xl font-bold">SMS Messaging Terms</h1>
-	<p class="mb-8 text-sm text-text-tertiary">Last updated: March 12, 2026</p>
+	<p class="mb-8 text-sm text-text-tertiary">Last updated: May 10, 2026</p>
 
 	<div class="space-y-8 text-sm leading-relaxed text-text-secondary">
+		<div>
+			<h2 class="mb-2 text-lg font-semibold text-text-primary">Who operates Forbetra?</h2>
+			<p>
+				Forbetra is operated by <strong>The Winning Mind, LLC</strong>, a California limited
+				liability company located at 2358 University Ave., #265, San Diego, CA 92104. References to
+				"Forbetra," "we," "our," or "us" in these SMS Messaging Terms refer to The Winning Mind,
+				LLC.
+			</p>
+		</div>
+
 		<div>
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">What messages will I receive?</h2>
 			<p class="mb-2">
@@ -77,7 +87,11 @@
 				use the platform without providing a phone number by selecting Email as your delivery method.
 			</p>
 			<p class="mt-2">
-				Your phone number will not be shared with third parties for marketing purposes.
+				<strong>Mobile information</strong>, including phone numbers and SMS opt-in or consent data,
+				will not be sold or shared with third parties or affiliates for marketing or promotional
+				purposes. SMS opt-in data and consent information is used only to deliver the messages you
+				opted in to receive, and is shared with our SMS provider (Twilio) solely to deliver those
+				messages.
 			</p>
 		</div>
 

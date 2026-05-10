@@ -4,15 +4,16 @@
 
 <section class="mx-auto max-w-3xl px-6 py-16 text-text-primary">
 	<h1 class="mb-2 text-3xl font-bold">Privacy Policy</h1>
-	<p class="mb-8 text-sm text-text-tertiary">Last updated: February 22, 2026</p>
+	<p class="mb-8 text-sm text-text-tertiary">Last updated: May 10, 2026</p>
 
 	<div class="space-y-8 text-sm leading-relaxed text-text-secondary">
 		<div>
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">1. Introduction</h2>
 			<p>
-				Forbetra ("we," "our," or "us") operates the Forbetra personal development platform at
-				app.forbetra.com. This Privacy Policy describes how we collect, use, and protect your
-				personal information when you use our service.
+				Forbetra is operated by <strong>The Winning Mind, LLC</strong> ("Forbetra," "we," "our," or "us"),
+				a California limited liability company located at 2358 University Ave., #265, San Diego, CA 92104.
+				We operate the Forbetra personal development platform at app.forbetra.com. This Privacy Policy
+				describes how we collect, use, and protect your personal information when you use our service.
 			</p>
 		</div>
 
@@ -66,6 +67,14 @@
 				Message frequency varies based on coaching activity. Message and data rates may apply. You
 				can opt out of SMS messages at any time by replying <strong>STOP</strong> to any message.
 				Reply <strong>HELP</strong> for support. Consent to receive SMS is not a condition of using Forbetra.
+			</p>
+			<p class="mt-3">
+				<strong>Mobile information</strong>, including phone numbers and SMS opt-in or consent data,
+				will not be sold or shared with third parties or affiliates for marketing or promotional
+				purposes. SMS opt-in data and consent information is used only to deliver the messages you
+				opted in to receive, and is shared with our SMS provider (Twilio) solely to deliver those
+				messages. No mobile information is shared with any third party for marketing or promotional
+				purposes under any circumstances.
 			</p>
 			<p class="mt-3">
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -146,6 +155,8 @@
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">11. Contact Us</h2>
 			<p>
 				If you have questions about this Privacy Policy, contact us at:<br />
+				<strong>The Winning Mind, LLC</strong><br />
+				2358 University Ave., #265, San Diego, CA 92104<br />
 				<strong>Email:</strong> sagal@thewinningmind.com
 			</p>
 		</div>
