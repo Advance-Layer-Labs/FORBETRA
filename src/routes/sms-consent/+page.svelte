@@ -169,8 +169,7 @@
 	<!-- Footer with contact -->
 	<div class="mt-12 border-t border-border-default pt-6 text-xs text-text-tertiary">
 		<p>
-			Forbetra is operated by The Winning Mind, LLC · 2358 University Ave., #265, San Diego, CA
-			92104 ·
+			Forbetra is operated by Winning Mind, LLC · 2358 University Ave., #265, San Diego, CA 92104 ·
 			<a href="mailto:sagal@thewinningmind.com" class="text-accent underline"
 				>sagal@thewinningmind.com</a
 			>
