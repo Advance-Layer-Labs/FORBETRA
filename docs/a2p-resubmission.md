@@ -194,6 +194,6 @@ Capture the exact rejection error code and text (30909 variants have sub-reasons
 
 - **"CTA not accessible"** → confirm `/sms-consent` loads without auth and is linked from the landing footer.
 - **"Opt-in description doesn't match flow"** → the copy in the "How do end users consent" field must exactly describe what a reviewer will see when they visit the URL. If we change the settings UI, update `/sms-consent` and the campaign copy in lockstep.
-- **"Business/brand mismatch"** → verify the Brand's legal name matches "The Winning Mind, LLC" (the business entity listed on the consent page) and that the trust score is acceptable.
+- **"Business/brand mismatch"** → verify the Brand's legal name matches "Winning Mind, LLC" (the business entity listed on the consent page) and that the trust score is acceptable.
 
 Do not keep resubmitting blindly — after two rejections, Twilio support is the fastest path. Open a ticket referencing the campaign SID and ask for specific guidance on what's failing verification.

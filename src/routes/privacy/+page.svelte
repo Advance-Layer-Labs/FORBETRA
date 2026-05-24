@@ -10,7 +10,7 @@
 		<div>
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">1. Introduction</h2>
 			<p>
-				Forbetra is operated by <strong>The Winning Mind, LLC</strong> ("Forbetra," "we," "our," or "us"),
+				Forbetra is operated by <strong>Winning Mind, LLC</strong> ("Forbetra," "we," "our," or "us"),
 				a California limited liability company located at 2358 University Ave., #265, San Diego, CA 92104.
 				We operate the Forbetra personal development platform at app.forbetra.com. This Privacy Policy
 				describes how we collect, use, and protect your personal information when you use our service.
@@ -155,7 +155,7 @@
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">11. Contact Us</h2>
 			<p>
 				If you have questions about this Privacy Policy, contact us at:<br />
-				<strong>The Winning Mind, LLC</strong><br />
+				<strong>Winning Mind, LLC</strong><br />
 				2358 University Ave., #265, San Diego, CA 92104<br />
 				<strong>Email:</strong> sagal@thewinningmind.com
 			</p>
