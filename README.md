@@ -2,14 +2,14 @@
 
 Real-time 360 coaching platform that combines structured weekly self-reflection with continuous stakeholder feedback, AI-synthesized insights, and coach-facing intelligence.
 
-**Live:** https://forbetra.vercel.app
+**Live:** https://app.forbetra.com
 
 ## Setup
 
 **Prerequisites:** Node.js 22+ (see `.nvmrc`), npm
 
 ```bash
-git clone https://github.com/k1bu/FORBETRA.git
+git clone https://github.com/Advance-Layer-Labs/FORBETRA.git
 cd FORBETRA
 npm install
 ```
