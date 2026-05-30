@@ -290,13 +290,8 @@ export const load: PageServerLoad = async (event) => {
 		});
 	}
 
-	// Initialize weeklyExperiences if cycle doesn't exist
-	// Double-check currentWeek calculation to ensure it's correct
-	const verifiedCurrentWeek = cycle ? computeWeekNumber(cycle.startDate) : null;
-	const weekToUse = verifiedCurrentWeek ?? currentWeek;
-
 	const weeklyExperiencesRaw =
-		cycle && weekToUse ? await getWeeklyExperiences(cycle, dbUser.id, weekToUse, prisma) : [];
+		cycle && currentWeek ? await getWeeklyExperiences(cycle, dbUser.id, currentWeek, prisma) : [];
 
 	const weeklyExperiences: Array<{
 		type: 'RATING_A';
@@ -316,7 +311,7 @@ export const load: PageServerLoad = async (event) => {
 
 	// Calculate nextPrompt based on current week's experiences
 	const nextPrompt =
-		cycle && weekToUse ? getNextPrompt(cycle.startDate, weekToUse, weeklyExperiencesRaw) : null;
+		cycle && currentWeek ? getNextPrompt(cycle.startDate, currentWeek, weeklyExperiencesRaw) : null;
 
 	let effortSum = 0;
 	let effortCount = 0;

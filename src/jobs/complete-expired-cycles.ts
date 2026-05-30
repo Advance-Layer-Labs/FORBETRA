@@ -12,6 +12,7 @@ import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
+import { getAppUrl } from '$lib/server/appUrl';
 
 export async function completeExpiredCycles(): Promise<{
 	completed: number;
@@ -76,12 +77,7 @@ export async function completeExpiredCycles(): Promise<{
 				skipped++;
 			}
 
-			// Send completion notifications
-			const baseUrl =
-				process.env.PUBLIC_APP_URL || process.env.VERCEL_URL
-					? `https://${process.env.PUBLIC_APP_URL || process.env.VERCEL_URL}`
-					: 'https://app.forbetra.com';
-
+			const baseUrl = getAppUrl();
 			const delivery = cycle.user.deliveryMethod ?? 'both';
 
 			if (delivery !== 'sms') {

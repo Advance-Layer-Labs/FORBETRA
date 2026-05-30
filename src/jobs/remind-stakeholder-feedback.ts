@@ -5,6 +5,7 @@ import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { computeWeekNumber } from '$lib/server/coachUtils';
 import { rateLimit } from '$lib/server/rateLimit';
+import { getAppUrl } from '$lib/server/appUrl';
 
 export const remindStakeholderFeedback = async () => {
 	const stakeholders = await prisma.stakeholder.findMany({
@@ -23,29 +24,24 @@ export const remindStakeholderFeedback = async () => {
 		}
 	});
 
-	// Build a map of individual's active cycle cadence for biweekly check
+	const individualIds = Array.from(new Set(stakeholders.map((s) => s.individual.id)));
+	const activeCycles = await prisma.cycle.findMany({
+		where: { userId: { in: individualIds }, status: 'ACTIVE' },
+		orderBy: { startDate: 'desc' },
+		select: { userId: true, stakeholderCadence: true, startDate: true }
+	});
+
 	const individualCycles = new Map<string, { stakeholderCadence: string; startDate: Date }>();
-	for (const stakeholder of stakeholders) {
-		const individualId = stakeholder.individual.id;
-		if (!individualCycles.has(individualId)) {
-			const cycle = await prisma.cycle.findFirst({
-				where: { userId: individualId, status: 'ACTIVE' },
-				orderBy: { startDate: 'desc' },
-				select: { stakeholderCadence: true, startDate: true }
+	for (const cycle of activeCycles) {
+		if (!individualCycles.has(cycle.userId)) {
+			individualCycles.set(cycle.userId, {
+				stakeholderCadence: cycle.stakeholderCadence,
+				startDate: cycle.startDate
 			});
-			if (cycle) {
-				individualCycles.set(individualId, {
-					stakeholderCadence: cycle.stakeholderCadence,
-					startDate: cycle.startDate
-				});
-			}
 		}
 	}
 
-	const baseUrl =
-		process.env.PUBLIC_APP_URL || process.env.VERCEL_URL
-			? `https://${process.env.PUBLIC_APP_URL || process.env.VERCEL_URL}`
-			: 'https://app.forbetra.com';
+	const baseUrl = getAppUrl();
 
 	for (const stakeholder of stakeholders) {
 		const pending = stakeholder.tokens.filter((token) => token.expiresAt > new Date());

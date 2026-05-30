@@ -22,13 +22,22 @@ import {
 import { computeWeekNumber, stdDev } from '$lib/server/coachUtils';
 import type { InsightType } from '@prisma/client';
 
-const MODEL_ID = 'claude-sonnet-4-5-20250929';
+// Override via ANTHROPIC_MODEL_ID env var without a redeploy. When upgrading
+// model versions (e.g., 4.5 → 4.6), test prompt outputs first — model behavior
+// can shift even on the same prompts.
+const MODEL_ID = process.env.ANTHROPIC_MODEL_ID || 'claude-sonnet-4-5-20250929';
+
+// System message is long and stable across every call — mark it cacheable so
+// Anthropic charges full input tokens only on cache misses.
+const CACHEABLE_SYSTEM = [
+	{ type: 'text' as const, text: SYSTEM_MESSAGE, cache_control: { type: 'ephemeral' as const } }
+];
 
 async function callClaude(prompt: string, maxTokens: number = 1024): Promise<string> {
 	const response = await anthropic.messages.create({
 		model: MODEL_ID,
 		max_tokens: maxTokens,
-		system: SYSTEM_MESSAGE,
+		system: CACHEABLE_SYSTEM,
 		messages: [{ role: 'user', content: prompt }]
 	});
 
@@ -43,7 +52,7 @@ function callClaudeStreaming(prompt: string, maxTokens: number = 4096): Readable
 				const stream = anthropic.messages.stream({
 					model: MODEL_ID,
 					max_tokens: maxTokens,
-					system: SYSTEM_MESSAGE,
+					system: CACHEABLE_SYSTEM,
 					messages: [{ role: 'user', content: prompt }]
 				});
 
@@ -244,26 +253,14 @@ async function createAndGenerateInsightStreaming(
 						controller.enqueue(value);
 					}
 
-					if (cancelled && accumulated) {
-						// Client disconnected but we have partial content — save it
-						await prisma.insight.update({
-							where: { id: insight.id },
-							data: {
-								status: 'COMPLETED',
-								content: accumulated,
-								promptHash: simpleHash(prompt)
-							}
-						});
-					} else {
-						await prisma.insight.update({
-							where: { id: insight.id },
-							data: {
-								status: 'COMPLETED',
-								content: accumulated,
-								promptHash: simpleHash(prompt)
-							}
-						});
-					}
+					await prisma.insight.update({
+						where: { id: insight.id },
+						data: {
+							status: 'COMPLETED',
+							content: accumulated,
+							promptHash: simpleHash(prompt)
+						}
+					});
 					controller.close();
 				} catch (error) {
 					await prisma.insight.update({
