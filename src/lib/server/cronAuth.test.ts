@@ -5,6 +5,8 @@ vi.mock('./rateLimit', () => ({
 	rateLimit: vi.fn(async () => true)
 }));
 
+type JobFn = () => Promise<unknown | void>;
+
 const buildEvent = (headers: Record<string, string> = {}, pathname = '/api/jobs/test') =>
 	({
 		request: new Request(`https://x${pathname}`, { headers }),
@@ -13,10 +15,10 @@ const buildEvent = (headers: Record<string, string> = {}, pathname = '/api/jobs/
 
 describe('createCronJobHandler', () => {
 	const ORIGINAL_ENV = { ...process.env };
-	let jobFn: ReturnType<typeof vi.fn>;
+	let jobFn: ReturnType<typeof vi.fn<JobFn>>;
 
 	beforeEach(() => {
-		jobFn = vi.fn(async () => ({ ok: true }));
+		jobFn = vi.fn<JobFn>(async () => ({ ok: true }));
 	});
 
 	afterEach(() => {
@@ -78,7 +80,7 @@ describe('createCronJobHandler', () => {
 
 	it('returns 500 when the job function throws', async () => {
 		process.env.JOB_SECRET_TOKEN = 'secret123';
-		const failing = vi.fn(async () => {
+		const failing = vi.fn<JobFn>(async () => {
 			throw new Error('boom');
 		});
 		const handler = createCronJobHandler('test', failing);
@@ -90,7 +92,7 @@ describe('createCronJobHandler', () => {
 
 	it('merges object result into the success response', async () => {
 		process.env.JOB_SECRET_TOKEN = 'secret123';
-		const fn = vi.fn(async () => ({ completed: 3, failed: 0 }));
+		const fn = vi.fn<JobFn>(async () => ({ completed: 3, failed: 0 }));
 		const handler = createCronJobHandler('test', fn);
 		const res = await handler(buildEvent({ authorization: 'Bearer secret123' }));
 		const body = await res.json();
@@ -99,7 +101,7 @@ describe('createCronJobHandler', () => {
 
 	it('handles void return from job function', async () => {
 		process.env.JOB_SECRET_TOKEN = 'secret123';
-		const fn = vi.fn(async () => undefined);
+		const fn = vi.fn<JobFn>(async () => undefined);
 		const handler = createCronJobHandler('test', fn);
 		const res = await handler(buildEvent({ authorization: 'Bearer secret123' }));
 		const body = await res.json();
