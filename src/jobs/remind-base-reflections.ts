@@ -4,6 +4,7 @@ import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { computeWeekNumber } from '$lib/server/coachUtils';
+import { getAppUrl } from '$lib/server/appUrl';
 
 export const remindBaseReflections = async () => {
 	const now = new Date();
@@ -44,10 +45,7 @@ export const remindBaseReflections = async () => {
 		return;
 	}
 
-	const baseUrl =
-		process.env.PUBLIC_APP_URL || process.env.VERCEL_URL
-			? `https://${process.env.PUBLIC_APP_URL || process.env.VERCEL_URL}`
-			: 'https://app.forbetra.com';
+	const baseUrl = getAppUrl();
 
 	// Find all active objectives with users who need reminders
 	// Include users with null reminderDays (default to wednesday_friday)
@@ -68,7 +66,9 @@ export const remindBaseReflections = async () => {
 				orderBy: { startDate: 'desc' },
 				take: 1,
 				include: {
-					reflections: true
+					reflections: {
+						select: { weekNumber: true, reflectionType: true }
+					}
 				}
 			}
 		}

@@ -146,6 +146,7 @@ model Cycle {
 
   @@index([userId])
   @@index([objectiveId])
+  @@index([status])
 }
 
 model Subgoal {

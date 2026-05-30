@@ -58,16 +58,3 @@ export const getDateForWeekday = (weekday: number, startDate: Date, weekNumber: 
 
 	return targetDate;
 };
-
-// Linear regression slope for trajectory calculations
-export const linearRegressionSlope = (points: { x: number; y: number }[]): number | null => {
-	if (points.length < 2) return null;
-	const n = points.length;
-	const sumX = points.reduce((s, p) => s + p.x, 0);
-	const sumY = points.reduce((s, p) => s + p.y, 0);
-	const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
-	const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
-	const denom = n * sumX2 - sumX * sumX;
-	if (denom === 0) return null;
-	return (n * sumXY - sumX * sumY) / denom;
-};

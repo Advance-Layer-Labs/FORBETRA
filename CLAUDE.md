@@ -22,7 +22,7 @@ npm run dev                 # http://localhost:5173
 - **ORM:** Prisma 6.19 → PostgreSQL (Neon)
 - **Auth:** Clerk (email/SSO) via svelte-clerk
 - **Email:** SendGrid (primary), Postmark (fallback)
-- **SMS:** Twilio (A2P 10DLC) — campaign currently rejected, see docs/session-prep-feb27.md
+- **SMS:** Twilio (A2P 10DLC) — campaign verified 2026-05-28 (TCR ID C9AJ2WU), end-to-end delivery confirmed 2026-05-29
 - **AI:** Anthropic Claude API
 - **Charts:** Chart.js
 - **Webhooks:** Svix (Clerk webhook verification)
@@ -107,13 +107,14 @@ Defined in `vercel.json`, authenticated via `CRON_SECRET` = `JOB_SECRET_TOKEN`:
 - Env vars: Set via `vercel env add` — **always use `printf '%s' 'value' | vercel env add NAME env`** (never `echo`, it adds trailing newlines)
 - Redeploy manually: `npx vercel deploy --prod`
 
-## Current Status (Apr 21, 2026)
+## Current Status (May 30, 2026)
 
 - **Tier 1 (Ship-Blocking):** Complete
 - **Tier 2 (Competitive Differentiation):** Complete (shipped March 2026)
-- **Tier 3 (Best-in-Class):** Complete — all 8 items shipped. SMS code is complete but delivery blocked (see below).
+- **Tier 3 (Best-in-Class):** Complete — all 8 items shipped
 - **Tier 4 (Market Expansion):** Not started — deferred until post-scale real-world testing
 - **Email:** Working via SendGrid
-- **SMS:** Code complete, `/sms-consent` + `/sms-terms` pages live. Delivery blocked by rejected Twilio A2P 10DLC campaign (error 30909) — needs Console resubmit with `/sms-consent` as the public CTA URL
+- **SMS:** Live. A2P 10DLC verified 2026-05-28 (TCR ID C9AJ2WU); end-to-end delivery confirmed 2026-05-29. `/sms-consent` + `/sms-terms` pages live. Single number `+16196482741` on messaging service `MG3e4cfc...`
 - **AI:** Anthropic key configured, insights/coach-prep/chat functional
+- **Vercel auto-deploy:** Reconnected 2026-05-28 (Advance-Layer-Labs org → Vercel GitHub App). Merges to `main` auto-deploy
 - **Next focus:** Real-world testing at scale before any new feature work

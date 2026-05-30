@@ -37,6 +37,24 @@ export async function generateCoachPrepInsights(): Promise<{
 		}
 	});
 
+	const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+	const candidateCycleIds = coachClients
+		.map((r) => r.individual.objectives[0]?.cycles[0]?.id)
+		.filter((id): id is string => !!id);
+
+	const recentPreps =
+		candidateCycleIds.length > 0
+			? await prisma.insight.findMany({
+					where: {
+						type: 'COACH_PREP',
+						cycleId: { in: candidateCycleIds },
+						createdAt: { gte: sevenDaysAgo }
+					},
+					select: { userId: true, cycleId: true }
+				})
+			: [];
+	const recentPrepSet = new Set(recentPreps.map((p) => `${p.userId}:${p.cycleId}`));
+
 	let generated = 0;
 	let skipped = 0;
 	let failed = 0;
@@ -48,17 +66,7 @@ export async function generateCoachPrepInsights(): Promise<{
 			continue;
 		}
 
-		// Check if COACH_PREP already exists for this week (within last 7 days)
-		const recentPrep = await prisma.insight.findFirst({
-			where: {
-				userId: rel.individualId,
-				cycleId: cycle.id,
-				type: 'COACH_PREP',
-				createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-			}
-		});
-
-		if (recentPrep) {
+		if (recentPrepSet.has(`${rel.individualId}:${cycle.id}`)) {
 			skipped++;
 			continue;
 		}
