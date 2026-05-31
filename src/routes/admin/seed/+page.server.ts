@@ -1,4 +1,5 @@
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
 import type { Actions, PageServerLoad } from './$types';
@@ -6,6 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 const SEED_EMAIL_PATTERN = '+seed@test.forbetra.com';
 
 export const load: PageServerLoad = async (event) => {
+	if (!dev) throw error(404, 'Not found');
 	requireRole(event, 'ADMIN');
 
 	const seedUsers = await prisma.user.findMany({
@@ -24,6 +26,7 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
 	clean: async (event) => {
+		if (!dev) throw error(404, 'Not found');
 		requireRole(event, 'ADMIN');
 
 		try {

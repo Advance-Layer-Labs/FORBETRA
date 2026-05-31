@@ -1,8 +1,11 @@
+import { error } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
+	if (!dev) throw error(404, 'Not found');
 	requireRole(event, 'ADMIN');
 
 	const [bestIndividual, bestCoach] = await Promise.all([

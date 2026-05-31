@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
+	import { dev } from '$app/environment';
 
 	const { children }: { children: Snippet } = $props();
 
@@ -12,7 +13,7 @@
 
 	const navItems = [
 		{ href: '/admin', label: 'Dashboard', icon: 'grid' },
-		{ href: '/admin/demo', label: 'Demo', icon: 'play' },
+		...(dev ? [{ href: '/admin/demo', label: 'Demo', icon: 'play' }] : []),
 		{ href: '/admin/preview', label: 'Preview Flows', icon: 'eye' },
 		{ href: '/admin/users', label: 'Users', icon: 'users' },
 		{ href: '/admin/objectives', label: 'Objectives & Cycles', icon: 'target' },
@@ -20,7 +21,7 @@
 		{ href: '/admin/coaches', label: 'Coach Assignments', icon: 'link' },
 		{ href: '/admin/insights', label: 'Insights', icon: 'sparkle' },
 		{ href: '/admin/organizations', label: 'Organizations', icon: 'building' },
-		{ href: '/admin/seed', label: 'Seed Data', icon: 'database' },
+		...(dev ? [{ href: '/admin/seed', label: 'Seed Data', icon: 'database' }] : []),
 		{ href: '/admin/settings', label: 'Settings', icon: 'settings' }
 	];
 </script>
