@@ -190,7 +190,11 @@ export const load: PageServerLoad = async (event) => {
 		myPerformance,
 		reviewerAvgEffort,
 		reviewerAvgPerf,
-		currentWeek
+		currentWeek,
+		// For the Reveal status badge — true means reviewers see your self-scores
+		// when they submit feedback; false means scored blind. Default is true;
+		// users can flip in /individual/settings.
+		revealScores: cycle?.revealScores ?? true
 	};
 };
 
