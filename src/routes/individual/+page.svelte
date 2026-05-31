@@ -198,7 +198,7 @@
 				</div>
 			{/if}
 
-			<!-- New feedback notification -->
+			<!-- New feedback notification (one-shot — overrides ambient scorecard nudge below) -->
 			{#if data.hasNewFeedback}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
@@ -209,6 +209,22 @@
 						{data.newFeedbackRaterName ?? 'A reviewer'} shared their perspective.
 						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
 							>View scores</span
+						>
+					</p>
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+			{:else if data.signals?.scorecardReady}
+				<!-- Ambient nudge: pull the user toward the blind-spot view once there's
+				     enough data for it to be meaningful. -->
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					href="/individual/feedback"
+					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
+				>
+					<p class="text-[13px] text-text-secondary">
+						Your blind-spot view is ready — see how your self-rating compares to your reviewers'.
+						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
+							>Open scorecard</span
 						>
 					</p>
 				</a>

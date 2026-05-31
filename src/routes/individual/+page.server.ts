@@ -318,7 +318,12 @@ export const load: PageServerLoad = async (event) => {
 			reviewerPerformance: { avg: revPerfAvg },
 			effortGap,
 			perfGap,
-			hasFeedback: feedbacks.length > 0
+			hasFeedback: feedbacks.length > 0,
+			// Scorecard adaptive default: surface the blind-spot view as a persistent
+			// ambient nudge once the user has enough feedback for the gap to be
+			// statistically meaningful. 4 entries ≈ 2 weeks × 2 reviewers (or
+			// 1 week × 4) — empirically the threshold where the gap stops being noise.
+			scorecardReady: feedbacks.length >= 4
 		},
 		// Inline check-in data
 		identityAnchor,
