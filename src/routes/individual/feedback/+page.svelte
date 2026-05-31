@@ -177,6 +177,19 @@
 				</p>
 			</div>
 		{:else}
+			{#if data.reviewers.every((r) => r.lastFeedbackDate === null)}
+				<div
+					class="rounded-xl border border-dashed border-accent/40 bg-accent-muted/30 p-6 text-center"
+				>
+					<p class="text-sm font-medium text-text-primary">
+						Your reviewers haven't responded yet — that's normal in week 1.
+					</p>
+					<p class="mt-1.5 text-xs text-text-tertiary">
+						Reviewers receive a feedback prompt at the end of each week. Reminders fire Mon–Fri at
+						3pm. Feedback will appear below as it arrives.
+					</p>
+				</div>
+			{/if}
 			{#each data.reviewers as reviewer (reviewer.id)}
 				{@const maxGap = Math.max(
 					Math.abs(reviewer.effortGap ?? 0),
