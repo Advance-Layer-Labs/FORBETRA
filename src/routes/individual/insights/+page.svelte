@@ -303,6 +303,13 @@
 						Get a comprehensive AI analysis of your full journey — performance trajectory,
 						perception gaps, strengths, and actionable recommendations.
 					</p>
+					{#if (data.historyWeeks?.length ?? 0) < 2}
+						<p class="mb-3 text-xs text-text-tertiary">
+							For best results, complete at least 2 weeks of check-ins first. The report uses your
+							reflection history and reviewer feedback to find patterns — there's not much to find
+							yet.
+						</p>
+					{/if}
 					{#if generateError}
 						<p class="mb-3 text-xs text-error">{generateError}</p>
 					{/if}
