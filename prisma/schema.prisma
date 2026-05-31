@@ -321,6 +321,7 @@ model Insight {
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   cycle Cycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, cycleId, weekNumber, type])
   @@index([userId])
   @@index([cycleId])
   @@index([type, status])
