@@ -635,5 +635,39 @@ export const emailTemplates = {
 			`,
 			text: `${m.emoji} ${m.headline}\n\nHi ${data.individualName},\n\n${m.body}\n\n${data.objectiveTitle ? `Goal: ${data.objectiveTitle}\n\n` : ''}View your progress: ${data.appUrl || baseUrl}/individual${textFooter()}`
 		};
+	},
+
+	stakeholderRequestedNewLink: (data: EmailTemplateData) => {
+		const indName = escapeHtml(data.individualName || 'there');
+		const shName = escapeHtml(data.stakeholderName || 'A reviewer');
+		const stakeholdersUrl = `${data.appUrl || baseUrl}/individual/stakeholders`;
+		return {
+			subject: `${data.stakeholderName || 'A reviewer'} requested a new feedback link`,
+			html: `
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			</head>
+			<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+				<div style="background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+					<h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">A reviewer needs a fresh link</h1>
+				</div>
+				<div style="background: white; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+					<p style="font-size: 16px; margin-top: 0;">Hi ${indName},</p>
+					<p style="font-size: 16px;"><strong>${shName}</strong> tried to use a feedback link that had expired or already been used.</p>
+					<p style="font-size: 16px;">They're ready to give you feedback — you just need to send them a new link from your reviewer settings.</p>
+					<div style="text-align: center; margin: 30px 0;">
+						<a href="${stakeholdersUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Manage reviewers</a>
+					</div>
+					<p style="font-size: 14px; color: #64748b;">If this reviewer is no longer relevant, you can archive them on the same page.</p>
+				</div>
+			${emailFooter()}
+			</body>
+			</html>
+		`,
+			text: `A reviewer needs a fresh feedback link\n\nHi ${data.individualName || 'there'},\n\n${data.stakeholderName || 'A reviewer'} tried to use a feedback link that had expired or already been used. They're ready to give you feedback — you just need to send them a new link from your reviewer settings.\n\nManage reviewers: ${stakeholdersUrl}\n\nIf this reviewer is no longer relevant, you can archive them on the same page.${textFooter()}`
+		};
 	}
 };
