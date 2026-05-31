@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Forbetra — UX Walkthrough</title>
+		<style>
+			:root {
+				--bg: #0b0d10;
+				--surface: #14171c;
+				--surface-2: #1c2028;
+				--border: #2a2f38;
+				--text: #e8eaee;
+				--text-2: #aab1bd;
+				--text-3: #6b7282;
+				--accent: #f5a623;
+				--accent-2: #4a90e2;
+				--maxw: 880px;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+				background: var(--bg);
+				color: var(--text);
+				line-height: 1.65;
+				font-size: 16px;
+			}
+			.wrap {
+				max-width: var(--maxw);
+				margin: 0 auto;
+				padding: 64px 24px 96px;
+			}
+			h1 {
+				font-size: 36px;
+				margin: 0 0 8px;
+				font-weight: 700;
+				letter-spacing: -0.02em;
+			}
+			h2 {
+				font-size: 28px;
+				margin: 64px 0 12px;
+				font-weight: 700;
+				letter-spacing: -0.01em;
+				padding-top: 24px;
+				border-top: 1px solid var(--border);
+			}
+			h3 {
+				font-size: 20px;
+				margin: 36px 0 10px;
+				font-weight: 600;
+				color: var(--text);
+			}
+			h4 {
+				font-size: 15px;
+				margin: 24px 0 6px;
+				font-weight: 600;
+				color: var(--text-2);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			p {
+				margin: 10px 0 14px;
+				color: var(--text);
+			}
+			p.lede {
+				font-size: 18px;
+				color: var(--text-2);
+				margin: 0 0 24px;
+			}
+			.meta {
+				color: var(--text-3);
+				font-size: 13px;
+				margin: 0 0 24px;
+			}
+			.badge {
+				display: inline-block;
+				background: var(--surface-2);
+				color: var(--text-2);
+				padding: 2px 8px;
+				border-radius: 4px;
+				font-size: 12px;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			}
+			a {
+				color: var(--accent-2);
+				text-decoration: none;
+			}
+			a:hover {
+				text-decoration: underline;
+			}
+			.toc {
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 20px 24px;
+				margin: 24px 0 48px;
+			}
+			.toc h3 {
+				margin-top: 0;
+				font-size: 14px;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: var(--text-3);
+			}
+			.toc ol {
+				margin: 8px 0 0;
+				padding-left: 20px;
+			}
+			.toc li {
+				margin: 4px 0;
+				color: var(--text-2);
+			}
+			.toc li a {
+				color: var(--text);
+			}
+			figure {
+				margin: 24px 0 32px;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				overflow: hidden;
+				background: var(--surface);
+			}
+			figure img {
+				display: block;
+				width: 100%;
+				height: auto;
+			}
+			figcaption {
+				padding: 12px 16px;
+				font-size: 13px;
+				color: var(--text-3);
+				border-top: 1px solid var(--border);
+				background: var(--surface-2);
+			}
+			.callout {
+				background: var(--surface);
+				border-left: 3px solid var(--accent);
+				padding: 14px 18px;
+				margin: 16px 0;
+				border-radius: 0 8px 8px 0;
+			}
+			.callout strong {
+				color: var(--accent);
+			}
+			.question {
+				background: rgba(74, 144, 226, 0.06);
+				border-left: 3px solid var(--accent-2);
+				padding: 14px 18px;
+				margin: 16px 0;
+				border-radius: 0 8px 8px 0;
+			}
+			.question strong {
+				color: var(--accent-2);
+			}
+			.step {
+				display: flex;
+				align-items: baseline;
+				gap: 12px;
+				margin: 32px 0 8px;
+			}
+			.step-num {
+				flex: 0 0 36px;
+				height: 36px;
+				background: var(--surface-2);
+				border: 1px solid var(--border);
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 700;
+				color: var(--accent);
+				font-size: 14px;
+			}
+			.step h3 {
+				margin: 0;
+			}
+			.persona-card {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 12px;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 20px 24px;
+				margin: 24px 0;
+			}
+			.persona-card div {
+				font-size: 14px;
+			}
+			.persona-card strong {
+				color: var(--text);
+				display: block;
+				margin-bottom: 2px;
+			}
+			.persona-card span {
+				color: var(--text-2);
+			}
+			hr {
+				border: 0;
+				border-top: 1px solid var(--border);
+				margin: 48px 0;
+			}
+			ul.bare {
+				list-style: none;
+				padding-left: 0;
+			}
+			ul.bare li {
+				padding: 4px 0;
+				color: var(--text-2);
+			}
+			ul.bare li::before {
+				content: '→ ';
+				color: var(--accent);
+			}
+			code {
+				background: var(--surface-2);
+				padding: 1px 6px;
+				border-radius: 4px;
+				font-size: 14px;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			}
+			.footer {
+				margin-top: 96px;
+				padding-top: 24px;
+				border-top: 1px solid var(--border);
+				font-size: 13px;
+				color: var(--text-3);
+				text-align: center;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="wrap">
+			<h1>Forbetra — UX Walkthrough</h1>
+			<p class="lede">
+				A narrative tour of what every user role experiences across a 12-week cycle, told as a
+				journey. Real screenshots from the live app at every step.
+			</p>
+			<p class="meta">
+				Built 2026-05-31. 53 captured screens. Open as a self-contained HTML file, or share by
+				emailing this directory.
+			</p>
+
+			<div class="toc">
+				<h3>What's in here</h3>
+				<ol>
+					<li><a href="#first-touch">First touch — anyone who lands on app.forbetra.com</a></li>
+					<li><a href="#individual">The Individual journey — your client's 12 weeks</a></li>
+					<li><a href="#coach">The Coach journey — the roster, sessions, analytics</a></li>
+					<li><a href="#stakeholder">The Stakeholder journey — 2 minutes, no signup</a></li>
+					<li><a href="#admin">The Operator (you) — admin & impersonation</a></li>
+					<li><a href="#offstage">Off-stage — what the cron jobs do</a></li>
+					<li><a href="#friction">Friction points worth thinking about</a></li>
+				</ol>
+			</div>
+
+			<h3>Four people, four apps under one URL</h3>
+			<div class="persona-card">
+				<div>
+					<strong>Individual</strong
+					><span
+						>Verb: <em>check in</em>. ~90 seconds, 1–2× per week. The client receiving
+						coaching.</span
+					>
+				</div>
+				<div>
+					<strong>Coach</strong
+					><span
+						>Verb: <em>prepare</em>. 5–15 min, 2–4× per week. Facilitates cycles, reads insights,
+						runs sessions.</span
+					>
+				</div>
+				<div>
+					<strong>Stakeholder</strong
+					><span
+						>Verb: <em>give feedback</em>. 2–4 min, every ~2 weeks. Tokenized link, no
+						account.</span
+					>
+				</div>
+				<div>
+					<strong>Operator (you)</strong
+					><span
+						>Verb: <em>inspect / impersonate</em>. Irregular. Platform observability + debug
+						tooling.</span
+					>
+				</div>
+			</div>
+
+			<hr />
+
+			<h2 id="first-touch">1. First touch — anyone who lands on the URL</h2>
+
+			<p>
+				The landing page is intentionally narrow: it assumes the visitor was either invited by a
+				coach or already knows what Forbetra is. The two CTAs ("Sign in" warm gradient, "Create
+				account" secondary) are the entire pitch.
+			</p>
+
+			<figure>
+				<img src="screenshots/00-landing.png" alt="Forbetra landing page" />
+				<figcaption>
+					The landing page at <code>app.forbetra.com</code>. Brand mark, 3-step value prop (Define →
+					Reflect → Get feedback), bottom-right policy block. No marketing hero, no testimonials —
+					this is for an invited audience.
+				</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> If/when you start organic marketing, this page needs a "what is
+				this?" hero. For coach-invited users it's fine as-is.
+			</div>
+
+			<h3>Sign in / sign up</h3>
+
+			<p>
+				Both are hosted by Clerk. The current sign-in form supports Google + LinkedIn SSO +
+				email/password. Sign-up adds a Username field (per the improvement plan, that should
+				probably be killed — uncommon for coaching apps).
+			</p>
+
+			<figure>
+				<img src="screenshots/01-sign-in.png" alt="Sign in form" />
+				<figcaption>
+					Clerk-hosted sign-in. The "Development mode" badge is dev-only; prod hides it. Worth
+					considering whether to customize the Clerk component for better brand cohesion — the white
+					card on a dark Forbetra background feels stitched-together.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/02-sign-up.png" alt="Sign up form" />
+				<figcaption>
+					Sign-up. Username is currently required (5 fields total). Most modern SaaS skips username.
+				</figcaption>
+			</figure>
+
+			<h3>The legal surface — usually invisible</h3>
+
+			<p>
+				Privacy, SMS Terms, SMS Consent, and Terms of Service. These pages exist primarily to
+				satisfy compliance requirements (especially the A2P 10DLC campaign for SMS), not as primary
+				user destinations. But the SMS Consent page in particular is a high-leverage compliance
+				surface — if it goes down, SMS breaks.
+			</p>
+
+			<figure>
+				<img src="screenshots/05-sms-consent.png" alt="SMS Consent page" />
+				<figcaption>
+					The dedicated SMS Consent page. TCR reviewers verify this exists and contains the
+					disclosure block. Don't accidentally break this URL.
+				</figcaption>
+			</figure>
+
+			<hr />
+
+			<h2 id="individual">2. The Individual journey — your client's 12 weeks</h2>
+
+			<p>
+				This is the single most important persona to design well. They visit ~1–2× per week for 12
+				weeks. The UX that gets them through week 1 determines whether they reach week 12.
+			</p>
+
+			<div class="step">
+				<div class="step-num">1</div>
+				<h3>Day 0 — Sign up, then land in onboarding</h3>
+			</div>
+
+			<p>
+				A new user is either coach-invited (in which case onboarding is
+				<strong>pre-populated</strong> with the coach's inputs) or self-driven. Either way, they hit
+				a 5-step wizard.
+			</p>
+
+			<figure>
+				<img src="screenshots/20-onboarding-step1.png" alt="Onboarding step 1" />
+				<figcaption>
+					Onboarding entry. The wizard walks: account essentials → objective → subgoals → cycle
+					config → invite stakeholders → initial ratings → complete. ~5 minutes if everything works,
+					longer if the user pauses.
+				</figcaption>
+			</figure>
+
+			<div class="callout">
+				<strong>Highest-stakes step:</strong> the stakeholder invitation step (asks for up to 10
+				names + emails before the user has seen any value). This is the single biggest drop-off risk
+				in onboarding. Worth experimenting with deferring it post-first-check-in, or lowering the
+				asking bar to 1–2 reviewers.
+			</div>
+
+			<div class="step">
+				<div class="step-num">2</div>
+				<h3>Day 1 — The Hub appears</h3>
+			</div>
+
+			<p>
+				After onboarding completes, the user lands on <code>/individual</code> — the hub. This is
+				the most-visited screen in the entire app. It renders one of four states depending on the
+				user's situation: <code>welcome</code>, <code>caught-up</code>, <code>cycle-complete</code>,
+				or <code>default</code> (pending check-in available).
+			</p>
+
+			<figure>
+				<img
+					src="screenshots/60-individual-hub-rich.png"
+					alt="Individual hub showing a week's check-in module inline"
+				/>
+				<figcaption>
+					The hub for a user mid-cycle. Inline check-in module: score effort + performance directly
+					here, no separate "click into check-in" flow. The sidebar shows Today / Progress /
+					Feedback as the three main views. Sample shown is for Alex Rivera, a seeded persona with
+					rich data.
+				</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> Below the check-in module, the hub has a lot of vertical
+				whitespace. Could it surface "since your last check-in: X" or "this week's pattern is…" in a
+				glanceable way?
+			</div>
+
+			<div class="step">
+				<div class="step-num">3</div>
+				<h3>Week 2 — Insights and Feedback begin to fill</h3>
+			</div>
+
+			<p>
+				The Insights and Feedback menu items exist from day 1, but they don't have meaningful
+				content until a user has 1–2 weeks of data + stakeholder responses.
+				<strong>Until very recently, those pages rendered as visually empty</strong> — a first-week
+				user clicked the menu item and thought the app was broken. The improvement plan shipped
+				explicit empty-state messaging for both:
+			</p>
+
+			<figure>
+				<img src="screenshots/64-individual-insights-rich.png" alt="Insights page with AI report" />
+				<figcaption>
+					The Insights page (week 22 of Alex Rivera's data). At the top, an AI-generated Performance
+					Report. Below, Correlation View and Gap Lens analyses. New empty-state copy: "Your first
+					AI insight will arrive after 2 weeks of check-ins."
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img
+					src="screenshots/63-individual-feedback-rich.png"
+					alt="Feedback page showing reviewer responses"
+				/>
+				<figcaption>
+					The Feedback page. Self vs. reviewer comparison. New empty-state copy: "Your reviewers
+					haven't responded yet — Mon-Fri 3pm reminders, feedback appears as it arrives."
+				</figcaption>
+			</figure>
+
+			<div class="step">
+				<div class="step-num">4</div>
+				<h3>Week 6 — The Scorecard becomes the most valuable view</h3>
+			</div>
+
+			<p>
+				Once enough stakeholder data exists, the Scorecard view (the
+				<em>blind-spot delta</em> between self-rating and reviewer-rating) becomes arguably more
+				valuable than Today's check-in module.
+				<strong
+					>This is the page that most differentiates Forbetra from any single-perspective reflection
+					tool.</strong
+				>
+			</p>
+
+			<figure>
+				<img
+					src="screenshots/62-individual-scorecard-rich.png"
+					alt="Scorecard self-vs-stakeholder comparison"
+				/>
+				<figcaption>
+					The Scorecard. Per-subgoal: your self-rating, average reviewer rating, gap with color
+					coding (green ≤1, amber 1–2, red >2). The "blind spot" view.
+				</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> Should the Scorecard become the <em>default</em> hub tab once a
+				user has 4+ weeks of feedback? Today is always default right now. By week 6+ the user's
+				primary motivation has shifted from "let me check in" to "what are people seeing that I'm
+				missing?"
+			</div>
+
+			<div class="step">
+				<div class="step-num">5</div>
+				<h3>Throughout — Progress and Ask</h3>
+			</div>
+
+			<p>The Progress view is the time-series of effort and performance over the current cycle.</p>
+
+			<figure>
+				<img src="screenshots/61-individual-progress-rich.png" alt="Progress chart" />
+				<figcaption>
+					Progress view. Effort and performance trend lines. Best at-a-glance "am I getting better?"
+					view, but only for the current cycle — not yet a "compare to prior cycle" overlay.
+				</figcaption>
+			</figure>
+
+			<p>
+				The Ask view is the AI-powered chat against the user's own data. Suggested prompts cover the
+				common questions; the user can also type freely.
+			</p>
+
+			<figure>
+				<img src="screenshots/68-individual-ask-rich.png" alt="Ask conversational interface" />
+				<figcaption>
+					"Ask About Your Data" — Anthropic Claude-powered chat with access to the user's reflection
+					+ feedback history. Already has good empty state with 4 suggested prompts.
+				</figcaption>
+			</figure>
+
+			<div class="step">
+				<div class="step-num">6</div>
+				<h3>Long-tail — Stakeholders, History, Journey</h3>
+			</div>
+
+			<p>
+				Less-visited but high-stakes routes. Stakeholders: manage the up-to-10 reviewer list.
+				History: chronological scrapbook of past weeks. Journey: cycle-by-cycle archive.
+			</p>
+
+			<figure>
+				<img src="screenshots/65-individual-stakeholders-rich.png" alt="Stakeholder management" />
+				<figcaption>Stakeholder management. Add, edit, archive, re-invite.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/66-individual-history-rich.png" alt="Reflection history" />
+				<figcaption>Reflection history — the chronological scrapbook.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/67-individual-journey-rich.png" alt="Journey cycle archive" />
+				<figcaption>Journey — past cycles archived, each self-contained.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/69-individual-journey-detail.png" alt="Cycle detail page" />
+				<figcaption>Drilling into one past cycle. Objective, dates, summary metrics.</figcaption>
+			</figure>
+
+			<div class="step">
+				<div class="step-num">7</div>
+				<h3>Week 12 — Cycle complete</h3>
+			</div>
+
+			<p>
+				End-of-cycle currently is a quiet UI state change — the hub shifts to a "cycle complete"
+				mode and offers a new cycle. For a user who just completed 12 weeks of self-reflection, this
+				is underwhelming.
+			</p>
+
+			<figure>
+				<img src="screenshots/19-individual-new-cycle.png" alt="Start new cycle flow" />
+				<figcaption>
+					The "Start new cycle" flow. Re-uses onboarding components, prior cycle's objective as
+					default.
+				</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> What should the end-of-cycle moment feel like? A celebration
+				page that shows scorecard delta + effort trend + top insight + share-with-coach option would
+				convert a quiet transition into a meaningful moment.
+			</div>
+
+			<h3>Settings</h3>
+
+			<figure>
+				<img src="screenshots/22-individual-settings.png" alt="Individual settings" />
+				<figcaption>
+					Notification delivery (Email / SMS / Both), phone number, profile, account deletion.
+				</figcaption>
+			</figure>
+
+			<hr />
+
+			<h2 id="coach">3. The Coach journey — roster, sessions, analytics</h2>
+
+			<p>
+				Coaches are higher-intent than individuals — they're using the app as their professional
+				tool. They visit 2–4× per week for 5–15 minutes per session. The most important screen is
+				the Session View (the per-client deep dive).
+			</p>
+
+			<div class="step">
+				<div class="step-num">1</div>
+				<h3>Default landing — the Roster</h3>
+			</div>
+
+			<figure>
+				<img src="screenshots/50-coach-roster.png" alt="Coach roster" />
+				<figcaption>
+					The coach's home screen. Lists active clients. Sort by alerts (default), name, or recent
+					activity. Filter by archived state. Search.
+				</figcaption>
+			</figure>
+
+			<div class="callout">
+				<strong>Why "sort by alerts" is the right default:</strong> a coach with 10+ clients can't
+				check on each one weekly. The alert sort surfaces who needs attention first — stalled
+				check-ins, missed weeks, big perception gaps.
+			</div>
+
+			<div class="step">
+				<div class="step-num">2</div>
+				<h3>Inviting a new client — the prefilled flow</h3>
+			</div>
+
+			<p>
+				The coach pre-fills the objective, subgoals, stakeholders, and cycle config. The client
+				signs up via the token link and sees the onboarding wizard pre-populated with the coach's
+				inputs. They just review and confirm.
+			</p>
+
+			<figure>
+				<img src="screenshots/53-coach-invite-new.png" alt="Coach invite new client" />
+				<figcaption>
+					Send a new invite. Coach fills the structural parts of the client's first cycle; client
+					lands in a confirm-don't-create state.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/52-coach-invitations.png" alt="Coach invitations list" />
+				<figcaption>Invitations dashboard — pending, accepted, cancelled.</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> Could a coach save their default objective/subgoal structure as
+				a template? Coaches with a methodology probably repeat the same scaffolding across clients.
+			</div>
+
+			<div class="step">
+				<div class="step-num">3</div>
+				<h3>Session View — the cockpit</h3>
+			</div>
+
+			<p>
+				The most information-dense screen in the app. Client profile, current objective, subgoals,
+				recent reflections, scores, trend lines, stakeholder feedback summary, AI-generated coach
+				prep, notes (coach-only).
+			</p>
+
+			<figure>
+				<img src="screenshots/55-coach-session-view.png" alt="Coach session view" />
+				<figcaption>
+					Session view. This is where a coach spends most of their time. The information density is
+					real — for a first-time coach it can feel overwhelming.
+				</figcaption>
+			</figure>
+
+			<div class="question">
+				<strong>Q for you:</strong> A first-time-coach progressive-disclosure tour ("here's the
+				recent activity, here's the AI prep, here's the notes area, dismiss") could reduce overwhelm
+				without dumbing down the page for veterans.
+			</div>
+
+			<div class="step">
+				<div class="step-num">4</div>
+				<h3>Analytics — zoom out across the roster</h3>
+			</div>
+
+			<figure>
+				<img src="screenshots/51-coach-analytics.png" alt="Coach analytics" />
+				<figcaption>
+					Coach analytics. Portfolio view: outcomes across all clients, time-series, comparative
+					trends. Different mental mode from Session View (zoom out vs. zoom in).
+				</figcaption>
+			</figure>
+
+			<hr />
+
+			<h2 id="stakeholder">4. The Stakeholder journey — 2 minutes, no signup</h2>
+
+			<p>
+				This is the only surface for a stakeholder. There's no account, no app history, no return
+				visit.
+				<strong>It has to land perfectly because there's no second chance.</strong> Mobile-first
+				absolutely required — stakeholders are giving feedback between meetings.
+			</p>
+
+			<div class="step">
+				<div class="step-num">1</div>
+				<h3>The email arrives</h3>
+			</div>
+
+			<p>
+				Stakeholders get an email every ~2 weeks (Mon-Fri 3pm cron) when the individual completes a
+				check-in. The email contains a tokenized link.
+			</p>
+
+			<div class="step">
+				<div class="step-num">2</div>
+				<h3>The feedback form</h3>
+			</div>
+
+			<figure>
+				<img src="screenshots/70-stakeholder-feedback-form.png" alt="Stakeholder feedback form" />
+				<figcaption>
+					Per subgoal: effort score + performance score, optional comment. Submit. Done.
+				</figcaption>
+			</figure>
+
+			<div class="callout">
+				<strong>The Reveal mechanic:</strong> by default, stakeholders see the individual's
+				self-scores ("Reveal scores"). Individuals can opt-out, in which case stakeholders score
+				blind. This is a deliberate trust feature — the individual controls how vulnerable they are.
+			</div>
+
+			<div class="step">
+				<div class="step-num">3</div>
+				<h3>Invalid / expired token — the new recovery flow</h3>
+			</div>
+
+			<p>
+				Previously, an expired or already-used link landed on a dead-end page that just said "ask
+				the person who invited you for a new link." Now there's a recovery flow:
+			</p>
+
+			<figure>
+				<img src="screenshots/07-stakeholder-invalid.png" alt="Invalid link page" />
+				<figcaption>
+					The invalid link page now offers a "Request a new link" form. Email (required) + name
+					(optional). Submit notifies the linked individual via email; rate-limited, generic success
+					response (no enumeration).
+				</figcaption>
+			</figure>
+
+			<hr />
+
+			<h2 id="admin">5. The Operator (you) — admin & impersonation</h2>
+
+			<p>
+				This is your debugging and observability surface. Not customer-facing; UX bar is lower. The
+				single most useful capability is impersonation — become any user, experience the app as
+				them.
+			</p>
+
+			<figure>
+				<img src="screenshots/30-admin-dashboard.png" alt="Admin dashboard" />
+				<figcaption>
+					Admin dashboard. User stats (total / by role), recent reflections, system health.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/32-admin-preview.png" alt="Admin preview/impersonate" />
+				<figcaption>
+					<strong>The killer admin tool:</strong> pick any user → become them. Sets
+					<code>forbetra_impersonate</code> cookie. Lets you experience the app as that user. This
+					is how you should debug every user issue.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/31-admin-users.png" alt="Admin users list" />
+				<figcaption>Users list. Click into a user for details.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/34-admin-insights.png" alt="Admin insights" />
+				<figcaption>
+					System-wide insight stream — every AI-generated insight across all users.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/35-admin-objectives.png" alt="Admin objectives" />
+				<figcaption>All objectives across all individuals.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/36-admin-organizations.png" alt="Admin organizations" />
+				<figcaption>
+					Multi-org admin — foundation for enterprise readiness, not customer-visible yet.
+				</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/33-admin-coaches.png" alt="Admin coaches" />
+				<figcaption>Coach-specific management.</figcaption>
+			</figure>
+
+			<figure>
+				<img src="screenshots/37-admin-stakeholders.png" alt="Admin stakeholders" />
+				<figcaption>Cross-individual stakeholder view.</figcaption>
+			</figure>
+
+			<hr />
+
+			<h2 id="offstage">6. Off-stage — what the cron jobs do</h2>
+
+			<p>
+				The user's experience also includes what arrives in their inbox / on their phone. Seven
+				scheduled jobs (defined in <code>vercel.json</code>) do most of the "I haven't been to the
+				app today" work:
+			</p>
+
+			<ul class="bare">
+				<li><code>remind-base</code> — Mon-Fri 9am. Weekly check-in reminders to individuals.</li>
+				<li>
+					<code>remind-prompts</code> — Mon-Fri 2pm. Overdue check-in nudges (potentially double-tap
+					with 9am — fatigue risk worth watching).
+				</li>
+				<li>
+					<code>remind-feedback</code> — Mon-Fri 3pm. "Time to give feedback" to stakeholders.
+				</li>
+				<li><code>generate-insights</code> — Sun 8pm. Weekly AI insight generation.</li>
+				<li><code>coach-prep</code> — Mon 7am. "Your week's coach prep is ready" to coaches.</li>
+				<li><code>complete-cycles</code> — Daily 1am. End-of-cycle state transitions.</li>
+				<li>
+					<code>stakeholder-impact</code> — 1st of month 10am. "Here's the impact your feedback had"
+					monthly summary to stakeholders.
+				</li>
+			</ul>
+
+			<div class="question">
+				<strong>Q for you:</strong> The stakeholder-impact monthly summary is a
+				relationship-builder. Could there be a similar monthly summary for the Individual — "here's
+				what you accomplished this month"? It would tie the cycle together without waiting for the
+				12-week complete.
+			</div>
+
+			<hr />
+
+			<h2 id="friction">7. Friction points worth thinking about — ranked by leverage</h2>
+
+			<p>
+				Pulled from the journey above. Ordered roughly by impact on first-cycle completion (a
+				leading indicator of long-term engagement).
+			</p>
+
+			<ol>
+				<li>
+					<strong>Empty-state copy on Insights/Feedback/Ask (week 1).</strong> Just shipped, but
+					worth A/B testing the wording.
+				</li>
+				<li>
+					<strong>Scorecard as default tab once data exists (~week 4–6).</strong> Right now Today is
+					always default; once 4+ weeks of feedback exist, Scorecard is arguably more valuable to
+					land on.
+				</li>
+				<li>
+					<strong>Stakeholder invitation deferral in onboarding.</strong> Asking for 10 names +
+					emails before showing value is the biggest drop-off risk. Lower the bar to 1–2 and offer
+					post-first-checkin add-more.
+				</li>
+				<li>
+					<strong>Cycle transition celebration moment (week 12).</strong> Quiet state change →
+					underwhelming. A summary moment + share-with-coach option could be a real high.
+				</li>
+				<li>
+					<strong>Suggested subgoals in onboarding step 3.</strong> Cold-start is hard. Once the
+					user types an objective in step 2, have Claude suggest 3 subgoals. Big cognitive-load
+					reducer.
+				</li>
+				<li>
+					<strong>First-time Coach session-view tour.</strong> Most info-dense screen in the app. A
+					3-step overlay-then-dismiss could reduce overwhelm.
+				</li>
+				<li>
+					<strong>Reminder cadence + fatigue.</strong> Mon-Fri 9am + 2pm could double-tap.
+					Activity-aware scheduling: if checked in within last 2 days, skip the next nudge.
+				</li>
+				<li>
+					<strong>Coach invite templates.</strong> Coaches with a methodology repeat subgoals across
+					clients. "Save as template" → reuse.
+				</li>
+				<li>
+					<strong>Mid-cycle objective edit.</strong> What if a user realizes their objective is
+					wrong 3 weeks in? Currently no clear "start over" path mid-cycle.
+				</li>
+				<li>
+					<strong>Reveal toggle discoverability.</strong> The opt-in/opt-out Reveal is a real trust
+					feature. Make discovery deliberate.
+				</li>
+			</ol>
+
+			<div class="footer">
+				Forbetra UX Walkthrough — 53 screens captured 2026-05-30 via authenticated local dev
+				session, organized as a journey 2026-05-31.<br />
+				<a href="architecture.md">architecture.md</a> is the route-by-route inventory if you prefer
+				that view.
+			</div>
+		</div>
+	</body>
+</html>
