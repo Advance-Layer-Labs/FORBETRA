@@ -323,7 +323,12 @@ export const load: PageServerLoad = async (event) => {
 			// ambient nudge once the user has enough feedback for the gap to be
 			// statistically meaningful. 4 entries ≈ 2 weeks × 2 reviewers (or
 			// 1 week × 4) — empirically the threshold where the gap stops being noise.
-			scorecardReady: feedbacks.length >= 4
+			scorecardReady: feedbacks.length >= 4,
+			// Add-more-reviewers nudge: persistent banner until user reaches ≥3
+			// reviewers, but only AFTER first check-in (so the immediate
+			// post-onboarding hub isn't already crowded). Onboarding now allows
+			// 0 reviewers; this banner is how we recover from that.
+			needsMoreReviewers: objective.stakeholders.length < 3 && reflections.length >= 1
 		},
 		// Inline check-in data
 		identityAnchor,
