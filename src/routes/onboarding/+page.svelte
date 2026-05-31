@@ -562,10 +562,10 @@
 					<div class="animate-in fade-in slide-in-from-right-4 space-y-6 duration-300">
 						<div class="rounded-2xl border border-border-default bg-surface-raised p-8">
 							<div class="mb-6 space-y-2">
-								<h2 class="text-3xl font-bold text-text-primary">Add your reviewers</h2>
+								<h2 class="text-3xl font-bold text-text-primary">Add a reviewer</h2>
 								<p class="text-text-secondary">
-									Add people who regularly see you in action. We recommend 3–10 reviewers for
-									meaningful feedback. You can always add more later.
+									Even one reviewer is enough to start — someone who sees you in action regularly.
+									You can add more later from your Feedback page.
 								</p>
 								<p class="text-xs text-text-muted">
 									Each reviewer receives a simple email with a link to rate your effort and
@@ -705,12 +705,13 @@
 								{/if}
 
 								<div
-									class="rounded-xl border border-accent/30 bg-accent-muted p-4 text-sm text-text-secondary"
+									class="rounded-xl border border-border-default bg-surface-subtle p-4 text-sm text-text-secondary"
 								>
-									<p class="font-medium text-accent">This step is optional</p>
-									<p class="mt-1">
-										You can skip this and add reviewers later from your Feedback page. Reviewers you
-										add here will receive a welcome email when you complete setup.
+									<p class="font-medium text-text-primary">No reviewers? You can finish anyway.</p>
+									<p class="mt-1 text-xs">
+										Leave the form blank and click <span class="font-medium">Complete setup</span>
+										to skip this step. You'll add reviewers later from your Feedback page — your hub will
+										remind you.
 									</p>
 								</div>
 							</div>

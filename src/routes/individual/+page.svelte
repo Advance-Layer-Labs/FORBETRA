@@ -213,7 +213,8 @@
 				</div>
 			{/if}
 
-			<!-- New feedback notification (one-shot — overrides ambient scorecard nudge below) -->
+			<!-- One ambient nudge at a time, in priority order: new feedback >
+			     scorecard ready > need more reviewers. -->
 			{#if data.hasNewFeedback}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
@@ -229,8 +230,6 @@
 				</a>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{:else if data.signals?.scorecardReady}
-				<!-- Ambient nudge: pull the user toward the blind-spot view once there's
-				     enough data for it to be meaningful. -->
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
 					href="/individual/feedback"
@@ -240,6 +239,21 @@
 						Your blind-spot view is ready — see how your self-rating compares to your reviewers'.
 						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
 							>Open scorecard</span
+						>
+					</p>
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+			{:else if data.signals?.needsMoreReviewers}
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					href="/individual/stakeholders"
+					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
+				>
+					<p class="text-[13px] text-text-secondary">
+						Add another reviewer to sharpen your blind-spot data. 2–3 perspectives is the sweet
+						spot.
+						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
+							>Manage reviewers</span
 						>
 					</p>
 				</a>
