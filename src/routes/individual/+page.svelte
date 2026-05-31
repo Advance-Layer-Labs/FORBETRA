@@ -91,6 +91,21 @@
 	{:else}
 		<!-- ═══ Active journey — Today screen ═══ -->
 		<div class="pt-10">
+			<!-- First-cycle orientation banner: decays after Week 2 OR once user
+			     has 4+ reflections (whichever comes first), so seasoned users
+			     never see it again. -->
+			{#if data.maturityStage === 'new' && data.currentWeek !== null && data.currentWeek <= 2}
+				<div
+					class="mb-6 rounded-lg border border-accent/20 bg-accent-muted/30 px-4 py-3 text-[12px] leading-relaxed text-text-secondary"
+				>
+					<p>
+						<span class="font-semibold text-accent">You're early</span> — Insights, Scorecard, and Feedback
+						views fill in once you have ~2 weeks of check-ins and reviewer responses. Just keep showing
+						up here each week.
+					</p>
+				</div>
+			{/if}
+
 			<!-- Identity anchor -->
 			{#if data.identityAnchor}
 				<p class="mb-2 text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
