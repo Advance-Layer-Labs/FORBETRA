@@ -72,14 +72,17 @@ export const load: PageServerLoad = async (event) => {
 			clientCount: u._count.coachClientsManaged
 		})),
 		stakeholders: stakeholders.map((s) => {
-			const hash = s.tokens[0]?.tokenHash ?? null;
+			// Tokens are hashed now (see src/lib/server/tokenHash.ts); the hash is
+			// not a usable URL. Admin should impersonate the stakeholder to test
+			// the feedback flow rather than reconstructing a URL.
+			const hasActiveToken = s.tokens.length > 0;
 			return {
 				id: s.id,
 				name: s.name,
 				email: s.email,
 				relationship: s.relationship,
 				individualName: s.individual.name ?? s.individual.email,
-				feedbackUrl: hash ? `/stakeholder/feedback/${hash}` : null
+				hasActiveToken
 			};
 		})
 	};

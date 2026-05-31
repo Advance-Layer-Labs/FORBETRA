@@ -93,15 +93,15 @@
 
 	const stakeholderFlows = $derived<FlowCard[]>([
 		{
-			label: 'Feedback Form',
-			description: 'Rate effort and performance for an individual',
+			label: 'Feedback Form (impersonate)',
+			description:
+				'Impersonate this stakeholder and preview the feedback form. Tokens are hashed at rest so direct-URL preview is not available.',
 			action: () => {
-				const url = selectedStakeholder?.feedbackUrl;
-				if (url) {
-					window.open(url, '_blank');
+				if (selectedStakeholder?.id) {
+					impersonateAndOpen(selectedStakeholder.id, '/stakeholder/feedback');
 				}
 			},
-			disabled: !selectedStakeholder?.feedbackUrl,
+			disabled: !selectedStakeholder?.hasActiveToken,
 			disabledReason: "No active feedback token — generate one from the individual's journey first"
 		},
 		{
@@ -249,7 +249,7 @@
 				</label>
 				{#if selectedStakeholder}
 					<div class="text-xs">
-						{#if selectedStakeholder.feedbackUrl}
+						{#if selectedStakeholder.hasActiveToken}
 							<span class="rounded bg-success-muted px-2 py-0.5 font-medium text-success">
 								Active token
 							</span>
