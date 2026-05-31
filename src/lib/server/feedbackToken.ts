@@ -5,6 +5,7 @@ import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { FEEDBACK_TOKEN_EXPIRY_DAYS } from '$lib/server/coachUtils';
+import { hashToken } from '$lib/server/tokenHash';
 
 /**
  * Validates stakeholder, checks cadence gating + auto-throttle,
@@ -134,7 +135,7 @@ export async function createFeedbackToken(
 
 	await prisma.token.create({
 		data: {
-			tokenHash: tokenValue,
+			tokenHash: hashToken(tokenValue),
 			type: 'FEEDBACK_INVITE',
 			expiresAt,
 			stakeholderId: stakeholder.id,

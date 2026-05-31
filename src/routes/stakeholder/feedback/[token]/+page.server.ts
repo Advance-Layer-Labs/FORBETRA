@@ -6,12 +6,49 @@ import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { rateLimit } from '$lib/server/rateLimit';
+import { hashToken } from '$lib/server/tokenHash';
+import type { Prisma } from '@prisma/client';
 import type { Actions, PageServerLoad } from './$types';
 
 const sanitizeToken = (value: string | undefined) => {
 	if (!value) return null;
 	return /^[a-f0-9]{64}$/i.test(value) ? value : null;
 };
+
+/**
+ * Lookup a token by URL value. Hashes the URL value first and queries by
+ * the hash; falls back to the raw value to keep already-emailed pre-hashing
+ * links working during the rollout window (PR-1 of 3). The fallback path
+ * becomes dead code after PR-2 backfills all rows and is removed in PR-3.
+ */
+async function findTokenByUrlValue<T extends Prisma.TokenInclude>(tokenParam: string, include: T) {
+	const hashed = hashToken(tokenParam);
+	const byHash = await prisma.token.findUnique({
+		where: { tokenHash: hashed },
+		include
+	});
+	if (byHash) return byHash;
+	return prisma.token.findUnique({
+		where: { tokenHash: tokenParam },
+		include
+	});
+}
+
+async function findTokenByUrlValueSelect<T extends Prisma.TokenSelect>(
+	tokenParam: string,
+	select: T
+) {
+	const hashed = hashToken(tokenParam);
+	const byHash = await prisma.token.findUnique({
+		where: { tokenHash: hashed },
+		select
+	});
+	if (byHash) return byHash;
+	return prisma.token.findUnique({
+		where: { tokenHash: tokenParam },
+		select
+	});
+}
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const isPreview = url.searchParams.get('preview') === 'true';
@@ -62,38 +99,35 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		throw redirect(302, '/stakeholder/invalid');
 	}
 
-	const token = await prisma.token.findUnique({
-		where: { tokenHash: tokenParam },
-		include: {
-			stakeholder: true,
-			reflection: {
-				select: {
-					id: true,
-					reflectionType: true,
-					weekNumber: true,
-					checkInDate: true,
-					cycleId: true,
-					cycle: {
-						select: {
-							label: true,
-							revealScores: true,
-							objective: {
-								select: {
-									title: true,
-									description: true,
-									subgoals: {
-										where: { active: true },
-										orderBy: { createdAt: 'asc' },
-										select: { id: true, label: true, description: true }
-									}
+	const token = await findTokenByUrlValue(tokenParam, {
+		stakeholder: true,
+		reflection: {
+			select: {
+				id: true,
+				reflectionType: true,
+				weekNumber: true,
+				checkInDate: true,
+				cycleId: true,
+				cycle: {
+					select: {
+						label: true,
+						revealScores: true,
+						objective: {
+							select: {
+								title: true,
+								description: true,
+								subgoals: {
+									where: { active: true },
+									orderBy: { createdAt: 'asc' },
+									select: { id: true, label: true, description: true }
 								}
 							}
 						}
-					},
-					user: {
-						select: {
-							name: true
-						}
+					}
+				},
+				user: {
+					select: {
+						name: true
 					}
 				}
 			}
@@ -194,7 +228,9 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	}));
 
 	return {
-		token: token.tokenHash,
+		// Pass the URL value (plaintext) through, not the stored hash. The action
+		// handler re-hashes it on submit to look up the token.
+		token: tokenParam,
 		stakeholder: {
 			id: token.stakeholder.id,
 			name: token.stakeholder.name,
@@ -255,15 +291,12 @@ export const actions: Actions = {
 
 		const data = parsed.data;
 
-		const token = await prisma.token.findUnique({
-			where: { tokenHash: data.token },
-			select: {
-				id: true,
-				usedAt: true,
-				expiresAt: true,
-				stakeholderId: true,
-				reflectionId: true
-			}
+		const token = await findTokenByUrlValueSelect(data.token, {
+			id: true,
+			usedAt: true,
+			expiresAt: true,
+			stakeholderId: true,
+			reflectionId: true
 		});
 
 		if (!token || token.usedAt || !token.reflectionId || !token.stakeholderId) {
