@@ -51,6 +51,63 @@
 	// Measure state (up to 3 ways to define/measure the objective)
 	let measureForms: string[] = $state(['']);
 
+	// Suggested-subgoals state (Item #2 of the 9/10 plan): when the user blurs
+	// the objective field with a substantive value, ask Claude for 3 candidate
+	// subgoals to lower cold-start cognitive load. Chips appear above the
+	// measure inputs; clicking a chip drops it into the first empty slot.
+	let suggestedSubgoals: string[] = $state([]);
+	let suggestionStatus: 'idle' | 'loading' | 'ready' | 'error' = $state('idle');
+	let lastSuggestionInput: string = $state('');
+
+	async function fetchSubgoalSuggestions() {
+		const objective = objectiveTitle.trim();
+		// Skip if too short, already requested for this exact text, or any
+		// measure input already has user content (don't overwrite their work).
+		if (objective.length < 20) return;
+		if (objective === lastSuggestionInput) return;
+		if (measureForms.some((m) => m.trim().length > 0)) return;
+		lastSuggestionInput = objective;
+		suggestionStatus = 'loading';
+		try {
+			const res = await fetch('/api/onboarding/suggest-subgoals', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ objective })
+			});
+			if (!res.ok) {
+				suggestionStatus = 'error';
+				return;
+			}
+			const json = await res.json();
+			const list = Array.isArray(json.subgoals)
+				? json.subgoals.filter((s: unknown) => typeof s === 'string')
+				: [];
+			suggestedSubgoals = list.slice(0, 3);
+			suggestionStatus = suggestedSubgoals.length > 0 ? 'ready' : 'idle';
+		} catch {
+			suggestionStatus = 'error';
+		}
+	}
+
+	function acceptSubgoalSuggestion(text: string) {
+		// Place into the first empty measure slot, or replace the only slot
+		// if just one and it's empty. If all 3 are filled already, do nothing.
+		const emptyIdx = measureForms.findIndex((m) => m.trim().length === 0);
+		if (emptyIdx === -1) {
+			if (measureForms.length < 3) {
+				measureForms = [...measureForms, text];
+			}
+		} else {
+			measureForms[emptyIdx] = text;
+		}
+		// Auto-add the next empty slot if available so the user can keep picking.
+		if (measureForms.length < 3 && measureForms.every((m) => m.trim().length > 0)) {
+			measureForms = [...measureForms, ''];
+		}
+		// Remove the accepted suggestion from the chip list.
+		suggestedSubgoals = suggestedSubgoals.filter((s) => s !== text);
+	}
+
 	// Template state
 	let selectedContextId: string | null = $state(null);
 	let selectedContext: OnboardingContext | null = $derived(
@@ -331,7 +388,10 @@
 											objectiveTitle = event.currentTarget.value;
 											if (getClientError('objectiveTitle')) validateField('objectiveTitle');
 										}}
-										onblur={() => validateField('objectiveTitle')}
+										onblur={() => {
+											validateField('objectiveTitle');
+											fetchSubgoalSuggestions();
+										}}
 									/>
 									{#if getClientError('objectiveTitle')}
 										<p class="text-sm text-error">{getClientError('objectiveTitle')}</p>
@@ -369,6 +429,33 @@
 									<p class="text-xs text-text-muted">
 										Define observable behaviors or outcomes that would signal you're on track.
 									</p>
+									<!-- Suggested-subgoals chips (AI-generated from objective text) -->
+									{#if suggestionStatus === 'loading'}
+										<p class="flex items-center gap-1.5 text-xs text-text-muted">
+											<span
+												class="h-1.5 w-1.5 animate-pulse rounded-full bg-accent"
+												aria-hidden="true"
+											></span>
+											Suggesting measures based on your goal…
+										</p>
+									{:else if suggestedSubgoals.length > 0}
+										<div class="space-y-1.5 pb-1">
+											<p class="text-xs text-text-muted">
+												Tap a suggestion to add it, or write your own below.
+											</p>
+											<div class="flex flex-wrap gap-1.5">
+												{#each suggestedSubgoals as suggestion (suggestion)}
+													<button
+														type="button"
+														onclick={() => acceptSubgoalSuggestion(suggestion)}
+														class="rounded-full border border-accent/30 bg-accent-muted px-3 py-1 text-xs text-accent transition-all hover:border-accent hover:bg-accent-muted/80"
+													>
+														+ {suggestion}
+													</button>
+												{/each}
+											</div>
+										</div>
+									{/if}
 									{#each measureForms as measure, mIndex (mIndex)}
 										<div class="flex items-center gap-2">
 											<span class="w-5 text-right font-mono text-xs text-text-muted"

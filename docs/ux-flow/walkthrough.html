@@ -376,23 +376,28 @@
 			<p>
 				A new user is either coach-invited (in which case onboarding is
 				<strong>pre-populated</strong> with the coach's inputs) or self-driven. Either way, they hit
-				a 5-step wizard.
+				a 2-step wizard: <em>Set your goal</em> then <em>Add reviewers</em>.
 			</p>
 
 			<figure>
 				<img src="screenshots/20-onboarding-step1.png" alt="Onboarding step 1" />
 				<figcaption>
-					Onboarding entry. The wizard walks: account essentials → objective → subgoals → cycle
-					config → invite stakeholders → initial ratings → complete. ~5 minutes if everything works,
-					longer if the user pauses.
+					Onboarding entry. Step 1 — set the objective + (up to 3) measures of progress. After the
+					user blurs the objective field with a substantive answer, Claude auto-suggests 3
+					measurable subgoals as dismissable chips above the measure inputs. Tap a chip to drop it
+					into the next empty measure slot, then keep typing your own or accept more. Step 2 adds
+					reviewers (now zero-required — recommend 1 to start; hub will nudge for more
+					post-first-checkin).
 				</figcaption>
 			</figure>
 
 			<div class="callout">
-				<strong>Highest-stakes step:</strong> the stakeholder invitation step (asks for up to 10
-				names + emails before the user has seen any value). This is the single biggest drop-off risk
-				in onboarding. Worth experimenting with deferring it post-first-check-in, or lowering the
-				asking bar to 1–2 reviewers.
+				<strong>Lowered activation cost (shipped 2026-05-31):</strong> onboarding used to ask for up
+				to 10 reviewers before the user had seen any value. Now the bar is one reviewer
+				(recommended, not required), and Claude pre-suggests subgoals from the user's objective text
+				so the cold-start cognitive load drops. Users who finish onboarding with few reviewers see a
+				persistent hub nudge to add more — but only after they've completed their first check-in, so
+				the immediate post-onboarding moment stays clean.
 			</div>
 
 			<div class="step">
