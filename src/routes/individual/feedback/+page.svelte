@@ -87,6 +87,23 @@
 				? ` — Week ${data.currentWeek}`
 				: ''}.
 		</p>
+		<!-- Reveal status badge — clarifies the asymmetric-trust feature -->
+		<!-- eslint-disable svelte/no-navigation-without-resolve -->
+		<a
+			href="/individual/settings"
+			class="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors {data.revealScores
+				? 'border-success/30 bg-success-muted text-success hover:border-success/50'
+				: 'border-border-default bg-surface-raised text-text-secondary hover:border-border-strong'}"
+		>
+			<span class="h-1.5 w-1.5 rounded-full {data.revealScores ? 'bg-success' : 'bg-text-muted'}"
+			></span>
+			Reveal: {data.revealScores ? 'On' : 'Off'}
+			<span class="text-text-muted">·</span>
+			<span class="text-text-tertiary">
+				{data.revealScores ? 'Reviewers see your self-scores' : 'Reviewers score blind'}
+			</span>
+		</a>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	</div>
 
 	<!-- Toast messages -->

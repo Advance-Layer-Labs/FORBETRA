@@ -278,7 +278,7 @@
 				<!-- Smart defaults as hidden inputs -->
 				<input type="hidden" name="checkInFrequency" value="mon,wed,fri" />
 				<input type="hidden" name="stakeholderCadence" value="weekly" />
-				<input type="hidden" name="revealScores" value="true" />
+				<input type="hidden" name="revealScores" value="false" />
 				<input type="hidden" name="sendStakeholderIntro" value="true" />
 				<input type="hidden" name="cycleStartDate" value={data.defaults.startDate} />
 				<input type="hidden" name="cycleDurationWeeks" value="12" />

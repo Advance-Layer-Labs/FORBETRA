@@ -134,7 +134,7 @@ model Cycle {
   stakeholderCadence       String      @default("weekly")
   stakeholderFeedbackTime  String?     // e.g. '09:00', '17:00'
   autoThrottle             Boolean     @default(true)
-  revealScores        Boolean     @default(true)
+  revealScores        Boolean     @default(false)
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
