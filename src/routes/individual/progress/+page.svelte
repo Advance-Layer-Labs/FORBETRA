@@ -231,6 +231,8 @@
 				individualData={data.visualizationData.individual}
 				stakeholderData={data.visualizationData.stakeholders}
 				stakeholders={data.visualizationData.stakeholderList}
+				priorIndividualData={data.visualizationData.priorIndividual}
+				priorCycleLabel={data.visualizationData.priorCycleLabel}
 			/>
 		{:else}
 			<div class="py-8 text-center">

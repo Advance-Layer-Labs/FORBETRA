@@ -43,6 +43,14 @@
 		}>;
 		stakeholders?: Array<{ id: string; name: string }>;
 		selfLabel?: string;
+		// Prior-cycle individual averages — when present, rendered as a dimmed
+		// dashed line so the user can compare to their last cycle.
+		priorIndividualData?: Array<{
+			weekNumber: number;
+			effortScore: number | null;
+			performanceScore: number | null;
+		}>;
+		priorCycleLabel?: string | null;
 	};
 
 	const props: Props = $props();
@@ -50,6 +58,8 @@
 	const stakeholderData = props.stakeholderData ?? [];
 	const stakeholders = props.stakeholders ?? [];
 	const selfLabel = props.selfLabel ?? 'My';
+	const priorIndividualData = props.priorIndividualData ?? [];
+	const priorCycleLabel = props.priorCycleLabel ?? 'Prior cycle';
 
 	let selectedStakeholderIds = new SvelteSet<string>();
 	let effortCanvas = $state<HTMLCanvasElement | null>(null);
@@ -258,6 +268,19 @@
 					2.5
 				)
 			];
+			if (priorIndividualData.length > 0) {
+				datasets.push(
+					makeLine(
+						`${priorCycleLabel} (effort)`,
+						weekSeries(priorIndividualData, 'effortScore'),
+						'rgba(148, 163, 184, 0.65)',
+						'rgba(148, 163, 184, 0.08)',
+						1.5,
+						[3, 4],
+						0
+					)
+				);
+			}
 			if (avgByWeek.length > 0) {
 				datasets.push(
 					makeLine(
@@ -297,6 +320,19 @@
 					2.5
 				)
 			];
+			if (priorIndividualData.length > 0) {
+				datasets.push(
+					makeLine(
+						`${priorCycleLabel} (perf)`,
+						weekSeries(priorIndividualData, 'performanceScore'),
+						'rgba(148, 163, 184, 0.65)',
+						'rgba(148, 163, 184, 0.08)',
+						1.5,
+						[3, 4],
+						0
+					)
+				);
+			}
 			if (avgByWeek.length > 0) {
 				datasets.push(
 					makeLine(
