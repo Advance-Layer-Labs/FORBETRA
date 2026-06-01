@@ -557,27 +557,30 @@
 
 			<div class="step">
 				<div class="step-num">7</div>
-				<h3>Week 12 — Cycle complete</h3>
+				<h3>Week 12 — Cycle complete (celebration)</h3>
 			</div>
 
 			<p>
-				End-of-cycle currently is a quiet UI state change — the hub shifts to a "cycle complete"
-				mode and offers a new cycle. For a user who just completed 12 weeks of self-reflection, this
-				is underwhelming.
+				The hub's complete state is no longer a blank "Journey complete" stub. It now greets the
+				user with: duration in weeks, total check-ins, total reviewer responses, the single biggest
+				movement across self and gap dimensions (narrated as a win when applicable), and a
+				first-half → second-half stats grid (effort, performance, effort gap, perf gap). View Report
+				+ Start New CTAs remain.
 			</p>
 
 			<figure>
 				<img src="screenshots/19-individual-new-cycle.png" alt="Start new cycle flow" />
 				<figcaption>
-					The "Start new cycle" flow. Re-uses onboarding components, prior cycle's objective as
-					default.
+					The "Start new cycle" flow is still reachable from the celebration. Re-uses onboarding
+					components with the prior cycle's objective as default.
 				</figcaption>
 			</figure>
 
-			<div class="question">
-				<strong>Q for you:</strong> What should the end-of-cycle moment feel like? A celebration
-				page that shows scorecard delta + effort trend + top insight + share-with-coach option would
-				convert a quiet transition into a meaningful moment.
+			<div class="callout">
+				<strong>Shipped (item #4, 2026-05-23):</strong> the cycle-complete moment used to be a quiet
+				UI state change. Now it's a real summary that earns the View Report click — the data is
+				right there in front of the user, and "the biggest move" callout interprets the cycle's
+				headline finding for them.
 			</div>
 
 			<h3>Settings</h3>
@@ -810,7 +813,7 @@
 			<h2 id="offstage">6. Off-stage — what the cron jobs do</h2>
 
 			<p>
-				The user's experience also includes what arrives in their inbox / on their phone. Seven
+				The user's experience also includes what arrives in their inbox / on their phone. Nine
 				scheduled jobs (defined in <code>vercel.json</code>) do most of the "I haven't been to the
 				app today" work:
 			</p>
@@ -825,19 +828,30 @@
 					<code>remind-feedback</code> — Mon-Fri 3pm. "Time to give feedback" to stakeholders.
 				</li>
 				<li><code>generate-insights</code> — Sun 8pm. Weekly AI insight generation.</li>
+				<li>
+					<code>notify-scorecard-shifts</code> — Sun 9pm (1h after generate-insights). Detects
+					week-over-week movements ≥ 1.5 in effort or performance gap and emails the individual with
+					a "your view and your reviewers' view are drifting apart / converging" narrative.
+					<em>Shipped item #7.</em>
+				</li>
 				<li><code>coach-prep</code> — Mon 7am. "Your week's coach prep is ready" to coaches.</li>
 				<li><code>complete-cycles</code> — Daily 1am. End-of-cycle state transitions.</li>
 				<li>
 					<code>stakeholder-impact</code> — 1st of month 10am. "Here's the impact your feedback had"
 					monthly summary to stakeholders.
 				</li>
+				<li>
+					<code>individual-monthly-summary</code> — 1st of month 10am. Last-30 vs prior-30 stats
+					(self averages, reviewer averages, gap delta) emailed to active individuals. Skips users
+					with zero activity in either window. <em>Shipped item #9.</em>
+				</li>
 			</ul>
 
-			<div class="question">
-				<strong>Q for you:</strong> The stakeholder-impact monthly summary is a
-				relationship-builder. Could there be a similar monthly summary for the Individual — "here's
-				what you accomplished this month"? It would tie the cycle together without waiting for the
-				12-week complete.
+			<div class="callout">
+				<strong>Two new cron jobs shipped in Burst 2:</strong>
+				<code>notify-scorecard-shifts</code> (interpretive narrative when the blind-spot gap moves)
+				and <code>individual-monthly-summary</code> (the monthly summary the prior version of this
+				doc asked for, modeled on the stakeholder-impact pattern).
 			</div>
 
 			<hr />
@@ -865,13 +879,15 @@
 					post-first-checkin add-more.
 				</li>
 				<li>
-					<strong>Cycle transition celebration moment (week 12).</strong> Quiet state change →
-					underwhelming. A summary moment + share-with-coach option could be a real high.
+					<strong>Cycle transition celebration moment (week 12).</strong>
+					<em>Shipped (item #4).</em> Hub's complete state now shows duration, totals, biggest-move
+					narrative, and first-half → second-half stats grid. Share-with-coach option remains a
+					future tap.
 				</li>
 				<li>
-					<strong>Suggested subgoals in onboarding step 3.</strong> Cold-start is hard. Once the
-					user types an objective in step 2, have Claude suggest 3 subgoals. Big cognitive-load
-					reducer.
+					<strong>Suggested subgoals in onboarding step 3.</strong>
+					<em>Shipped (item #2).</em> Once the user types an objective, Claude returns 3 suggested
+					subgoals as chips they can accept with one tap. Big cognitive-load reducer.
 				</li>
 				<li>
 					<strong>First-time Coach session-view tour.</strong> Most info-dense screen in the app. A
