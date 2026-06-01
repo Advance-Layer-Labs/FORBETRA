@@ -16,7 +16,7 @@ export const load: PageServerLoad = async (event) => {
 			},
 			cycles: {
 				orderBy: { startDate: 'desc' },
-				take: 1,
+				take: 2,
 				include: {
 					reflections: {
 						select: {
@@ -39,6 +39,48 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const cycle = objective.cycles[0] ?? null;
+	const priorCycle = objective.cycles[1] ?? null;
+
+	// Prior-cycle individual weekly averages (Item #10 of 9/10 plan).
+	// Rendered as a dimmed dashed line in PerformanceEffortChart so the user
+	// can see whether they're trending better than they did last time around.
+	let priorIndividualData: Array<{
+		weekNumber: number;
+		effortScore: number | null;
+		performanceScore: number | null;
+	}> = [];
+	if (priorCycle && priorCycle.reflections.length > 0) {
+		const priorMap = new Map<number, { effortScores: number[]; performanceScores: number[] }>();
+		for (const r of priorCycle.reflections) {
+			if (r.reflectionType !== 'RATING_A' && r.reflectionType !== 'RATING_B') continue;
+			const entry = priorMap.get(r.weekNumber) ?? { effortScores: [], performanceScores: [] };
+			if (r.effortScore !== null) entry.effortScores.push(r.effortScore);
+			if (r.performanceScore !== null) entry.performanceScores.push(r.performanceScore);
+			priorMap.set(r.weekNumber, entry);
+		}
+		priorIndividualData = Array.from(priorMap.entries())
+			.sort(([a], [b]) => a - b)
+			.map(([weekNumber, scores]) => ({
+				weekNumber,
+				effortScore:
+					scores.effortScores.length > 0
+						? Number(
+								(
+									scores.effortScores.reduce((s, v) => s + v, 0) / scores.effortScores.length
+								).toFixed(1)
+							)
+						: null,
+				performanceScore:
+					scores.performanceScores.length > 0
+						? Number(
+								(
+									scores.performanceScores.reduce((s, v) => s + v, 0) /
+									scores.performanceScores.length
+								).toFixed(1)
+							)
+						: null
+			}));
+	}
 
 	// --- 1. Latest cycle report (AI report) ---
 	let cycleReport: {
@@ -213,7 +255,9 @@ export const load: PageServerLoad = async (event) => {
 		visualizationData: {
 			individual: individualWeeklyData,
 			stakeholders: stakeholderWeeklyData,
-			stakeholderList: objective.stakeholders.map((s) => ({ id: s.id, name: s.name }))
+			stakeholderList: objective.stakeholders.map((s) => ({ id: s.id, name: s.name })),
+			priorIndividual: priorIndividualData,
+			priorCycleLabel: priorCycle?.label ?? null
 		},
 		weeks
 	};
