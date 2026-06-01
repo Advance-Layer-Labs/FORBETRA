@@ -1,124 +1,101 @@
 # Security & Hygiene Follow-ups
 
-Items identified by the 2026-05-30 audit that were **not** shipped in PR #5 because they require data migrations in production, external account access, or org-admin permissions. Each item has concrete next steps so the work is ready to pick up.
+_Status board for items identified by the 2026-05-30 hygiene audit. Last refresh: 2026-05-31._
+
+Comprehensive sequencing lives in `docs/improvement-plan.md`; this doc is the short security/ops checklist.
+
+## Status at a glance
+
+| #   | Item                                            | Status                                                                       |
+| --- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Hash stakeholder feedback tokens (3-PR rollout) | 🟡 PR-1 ✅ (PR #8) · PR-2 pending · PR-3 pending                             |
+| 2   | `@@unique` on `Insight`                         | ✅ shipped in PR #7 (dedupe check came back clean)                           |
+| 3   | Provision Upstash Redis                         | ❌ external — needs Marc                                                     |
+| 4   | Sentry DSN                                      | ❌ external — needs Marc                                                     |
+| 5   | Neon `directUrl`                                | ❌ external — needs Marc to grab URL from Neon, then 1-line schema PR        |
+| 6   | GitHub branch protection on `main`              | ✅ set via API (require PR + 3 CI checks; admins can bypass for emergencies) |
+| 7   | `CRON_SECRET` ↔ `JOB_SECRET_TOKEN` in Vercel    | ❌ trivial verification — needs Marc                                         |
+| 8   | Deeper `docs/` reorg                            | ⏸ deprioritized — `improvement-plan.md` is now the canonical entry           |
 
 ---
 
-## 1. Hash stakeholder feedback tokens (IDOR risk)
+## 1. Hash stakeholder feedback tokens — PR-2 + PR-3 still open
 
 **Severity:** High — DB leak exposes every active feedback link.
 
-**Current state:** `Token.tokenHash` column name implies a hash is stored, but the raw 32-byte hex value is persisted. See `src/routes/individual/dashboard/+page.server.ts` (token creation) and `src/routes/stakeholder/feedback/[token]/+page.server.ts:65` (lookup).
+**Shipped (PR #8, 2026-05-31):**
 
-**Safe rollout (3 PRs, ~1 sprint):**
+- New `$lib/server/tokenHash` helper (`sha256(token)` → hex)
+- `feedbackToken.ts`: hash before storing on create
+- Stakeholder feedback lookup: dual-read (hash first, raw fallback) so pre-PR-1 emailed links still work
+- Removed broken `feedbackUrl` exposure in `/admin/preview`
 
-1. **PR-1 (additive, zero risk):** On create, store `createHash('sha256').update(token).digest('hex')`. On lookup, hash the URL token before query. **Also** add a fallback path that tries the raw value if the hashed lookup returns nothing. Existing emails with raw-token URLs continue to work; new tokens are stored hashed.
-2. **PR-2 (data migration):** One-shot UPDATE that hashes every existing `Token.tokenHash` row in a transaction. After this runs, all rows are hashed and the fallback path in PR-1 is dead code but harmless.
-3. **PR-3 (cleanup):** Remove the raw-value fallback from lookup. Single line.
+**PR-2 (this PR, when shipped):** one-shot UPDATE that hashes every pre-PR-1 `Token.tokenHash` row in place. Cutoff: rows where `createdAt < '2026-05-31 05:34:33'`. Anything created later was already written hashed.
 
-**Why not in one PR:** during the rolling deploy window of a single-PR fix, in-flight requests against just-deployed instances might find unhashed rows; just-deployed instances looking up old emails would 404. The 3-PR dance avoids any user-visible regression.
+**PR-3 (after PR-2):** remove the raw-value fallback in `findTokenByUrlValue` / `findTokenByUrlValueSelect`. Single-file diff.
 
----
-
-## 2. `@@unique([userId, cycleId, weekNumber, type])` on `Insight`
-
-**Severity:** Medium — TOCTOU race between cron findFirst and create can produce duplicate insights.
-
-**Blocker:** Migration will fail if any duplicate rows already exist.
-
-**Steps:**
-
-1. Run the dedupe check:
-   ```sql
-   SELECT "userId", "cycleId", "weekNumber", "type", COUNT(*) c
-   FROM "Insight"
-   WHERE "weekNumber" IS NOT NULL
-   GROUP BY 1, 2, 3, 4
-   HAVING COUNT(*) > 1;
-   ```
-2. If any rows: write a dedupe migration that keeps the most recent and deletes earlier dupes (decide policy with Marc).
-3. Then add `@@unique(...)` to schema and let `prisma migrate dev` generate the constraint.
-
-Note that `type` includes nullable `weekNumber` and `cycleId` fields for some Insight kinds (e.g., `COACH_PREP`, `CYCLE_REPORT`). Postgres treats NULLs as distinct in unique constraints — verify the constraint shape matches the actual de-dup intent for each Insight type.
+**Sequencing constraint:** don't ship PR-2 + PR-3 together — the raw fallback in PR-1 is what makes PR-2's deploy safe. If a request lands mid-migration on an unhashed row, the fallback catches it.
 
 ---
 
-## 3. Provision Upstash Redis + set env vars
+## 3. Upstash Redis
 
-**Severity:** High — rate limiter is silent no-op on Vercel serverless.
+**Severity:** High — `rateLimit.ts` silently falls back to in-memory on Vercel serverless without these env vars. Rate limit is effectively no-op in prod today.
 
 **Steps:**
 
-1. Sign in at upstash.com (or create account).
-2. Create a Redis instance, region close to Vercel (iad1).
-3. Copy REST URL + REST Token.
-4. In Vercel project settings → Environment Variables (production + preview):
+1. https://console.upstash.com → Sign up
+2. Create Redis instance → region `us-east-1` (matches Vercel iad1)
+3. Open the database → REST API tab → copy URL + Token
+4. Vercel env vars → add both, all environments:
    - `UPSTASH_REDIS_REST_URL`
    - `UPSTASH_REDIS_REST_TOKEN`
-5. Redeploy or wait for next push. `rateLimit.ts` auto-uses Upstash when env vars present.
+5. Redeploy
 
 ---
 
-## 4. Sentry DSN setup
+## 4. Sentry DSN
 
 **Severity:** High — zero error monitoring in prod today.
 
 **Steps:**
 
-1. Create Sentry project for Forbetra (sveltekit platform).
-2. Copy DSN. Set in Vercel env:
-   - `SENTRY_DSN` (server)
-   - `VITE_SENTRY_DSN` (client)
-3. `hooks.server.ts` and `hooks.client.ts` already guard init behind `if (dsn)` — Sentry activates on next deploy.
-4. **Bonus (separate PR):** add `sentryVitePlugin` to `vite.config.ts` for source map upload. Requires `SENTRY_AUTH_TOKEN` env var.
-5. **Bonus:** bump `tracesSampleRate` from 0 → 0.1 for performance traces.
+1. https://sentry.io → Sign up (sagalwm@gmail.com)
+2. Create Project → SvelteKit → name `forbetra`
+3. Copy DSN (looks like `https://abc@o12345.ingest.us.sentry.io/678`)
+4. Vercel env vars → add both, all environments:
+   - `SENTRY_DSN` (server-side)
+   - `VITE_SENTRY_DSN` (client-side, same DSN)
+5. Trigger redeploy
+6. Ping me — I'll PR the 1-line `tracesSampleRate: 0 → 0.1` bump in `hooks.server.ts` for performance traces
+
+**Optional follow-up:** `sentryVitePlugin` for source-map upload (needs `SENTRY_AUTH_TOKEN` env var).
 
 ---
 
-## 5. Neon pooled URL + `directUrl`
+## 5. Neon `directUrl`
 
-**Severity:** Medium — works today; will hit connection limits at scale.
-
-**Current state:** `DATABASE_URL` uses `-pooler` subdomain (good!). But `schema.prisma` has no `directUrl`, so Prisma migrations may hit the pool which can fail on transactional DDL.
+**Severity:** Medium — works today (current `DATABASE_URL` uses the `-pooler` subdomain), but Prisma migrations should use a non-pooled connection for transactional DDL.
 
 **Steps:**
 
-1. Add to `schema.prisma`:
-   ```prisma
-   datasource db {
-     provider  = "postgresql"
-     url       = env("DATABASE_URL")
-     directUrl = env("DIRECT_DATABASE_URL")
-   }
-   ```
-2. In Vercel env, set `DIRECT_DATABASE_URL` to the Neon **direct** connection string (the one without `-pooler` in the subdomain).
-3. Migrations use `directUrl`; runtime queries use the pooled `url`.
+1. https://console.neon.tech → Forbetra project → Connection Details
+2. Disable "Pooled connection" toggle → copy the **direct** connection string (no `-pooler` in the host)
+3. Vercel env vars → add `DIRECT_DATABASE_URL` = direct URL, all environments
+4. Ping me — I'll ship a 1-line `schema.prisma` change adding `directUrl = env("DIRECT_DATABASE_URL")`
+
+**Deferred reason:** schema validation runs at build time and would fail if `DIRECT_DATABASE_URL` isn't set when the schema change merges. Env var has to be set in Vercel **first**.
 
 ---
 
-## 6. GitHub branch protection on `main`
+## 7. Confirm `CRON_SECRET` in Vercel env
 
-**Severity:** Medium — CI is advisory only today.
+`src/lib/server/cronAuth.ts:isAuthorized` accepts either `process.env.CRON_SECRET` (Vercel's native cron header) or `process.env.JOB_SECRET_TOKEN`. The current cron jobs work, so one of them is set — just confirm which.
 
-**Blocker:** needs Advance-Layer-Labs org-admin (Kieran).
-
-**Settings:**
-
-- Branches → `main` → Add rule
-- ✅ Require a pull request before merging
-- ✅ Require status checks to pass: `Lint & Type Check`, `Tests`, `Build`
-- ✅ Require branches to be up to date
+**Steps:** Vercel → Settings → Environment Variables → search for `CRON_SECRET` and `JOB_SECRET_TOKEN`. Paste back which exist.
 
 ---
 
-## 7. Confirm `CRON_SECRET` ↔ `JOB_SECRET_TOKEN` in Vercel env
+## 8. Deeper `docs/` reorg (deprioritized)
 
-`createCronJobHandler` in `src/lib/server/cronAuth.ts` accepts either, so this is just a verification check.
-
-**Steps:** Vercel → Environment Variables. Check both exist OR confirm `CRON_SECRET` (set by Vercel cron) matches what your jobs expect.
-
----
-
-## 8. Deeper `docs/` reorganization
-
-Many cross-doc relative refs exist (CLAUDE.md → expert-panel-\*, DESIGN_SPEC → prototype-v2, etc.). A proper `docs/active/` + `docs/archive/` + `docs/specs/` reorg would need all of these updated atomically. The reorg outline lives in PR #5's description; do as one focused PR when ready.
+`docs/improvement-plan.md` is now the canonical product/tech entry point. The original reorg outline (`active/`, `archive/`, `specs/`) is no longer high-leverage. Revisit only if `docs/` becomes hard to navigate.
