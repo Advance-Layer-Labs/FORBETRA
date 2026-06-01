@@ -60,18 +60,105 @@
 			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</div>
 	{:else if screenState === 'complete'}
-		<!-- ═══ Cycle complete ═══ -->
-		<div class="anim-fade-in py-20 text-center">
-			<div
-				class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-border-strong"
-			>
-				<span class="text-3xl font-extralight text-accent">&#10003;</span>
+		<!-- ═══ Cycle complete — celebration ═══ -->
+		<div class="anim-fade-in py-16">
+			<div class="text-center">
+				<div
+					class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-border-strong"
+				>
+					<span class="text-3xl font-extralight text-accent">&#10003;</span>
+				</div>
+				<h1 class="text-3xl font-bold tracking-tight text-text-primary">Journey complete</h1>
+				{#if data.cycleSummary}
+					<p class="mx-auto mt-4 max-w-sm text-base leading-relaxed text-text-secondary">
+						{data.cycleSummary.durationWeeks} weeks, {data.cycleSummary.totalCheckIns} check-ins,
+						{data.cycleSummary.totalFeedbacks}
+						{data.cycleSummary.totalFeedbacks === 1 ? 'response' : 'responses'} from your reviewers. You
+						did the work.
+					</p>
+				{:else}
+					<p class="mx-auto mt-4 max-w-xs text-base leading-relaxed text-text-secondary">
+						You did the work. See what the data says.
+					</p>
+				{/if}
 			</div>
-			<h1 class="text-3xl font-bold tracking-tight text-text-primary">Journey complete</h1>
-			<p class="mx-auto mt-4 max-w-xs text-base leading-relaxed text-text-secondary">
-				You did the work. See what the data says.
-			</p>
-			<div class="mt-10 flex justify-center gap-3">
+
+			{#if data.cycleSummary}
+				{@const s = data.cycleSummary}
+				{@const delta = s.biggestDelta}
+
+				<!-- Headline movement -->
+				{#if delta && delta.magnitude >= 0.3}
+					{@const isGapMetric = delta.label.toLowerCase().includes('gap')}
+					{@const isWin = isGapMetric ? delta.direction === 'down' : delta.direction === 'up'}
+					<div class="mt-10 border-l-2 border-accent/30 py-3 pr-4 pl-5">
+						<p class="text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+							The biggest move
+						</p>
+						<p class="mt-2 text-[15px] leading-relaxed text-text-secondary">
+							<span class="font-semibold text-text-primary">{delta.label}</span>
+							{#if isGapMetric}
+								{delta.direction === 'down'
+									? `closed by ${delta.magnitude.toFixed(1)} points`
+									: delta.direction === 'up'
+										? `widened by ${delta.magnitude.toFixed(1)} points`
+										: 'held steady'}
+							{:else}
+								{delta.direction === 'up'
+									? `climbed ${delta.magnitude.toFixed(1)} points`
+									: delta.direction === 'down'
+										? `dropped ${delta.magnitude.toFixed(1)} points`
+										: 'held steady'}
+							{/if}
+							{#if isWin}
+								<span class="text-accent">— the kind of shift this is built for.</span>
+							{:else if delta.direction !== 'flat'}
+								<span class="text-text-tertiary">— a real signal to bring to your next cycle.</span>
+							{/if}
+						</p>
+					</div>
+				{/if}
+
+				<!-- Stats grid -->
+				<dl class="mt-10 grid grid-cols-2 gap-x-6 gap-y-6">
+					{#if s.selfEffortStart != null && s.selfEffortEnd != null}
+						<div>
+							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Your effort</dt>
+							<dd class="mt-1 font-mono text-[15px] text-text-primary">
+								{s.selfEffortStart.toFixed(1)} → {s.selfEffortEnd.toFixed(1)}
+							</dd>
+						</div>
+					{/if}
+					{#if s.selfPerfStart != null && s.selfPerfEnd != null}
+						<div>
+							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">
+								Your performance
+							</dt>
+							<dd class="mt-1 font-mono text-[15px] text-text-primary">
+								{s.selfPerfStart.toFixed(1)} → {s.selfPerfEnd.toFixed(1)}
+							</dd>
+						</div>
+					{/if}
+					{#if s.effortGapStart != null && s.effortGapEnd != null}
+						<div>
+							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Effort gap</dt>
+							<dd class="mt-1 font-mono text-[15px] text-text-primary">
+								{s.effortGapStart.toFixed(1)} → {s.effortGapEnd.toFixed(1)}
+							</dd>
+						</div>
+					{/if}
+					{#if s.perfGapStart != null && s.perfGapEnd != null}
+						<div>
+							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Perf gap</dt>
+							<dd class="mt-1 font-mono text-[15px] text-text-primary">
+								{s.perfGapStart.toFixed(1)} → {s.perfGapEnd.toFixed(1)}
+							</dd>
+						</div>
+					{/if}
+				</dl>
+			{/if}
+
+			<div class="mt-12 flex flex-wrap justify-center gap-3">
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
 					href="/individual/progress"
