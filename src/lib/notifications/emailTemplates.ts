@@ -736,5 +736,55 @@ export const emailTemplates = {
 			`,
 			text: `Your Forbetra month\n\nHi ${data.individualName || 'there'},\n\nHere's what happened this month on ${data.objectiveTitle}.\n\n• Check-ins completed: ${data.checkInCount}\n• Reviewer responses: ${data.feedbackCount}\n${data.myEffortThis !== null ? `• Your effort (avg): ${data.myEffortThis.toFixed(1)}\n` : ''}${data.myPerfThis !== null ? `• Your performance (avg): ${data.myPerfThis.toFixed(1)}\n` : ''}${data.reviewerEffortThis !== null ? `• Reviewer effort (avg): ${data.reviewerEffortThis.toFixed(1)}\n` : ''}${data.reviewerPerfThis !== null ? `• Reviewer performance (avg): ${data.reviewerPerfThis.toFixed(1)}\n` : ''}${trendLine ? `\n${trendLine}\n` : ''}\nOpen your hub: ${hubUrl}\n\nKeep showing up. The compounding is real.${textFooter()}`
 		};
+	},
+
+	scorecardShiftAlert: (data: {
+		individualName?: string;
+		objectiveTitle: string;
+		dimension: 'effort' | 'performance';
+		direction: 'widening' | 'closing';
+		gapNow: number;
+		gapBefore: number;
+		deltaAbs: number;
+	}) => {
+		const name = escapeHtml(data.individualName || 'there');
+		const obj = escapeHtml(data.objectiveTitle);
+		const feedbackUrl = `${baseUrl}/individual/feedback`;
+		const dim = data.dimension;
+		const dir = data.direction;
+		const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(1);
+		const narrative =
+			dir === 'widening'
+				? `Your ${dim} gap widened from ${sign(data.gapBefore)} to ${sign(data.gapNow)} this week — your view of yourself and your reviewers' view are drifting apart.`
+				: `Your ${dim} gap closed from ${sign(data.gapBefore)} to ${sign(data.gapNow)} this week — you and your reviewers are converging on what's happening.`;
+		const sub =
+			dir === 'widening'
+				? `Your scorecard gap on ${dim} just widened ${data.deltaAbs.toFixed(1)} points`
+				: `Your scorecard gap on ${dim} just closed ${data.deltaAbs.toFixed(1)} points`;
+		return {
+			subject: sub,
+			html: `
+				<!DOCTYPE html>
+				<html>
+				<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+				<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+					<div style="background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+						<h1 style="color: white; margin: 0; font-size: 22px; font-weight: 600;">Your scorecard shifted this week</h1>
+					</div>
+					<div style="background: white; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+						<p style="font-size: 16px; margin-top: 0;">Hi ${name},</p>
+						<p style="font-size: 16px;">Something interesting happened in <strong>${obj}</strong> this week.</p>
+						<p style="font-size: 16px;">${escapeHtml(narrative)}</p>
+						<div style="text-align: center; margin: 28px 0;">
+							<a href="${feedbackUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">See what changed</a>
+						</div>
+						<p style="font-size: 13px; color: #64748b;">Positive gap (your score &gt; reviewers') usually means you see yourself more favorably than they do. Negative means the reverse.</p>
+					</div>
+				${emailFooter()}
+				</body>
+				</html>
+			`,
+			text: `${sub}\n\nHi ${data.individualName || 'there'},\n\nSomething interesting happened in ${data.objectiveTitle} this week.\n\n${narrative}\n\nSee what changed: ${feedbackUrl}\n\nPositive gap (your score > reviewers') usually means you see yourself more favorably than they do. Negative means the reverse.${textFooter()}`
+		};
 	}
 };
