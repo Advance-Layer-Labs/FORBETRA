@@ -128,7 +128,8 @@ export const load: PageServerLoad = async (event) => {
 			lastPerformanceScore: null,
 			hasNewFeedback: false,
 			newFeedbackRaterName: null,
-			coachNudge: null
+			coachNudge: null,
+			cycleSummary: null
 		};
 	}
 
@@ -255,6 +256,145 @@ export const load: PageServerLoad = async (event) => {
 		// Non-critical — skip on error
 	}
 
+	// ═══ Cycle celebration summary (only when the cycle has wrapped) ═══
+	// Compares the first half vs second half of the cycle on self and reviewer
+	// dimensions, surfaces the single biggest movement, and counts the work
+	// the individual put in. This is what greets them on the complete hub state.
+	let cycleSummary: {
+		durationWeeks: number;
+		totalCheckIns: number;
+		totalFeedbacks: number;
+		totalReviewers: number;
+		selfEffortStart: number | null;
+		selfEffortEnd: number | null;
+		selfPerfStart: number | null;
+		selfPerfEnd: number | null;
+		effortGapStart: number | null;
+		effortGapEnd: number | null;
+		perfGapStart: number | null;
+		perfGapEnd: number | null;
+		biggestDelta: {
+			label: string;
+			direction: 'up' | 'down' | 'flat';
+			magnitude: number;
+		} | null;
+	} | null = null;
+
+	if (cycle.status === 'COMPLETED') {
+		const ratingReflections = reflections.filter(
+			(r) => r.effortScore != null || r.performanceScore != null
+		);
+		const weekNumbers = ratingReflections.map((r) => r.weekNumber);
+		const minWeek = weekNumbers.length > 0 ? Math.min(...weekNumbers) : 1;
+		const maxWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) : totalWeeks;
+		const midpoint = (minWeek + maxWeek) / 2;
+
+		const firstHalfSelf = ratingReflections.filter((r) => r.weekNumber <= midpoint);
+		const secondHalfSelf = ratingReflections.filter((r) => r.weekNumber > midpoint);
+		const firstHalfRev = feedbacks.filter((f) => (f.reflection?.weekNumber ?? 0) <= midpoint);
+		const secondHalfRev = feedbacks.filter((f) => (f.reflection?.weekNumber ?? 0) > midpoint);
+
+		const selfEffortStart = avg(
+			firstHalfSelf.filter((r) => r.effortScore != null).map((r) => r.effortScore!)
+		);
+		const selfEffortEnd = avg(
+			secondHalfSelf.filter((r) => r.effortScore != null).map((r) => r.effortScore!)
+		);
+		const selfPerfStart = avg(
+			firstHalfSelf.filter((r) => r.performanceScore != null).map((r) => r.performanceScore!)
+		);
+		const selfPerfEnd = avg(
+			secondHalfSelf.filter((r) => r.performanceScore != null).map((r) => r.performanceScore!)
+		);
+		const revEffortStart = avg(
+			firstHalfRev.filter((f) => f.effortScore != null).map((f) => f.effortScore!)
+		);
+		const revEffortEnd = avg(
+			secondHalfRev.filter((f) => f.effortScore != null).map((f) => f.effortScore!)
+		);
+		const revPerfStart = avg(
+			firstHalfRev.filter((f) => f.performanceScore != null).map((f) => f.performanceScore!)
+		);
+		const revPerfEnd = avg(
+			secondHalfRev.filter((f) => f.performanceScore != null).map((f) => f.performanceScore!)
+		);
+
+		const effortGapStart =
+			selfEffortStart != null && revEffortStart != null
+				? +Math.abs(selfEffortStart - revEffortStart).toFixed(1)
+				: null;
+		const effortGapEnd =
+			selfEffortEnd != null && revEffortEnd != null
+				? +Math.abs(selfEffortEnd - revEffortEnd).toFixed(1)
+				: null;
+		const perfGapStart =
+			selfPerfStart != null && revPerfStart != null
+				? +Math.abs(selfPerfStart - revPerfStart).toFixed(1)
+				: null;
+		const perfGapEnd =
+			selfPerfEnd != null && revPerfEnd != null
+				? +Math.abs(selfPerfEnd - revPerfEnd).toFixed(1)
+				: null;
+
+		const candidates: Array<{
+			label: string;
+			start: number | null;
+			end: number | null;
+			gapMetric: boolean;
+		}> = [
+			{ label: 'Your effort', start: selfEffortStart, end: selfEffortEnd, gapMetric: false },
+			{ label: 'Your performance', start: selfPerfStart, end: selfPerfEnd, gapMetric: false },
+			{ label: 'Effort blind-spot gap', start: effortGapStart, end: effortGapEnd, gapMetric: true },
+			{
+				label: 'Performance blind-spot gap',
+				start: perfGapStart,
+				end: perfGapEnd,
+				gapMetric: true
+			}
+		];
+
+		let biggestDelta: {
+			label: string;
+			direction: 'up' | 'down' | 'flat';
+			magnitude: number;
+		} | null = null;
+		for (const c of candidates) {
+			if (c.start == null || c.end == null) continue;
+			const delta = +(c.end - c.start).toFixed(1);
+			const magnitude = Math.abs(delta);
+			if (biggestDelta == null || magnitude > biggestDelta.magnitude) {
+				// For gap metrics, "down" (smaller gap) is the win; for self metrics, "up" is.
+				const direction = delta > 0.2 ? 'up' : delta < -0.2 ? 'down' : 'flat';
+				biggestDelta = { label: c.label, direction, magnitude };
+			}
+		}
+
+		const durationWeeks = cycle.endDate
+			? Math.max(
+					1,
+					Math.round(
+						(cycle.endDate.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+					)
+				)
+			: totalWeeks;
+
+		cycleSummary = {
+			durationWeeks,
+			totalCheckIns: ratingReflections.length,
+			totalFeedbacks: feedbacks.length,
+			totalReviewers: objective.stakeholders.length,
+			selfEffortStart,
+			selfEffortEnd,
+			selfPerfStart,
+			selfPerfEnd,
+			effortGapStart,
+			effortGapEnd,
+			perfGapStart,
+			perfGapEnd,
+			biggestDelta
+		};
+	}
+
 	// Coach nudge (latest coach note for this individual)
 	let coachNudge: { text: string; coachName: string } | null = null;
 	if (coachClient?.coach?.name) {
@@ -337,7 +477,8 @@ export const load: PageServerLoad = async (event) => {
 		lastPerformanceScore,
 		hasNewFeedback,
 		newFeedbackRaterName,
-		coachNudge
+		coachNudge,
+		cycleSummary
 	};
 };
 
