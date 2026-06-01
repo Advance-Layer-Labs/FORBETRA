@@ -669,5 +669,72 @@ export const emailTemplates = {
 		`,
 			text: `A reviewer needs a fresh feedback link\n\nHi ${data.individualName || 'there'},\n\n${data.stakeholderName || 'A reviewer'} tried to use a feedback link that had expired or already been used. They're ready to give you feedback — you just need to send them a new link from your reviewer settings.\n\nManage reviewers: ${stakeholdersUrl}\n\nIf this reviewer is no longer relevant, you can archive them on the same page.${textFooter()}`
 		};
+	},
+
+	individualMonthlySummary: (data: {
+		individualName?: string;
+		objectiveTitle: string;
+		checkInCount: number;
+		feedbackCount: number;
+		myEffortThis: number | null;
+		myPerfThis: number | null;
+		reviewerEffortThis: number | null;
+		reviewerPerfThis: number | null;
+		gapDelta: number | null; // positive = gap widening, negative = closing
+	}) => {
+		const name = escapeHtml(data.individualName || 'there');
+		const obj = escapeHtml(data.objectiveTitle);
+		const hubUrl = `${baseUrl}/individual`;
+
+		const trendLine = (() => {
+			if (data.gapDelta === null) return null;
+			const abs = Math.abs(data.gapDelta).toFixed(1);
+			if (data.gapDelta < -0.3) return `Your perception gap closed by ${abs} this month.`;
+			if (data.gapDelta > 0.3)
+				return `Your perception gap widened by ${abs} this month — worth a look.`;
+			return `Your perception gap held steady this month.`;
+		})();
+
+		const statRow = (label: string, value: string | null) =>
+			value === null
+				? ''
+				: `<tr><td style="padding: 4px 12px 4px 0; color: #64748b; font-size: 13px;">${label}</td><td style="padding: 4px 0; color: #0f172a; font-size: 14px; font-weight: 600;">${value}</td></tr>`;
+
+		return {
+			subject: `Your Forbetra month — ${data.checkInCount} check-in${data.checkInCount === 1 ? '' : 's'}, ${data.feedbackCount} reviewer response${data.feedbackCount === 1 ? '' : 's'}`,
+			html: `
+				<!DOCTYPE html>
+				<html>
+				<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+				<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; padding: 20px;">
+					<div style="background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+						<h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">Your month in motion</h1>
+						<p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">A snapshot of the last 30 days on Forbetra</p>
+					</div>
+					<div style="background: white; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+						<p style="font-size: 16px; margin-top: 0;">Hi ${name},</p>
+						<p style="font-size: 16px;">Here's what happened this month on <strong>${obj}</strong>.</p>
+						<div style="background: #f1f5f9; padding: 18px 20px; border-radius: 8px; margin: 20px 0;">
+							<table style="width: 100%; border-collapse: collapse;">
+								${statRow('Check-ins completed', String(data.checkInCount))}
+								${statRow('Reviewer responses received', String(data.feedbackCount))}
+								${statRow('Your effort (avg)', data.myEffortThis !== null ? data.myEffortThis.toFixed(1) : null)}
+								${statRow('Your performance (avg)', data.myPerfThis !== null ? data.myPerfThis.toFixed(1) : null)}
+								${statRow('Reviewer effort (avg)', data.reviewerEffortThis !== null ? data.reviewerEffortThis.toFixed(1) : null)}
+								${statRow('Reviewer performance (avg)', data.reviewerPerfThis !== null ? data.reviewerPerfThis.toFixed(1) : null)}
+							</table>
+						</div>
+						${trendLine ? `<p style="font-size: 15px; color: #334155; margin: 16px 0;">${escapeHtml(trendLine)}</p>` : ''}
+						<div style="text-align: center; margin: 28px 0;">
+							<a href="${hubUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Open your hub</a>
+						</div>
+						<p style="font-size: 13px; color: #64748b;">Keep showing up. The compounding is real.</p>
+					</div>
+				${emailFooter()}
+				</body>
+				</html>
+			`,
+			text: `Your Forbetra month\n\nHi ${data.individualName || 'there'},\n\nHere's what happened this month on ${data.objectiveTitle}.\n\n• Check-ins completed: ${data.checkInCount}\n• Reviewer responses: ${data.feedbackCount}\n${data.myEffortThis !== null ? `• Your effort (avg): ${data.myEffortThis.toFixed(1)}\n` : ''}${data.myPerfThis !== null ? `• Your performance (avg): ${data.myPerfThis.toFixed(1)}\n` : ''}${data.reviewerEffortThis !== null ? `• Reviewer effort (avg): ${data.reviewerEffortThis.toFixed(1)}\n` : ''}${data.reviewerPerfThis !== null ? `• Reviewer performance (avg): ${data.reviewerPerfThis.toFixed(1)}\n` : ''}${trendLine ? `\n${trendLine}\n` : ''}\nOpen your hub: ${hubUrl}\n\nKeep showing up. The compounding is real.${textFooter()}`
+		};
 	}
 };
