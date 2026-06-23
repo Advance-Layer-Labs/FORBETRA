@@ -34,16 +34,11 @@
 	};
 
 	afterNavigate(() => {
-		// Focus main content area for accessibility after page transitions
-		const h1 = document.querySelector('main h1');
-		if (h1 instanceof HTMLElement) {
-			h1.setAttribute('tabindex', '-1');
-			h1.focus({ preventScroll: true });
-		} else {
-			const main = document.getElementById('main-content');
-			if (main) {
-				main.focus({ preventScroll: true });
-			}
+		// Focus the main landmark for screen readers without highlighting a block-level h1.
+		const main = document.getElementById('main-content');
+		if (main) {
+			main.setAttribute('tabindex', '-1');
+			main.focus({ preventScroll: true });
 		}
 	});
 </script>
