@@ -202,4 +202,26 @@
 		-moz-osx-font-smoothing: grayscale;
 		letter-spacing: -0.01em;
 	}
+
+	/* Programmatic focus after navigation (see +layout.svelte) should not show a ring;
+	   keyboard users still get the standard accent ring via focus-visible. */
+	main h1:focus {
+		outline: none;
+	}
+
+	main h1:focus:not(:focus-visible) {
+		box-shadow: none;
+	}
+
+	main h1:focus-visible {
+		@apply ring-2 ring-accent ring-offset-2 ring-offset-surface-base;
+	}
+
+	main#main-content:focus {
+		outline: none;
+	}
+
+	main#main-content:focus:not(:focus-visible) {
+		box-shadow: none;
+	}
 }
