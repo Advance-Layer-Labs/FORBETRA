@@ -1,54 +1,62 @@
 import { json, error } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
-import { getActiveObjectiveWithCycle } from '$lib/server/individualContext';
+import { getActiveGoalWithJourney } from '$lib/server/individualContext';
 import {
 	computeMyLastRatings,
-	computeStakeholdersLastRatings,
-	computePerceptionGaps
+	computeReviewersLastRatings,
+	computePerceptionGaps,
+	withCheckInWeeks
 } from '$lib/server/hubMetrics';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
-	const result = await getActiveObjectiveWithCycle(dbUser.id);
-	if (!result?.cycle) {
-		throw error(404, 'No active cycle');
+	const result = await getActiveGoalWithJourney(dbUser.id);
+	if (!result?.journey) {
+		throw error(404, 'No active journey');
 	}
 
-	const { objective, cycle } = result;
-	const reflections = cycle.reflections ?? [];
-	const stakeholderRefs = objective.stakeholders.map((s) => ({ id: s.id, name: s.name }));
+	const { goal, journey } = result;
 
-	const [allFeedbacks] = await Promise.all([
+	const [checkInRows, allFeedbacks, reviewers] = await Promise.all([
+		prisma.checkIn.findMany({
+			where: { journeyId: journey.id },
+			orderBy: { submittedAt: 'asc' },
+			select: { id: true, effortScore: true, performanceScore: true, submittedAt: true }
+		}),
 		prisma.feedback.findMany({
-			where: { reflection: { cycleId: cycle.id } },
+			where: { journeyId: journey.id },
 			select: {
-				stakeholderId: true,
+				reviewerId: true,
+				weekNumber: true,
 				effortScore: true,
 				performanceScore: true,
-				submittedAt: true,
-				reflection: { select: { weekNumber: true } }
+				submittedAt: true
 			},
 			orderBy: { submittedAt: 'desc' }
+		}),
+		prisma.reviewer.findMany({
+			where: { individualId: dbUser.id, OR: [{ goalId: null }, { goalId: goal.id }] },
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true }
 		})
 	]);
 
-	const myLastRatings = computeMyLastRatings(reflections);
-	const stakeholdersLastRatings = computeStakeholdersLastRatings(allFeedbacks);
+	const checkIns = withCheckInWeeks(journey.startDate, checkInRows, result.timeZone);
+	const myLastRatings = computeMyLastRatings(checkIns);
+	const reviewersLastRatings = computeReviewersLastRatings(allFeedbacks);
 	const perceptionGaps =
-		allFeedbacks.length > 0
-			? computePerceptionGaps(allFeedbacks, reflections, stakeholderRefs)
-			: null;
+		allFeedbacks.length > 0 ? computePerceptionGaps(allFeedbacks, checkIns, reviewers) : null;
 
-	const uniqueRatedStakeholders = new Set(allFeedbacks.map((f) => f.stakeholderId)).size;
+	const uniqueRatedReviewers = new Set(allFeedbacks.map((f) => f.reviewerId)).size;
 
 	return json({
 		myLastRatings,
-		stakeholdersLastRatings,
+		reviewersLastRatings,
 		perceptionGaps,
-		hasMultipleStakeholderRatings: uniqueRatedStakeholders >= 2,
-		totalStakeholders: objective.stakeholders.length
+		hasMultipleReviewerRatings: uniqueRatedReviewers >= 2,
+		totalReviewers: reviewers.length
 	});
 };

@@ -152,11 +152,7 @@
 						path: '/coach/roster',
 						userId: bestCoachId,
 						say: "Now the coach side. Before every session, AI-generated prep: trends, risks, conversation starters — all from the athlete's actual data.",
-						pointOut: [
-							'Click into a client',
-							'Generate Prep button',
-							'Stakeholder feedback trends'
-						],
+						pointOut: ['Click into a client', 'Generate Prep button', 'Reviewer feedback trends'],
 						tip: 'Click a client and hit Generate Prep to show streaming AI'
 					},
 					{
@@ -184,8 +180,8 @@
 				steps: [
 					{
 						path: '/admin',
-						say: 'The admin view — all users, active coaching cycles, and system health at a glance.',
-						pointOut: ['Total users and roles', 'Active cycles', 'System status']
+						say: 'The admin view — all users, active coaching journeys, and system health at a glance.',
+						pointOut: ['Total users and roles', 'Active journeys', 'System status']
 					},
 					{
 						path: '/admin/organizations',

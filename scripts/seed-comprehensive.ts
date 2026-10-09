@@ -4,8 +4,8 @@
  * Creates rich, multi-pattern test data:
  * - 3 coaches
  * - 8 individuals with diverse behavioral patterns
- * - 24 stakeholders with varied feedback bias
- * - 200+ reflections
+ * - 24 reviewers with varied feedback bias
+ * - 200+ checkIns
  * - 500+ feedback entries
  * - 20+ coach notes
  * - Coach-client relationships
@@ -13,9 +13,9 @@
  * Usage: npx tsx scripts/seed-comprehensive.ts
  */
 
-import { PrismaClient, UserRole, CycleStatus, ReflectionType, SubgoalMetric } from '@prisma/client';
+import { PrismaClient, UserRole, JourneyStatus } from '@prisma/client';
 import { COACHES, PERSONAS, SEED_EMAIL_PATTERN } from './seed-config';
-import { getScores, applyStakeholderBias, getActiveWeeks } from './seed-patterns';
+import { getScores, applyReviewerBias, getActiveWeeks } from './seed-patterns';
 import { generateCoachNotes } from './seed-coach-notes';
 
 const prisma = new PrismaClient();
@@ -26,16 +26,11 @@ async function cleanExistingSeedData() {
 	const seedUsers = await prisma.user.findMany({
 		where: { email: { contains: SEED_EMAIL_PATTERN } },
 		include: {
-			objectives: {
+			goals: {
 				include: {
-					cycles: {
-						include: {
-							reflections: { include: { feedbacks: true } },
-							coachNotes: true
-						}
-					},
-					stakeholders: true,
-					subgoals: true
+					journeys: true,
+					reviewers: true,
+					focusAreas: true
 				}
 			}
 		}
@@ -51,19 +46,17 @@ async function cleanExistingSeedData() {
 	await prisma.$transaction(
 		async (tx) => {
 			for (const user of seedUsers) {
-				for (const objective of user.objectives) {
-					for (const cycle of objective.cycles) {
-						for (const reflection of cycle.reflections) {
-							await tx.feedback.deleteMany({ where: { reflectionId: reflection.id } });
-						}
-						await tx.reflection.deleteMany({ where: { cycleId: cycle.id } });
-						await tx.coachNote.deleteMany({ where: { cycleId: cycle.id } });
+				for (const goal of user.goals) {
+					for (const journey of goal.journeys) {
+						await tx.feedback.deleteMany({ where: { journeyId: journey.id } });
+						await tx.checkIn.deleteMany({ where: { journeyId: journey.id } });
+						await tx.coachNote.deleteMany({ where: { journeyId: journey.id } });
 					}
-					await tx.cycle.deleteMany({ where: { objectiveId: objective.id } });
-					await tx.subgoal.deleteMany({ where: { objectiveId: objective.id } });
-					await tx.stakeholder.deleteMany({ where: { objectiveId: objective.id } });
+					await tx.journey.deleteMany({ where: { goalId: goal.id } });
+					await tx.focusArea.deleteMany({ where: { goalId: goal.id } });
+					await tx.reviewer.deleteMany({ where: { goalId: goal.id } });
 				}
-				await tx.objective.deleteMany({ where: { userId: user.id } });
+				await tx.goal.deleteMany({ where: { userId: user.id } });
 				await tx.coachClient.deleteMany({
 					where: { OR: [{ coachId: user.id }, { individualId: user.id }] }
 				});
@@ -110,11 +103,11 @@ async function main() {
 		}
 
 		// Step 3: Create individuals with full data
-		console.log('\nCreating individuals with objectives, cycles, reflections, and feedback...');
+		console.log('\nCreating individuals with goals, journeys, checkIns, and feedback...');
 
 		let totalReflections = 0;
 		let totalFeedbacks = 0;
-		let totalStakeholders = 0;
+		let totalReviewers = 0;
 		let totalCoachNotes = 0;
 
 		const individualRecords: Array<{ id: string; email: string; name: string; index: number }> = [];
@@ -142,26 +135,25 @@ async function main() {
 				index: i
 			});
 
-			// Create objective with subgoals
-			const objective = await prisma.objective.create({
+			// Create goal with focusAreas
+			const goal = await prisma.goal.create({
 				data: {
 					userId: individual.id,
-					title: persona.objectiveTitle,
-					description: persona.objectiveDescription,
+					title: persona.goalTitle,
+					description: persona.goalDescription,
 					active: true,
-					subgoals: {
-						create: persona.subgoals.map((sg, idx) => ({
-							label: sg.label,
-							description: sg.description,
-							metricType: SubgoalMetric.BOTH,
+					focusAreas: {
+						create: persona.focusAreas.map((area, idx) => ({
+							label: area.label,
+							description: area.description,
 							order: idx + 1
 						}))
 					}
 				},
-				include: { subgoals: true }
+				include: { focusAreas: true }
 			});
 
-			// Create cycle
+			// Create journey
 			const cycleStartDate = new Date();
 			cycleStartDate.setDate(cycleStartDate.getDate() - persona.cycleWeeks * 7);
 			cycleStartDate.setHours(0, 0, 0, 0);
@@ -169,26 +161,25 @@ async function main() {
 			const cycleEndDate = new Date(cycleStartDate);
 			cycleEndDate.setDate(cycleEndDate.getDate() + persona.cycleWeeks * 7);
 
-			const cycle = await prisma.cycle.create({
+			const journey = await prisma.journey.create({
 				data: {
 					userId: individual.id,
-					objectiveId: objective.id,
-					label: 'Cycle 1',
+					goalId: goal.id,
+					label: 'Journey 1',
 					startDate: cycleStartDate,
 					endDate: cycleEndDate,
-					status: persona.cycleStatus === 'ACTIVE' ? CycleStatus.ACTIVE : CycleStatus.COMPLETED,
-					stakeholderCadence: 'weekly',
-					autoThrottle: true
+					status: persona.cycleStatus === 'ACTIVE' ? JourneyStatus.ACTIVE : JourneyStatus.COMPLETED,
+					lengthWeeks: persona.cycleWeeks
 				}
 			});
 
-			// Create stakeholders
-			const stakeholderRecords = await Promise.all(
-				persona.stakeholders.map((sh) =>
-					prisma.stakeholder.create({
+			// Create reviewers
+			const reviewerRecords = await Promise.all(
+				persona.reviewers.map((sh) =>
+					prisma.reviewer.create({
 						data: {
 							individualId: individual.id,
-							objectiveId: objective.id,
+							goalId: goal.id,
 							name: sh.name,
 							email: sh.email,
 							relationship: sh.relationship
@@ -196,28 +187,53 @@ async function main() {
 					})
 				)
 			);
-			totalStakeholders += stakeholderRecords.length;
+			totalReviewers += reviewerRecords.length;
 
-			// Use first subgoal for reflections
-			const subgoal = objective.subgoals[0];
+			const coachForPersona = COACHES.find((coach) => coach.clientIndices.includes(i));
+			const coachRecord = coachForPersona
+				? coachRecords[COACHES.indexOf(coachForPersona)]
+				: undefined;
+			if (coachRecord) {
+				await prisma.reviewer.create({
+					data: {
+						individualId: individual.id,
+						goalId: goal.id,
+						userId: coachRecord.id,
+						invitedById: coachRecord.id,
+						name: coachRecord.name,
+						email: coachRecord.email,
+						relationship: 'Coach',
+						cadence: 'WEEKLY',
+						attribution: 'COACH'
+					}
+				});
+				totalReviewers++;
+			}
 
-			// Create initial rating (week 0) — required by onboarding flow
-			await prisma.reflection.create({
+			await prisma.insight.create({
 				data: {
-					cycleId: cycle.id,
 					userId: individual.id,
-					subgoalId: subgoal.id,
-					reflectionType: ReflectionType.RATING_A,
-					weekNumber: 0,
-					checkInDate: cycleStartDate,
+					journeyId: journey.id,
+					weekNumber: 1,
+					type: 'WEEKLY_SYNTHESIS',
+					status: 'COMPLETED',
+					content: `${persona.name} is building a baseline on ${persona.goalTitle}. The gap between self ratings and reviewers is the thing to watch.`
+				}
+			});
+
+			await prisma.checkIn.create({
+				data: {
+					journeyId: journey.id,
+					userId: individual.id,
 					submittedAt: cycleStartDate,
 					effortScore: 5,
-					performanceScore: 5
+					performanceScore: 5,
+					notes: 'Baseline check-in.'
 				}
 			});
 			totalReflections++;
 
-			// Generate reflections and feedback for each active week
+			// Generate checkIns and feedback for each active week
 			for (let week = 1; week <= activeWeeks; week++) {
 				const weekStartDate = new Date(cycleStartDate);
 				weekStartDate.setDate(weekStartDate.getDate() + (week - 1) * 7);
@@ -229,15 +245,11 @@ async function main() {
 
 				const scores = getScores(persona.pattern, week);
 
-				// EFFORT reflection (RATING_A)
-				await prisma.reflection.create({
+				// EFFORT reflection (CHECK_IN)
+				await prisma.checkIn.create({
 					data: {
-						cycleId: cycle.id,
+						journeyId: journey.id,
 						userId: individual.id,
-						subgoalId: subgoal.id,
-						reflectionType: ReflectionType.RATING_A,
-						weekNumber: week,
-						checkInDate: wednesdayDate,
 						submittedAt: wednesdayDate,
 						effortScore: Math.round(scores.effort),
 						performanceScore: Math.round(scores.performance * 0.9),
@@ -246,38 +258,33 @@ async function main() {
 				});
 				totalReflections++;
 
-				// PROGRESS reflection (RATING_B)
-				const progressReflection = await prisma.reflection.create({
+				await prisma.checkIn.create({
 					data: {
-						cycleId: cycle.id,
+						journeyId: journey.id,
 						userId: individual.id,
-						subgoalId: subgoal.id,
-						reflectionType: ReflectionType.RATING_B,
-						weekNumber: week,
-						checkInDate: fridayDate,
 						submittedAt: fridayDate,
 						effortScore: Math.round(scores.effort),
 						performanceScore: Math.round(scores.performance),
-						notes: `Week ${week} end-of-week reflection.`
+						notes: `Week ${week} end-of-week check-in.`
 					}
 				});
 				totalReflections++;
 
-				// Stakeholder feedback on the PROGRESS reflection
+				// Reviewer feedback on the PROGRESS reflection
 				const feedbackDate = new Date(fridayDate);
 				feedbackDate.setHours(18, 0, 0, 0);
 
-				for (let si = 0; si < persona.stakeholders.length; si++) {
-					const stakeholderConfig = persona.stakeholders[si];
-					const stakeholderRecord = stakeholderRecords[si];
+				for (let si = 0; si < persona.reviewers.length; si++) {
+					const reviewerConfig = persona.reviewers[si];
+					const reviewerRecord = reviewerRecords[si];
 
-					const biasedScores = applyStakeholderBias(scores, stakeholderConfig.bias, week, si);
+					const biasedScores = applyReviewerBias(scores, reviewerConfig.bias, week, si);
 
-					// null means sporadic stakeholder didn't respond this week
+					// null means sporadic reviewer didn't respond this week
 					if (biasedScores === null) continue;
 
-					const comments = getStakeholderComment(
-						stakeholderConfig.bias,
+					const comments = getReviewerComment(
+						reviewerConfig.bias,
 						scores.effort,
 						scores.performance,
 						week
@@ -285,8 +292,9 @@ async function main() {
 
 					await prisma.feedback.create({
 						data: {
-							reflectionId: progressReflection.id,
-							stakeholderId: stakeholderRecord.id,
+							journeyId: journey.id,
+							reviewerId: reviewerRecord.id,
+							weekNumber: week,
 							effortScore: Math.round(biasedScores.effort),
 							performanceScore: Math.round(biasedScores.performance),
 							submittedAt: feedbackDate,
@@ -299,18 +307,13 @@ async function main() {
 
 			// Generate coach notes
 			const coachNotes = generateCoachNotes(persona.pattern, activeWeeks);
-			const coachForIndividual = COACHES.find((c) => c.clientIndices.includes(i));
-			const coachRecord = coachForIndividual
-				? coachRecords[COACHES.indexOf(coachForIndividual)]
-				: null;
-
 			if (coachRecord) {
 				for (const note of coachNotes) {
 					await prisma.coachNote.create({
 						data: {
 							coachId: coachRecord.id,
 							individualId: individual.id,
-							cycleId: cycle.id,
+							journeyId: journey.id,
 							weekNumber: note.weekNumber,
 							content: note.content
 						}
@@ -320,7 +323,7 @@ async function main() {
 			}
 
 			console.log(
-				`    Reflections: ${activeWeeks * 3}, Stakeholders: ${stakeholderRecords.length}, Notes: ${coachNotes.length}`
+				`    Reflections: ${activeWeeks * 3}, Reviewers: ${reviewerRecords.length}, Notes: ${coachNotes.length}`
 			);
 		}
 
@@ -350,7 +353,7 @@ async function main() {
 		console.log('Summary:');
 		console.log(`  Coaches: ${coachRecords.length}`);
 		console.log(`  Individuals: ${individualRecords.length}`);
-		console.log(`  Stakeholders: ${totalStakeholders}`);
+		console.log(`  Reviewers: ${totalReviewers}`);
 		console.log(`  Reflections: ${totalReflections}`);
 		console.log(`  Feedback entries: ${totalFeedbacks}`);
 		console.log(`  Coach notes: ${totalCoachNotes}`);
@@ -376,7 +379,7 @@ async function main() {
 	}
 }
 
-function getStakeholderComment(
+function getReviewerComment(
 	bias: string,
 	effort: number,
 	performance: number,
@@ -405,7 +408,7 @@ function getStakeholderComment(
 	if (bias === 'negative') {
 		const comments = [
 			'Still seeing gaps in follow-through on commitments.',
-			'Expected more progress by this point in the cycle.',
+			'Expected more progress by this point in the journey.',
 			'The effort is there but the execution needs work.',
 			'Some areas still need significant improvement.',
 			"Not yet seeing the change we discussed. Let's talk."

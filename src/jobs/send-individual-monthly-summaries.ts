@@ -1,14 +1,18 @@
 import prisma from '$lib/server/prisma';
 import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
+import { wantsEmail, wantsSms } from '$lib/notifications/preferences';
+import { trySendSms } from '$lib/notifications/sms';
+import { smsTemplates } from '$lib/notifications/smsTemplates';
+import { getAppUrl } from '$lib/server/appUrl';
 
 /**
  * Monthly "here's what happened this month" email to each active Individual.
- * Parallel to send-stakeholder-impact-summaries — that one nurtures reviewers,
+ * Parallel to send-reviewer-impact-summaries — that one nurtures reviewers,
  * this one closes the loop for the Individual themself.
  *
  * Fires from /api/jobs/individual-monthly-summary cron on the 1st of each
- * month. The stakeholder-impact cron also runs at the same time.
+ * month. The reviewer-impact cron also runs at the same time.
  */
 export const sendIndividualMonthlySummaries = async () => {
 	const thirtyDaysAgo = new Date();
@@ -16,39 +20,43 @@ export const sendIndividualMonthlySummaries = async () => {
 	const sixtyDaysAgo = new Date();
 	sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-	// Pull active individuals who have an active cycle. We compute last-30 vs
+	// Pull active individuals who have an active journey. We compute last-30 vs
 	// prior-30 stats and skip users with no recent activity.
 	const individuals = await prisma.user.findMany({
 		where: {
 			role: 'INDIVIDUAL',
-			objectives: { some: { active: true, cycles: { some: { status: 'ACTIVE' } } } }
+			goals: { some: { active: true, journeys: { some: { status: 'ACTIVE' } } } }
 		},
 		select: {
 			id: true,
 			name: true,
 			email: true,
-			objectives: {
+			phone: true,
+			deliveryMethod: true,
+			goals: {
 				where: { active: true },
 				select: {
 					title: true,
-					cycles: {
+					journeys: {
+						where: { status: 'ACTIVE' },
 						orderBy: { startDate: 'desc' },
 						take: 1,
 						select: {
 							id: true,
-							reflections: {
+							checkIns: {
 								where: { submittedAt: { gte: sixtyDaysAgo } },
 								select: {
 									effortScore: true,
 									performanceScore: true,
-									submittedAt: true,
-									feedbacks: {
-										select: {
-											effortScore: true,
-											performanceScore: true,
-											submittedAt: true
-										}
-									}
+									submittedAt: true
+								}
+							},
+							feedback: {
+								where: { submittedAt: { gte: sixtyDaysAgo } },
+								select: {
+									effortScore: true,
+									performanceScore: true,
+									submittedAt: true
 								}
 							}
 						}
@@ -60,23 +68,21 @@ export const sendIndividualMonthlySummaries = async () => {
 
 	let sent = 0;
 	for (const user of individuals) {
-		const objective = user.objectives[0];
-		const cycle = objective?.cycles[0];
-		if (!objective || !cycle) continue;
+		const goal = user.goals[0];
+		const journey = goal?.journeys[0];
+		if (!goal || !journey) continue;
 
-		// Partition reflections + feedbacks into "this month" (last 30d) and
+		// Partition checkIns + feedbacks into "this month" (last 30d) and
 		// "last month" (30-60d). All-zero in this-month → skip (no activity to
 		// summarize, don't spam inactive users).
-		const reflectionsThis = cycle.reflections.filter((r) => r.submittedAt >= thirtyDaysAgo);
-		const reflectionsLast = cycle.reflections.filter(
+		const reflectionsThis = journey.checkIns.filter((r) => r.submittedAt >= thirtyDaysAgo);
+		const reflectionsLast = journey.checkIns.filter(
 			(r) => r.submittedAt < thirtyDaysAgo && r.submittedAt >= sixtyDaysAgo
 		);
 
-		const feedbacksThis = cycle.reflections.flatMap((r) =>
-			r.feedbacks.filter((f) => f.submittedAt >= thirtyDaysAgo)
-		);
-		const feedbacksLast = cycle.reflections.flatMap((r) =>
-			r.feedbacks.filter((f) => f.submittedAt < thirtyDaysAgo && f.submittedAt >= sixtyDaysAgo)
+		const feedbacksThis = journey.feedback.filter((f) => f.submittedAt >= thirtyDaysAgo);
+		const feedbacksLast = journey.feedback.filter(
+			(f) => f.submittedAt < thirtyDaysAgo && f.submittedAt >= sixtyDaysAgo
 		);
 
 		const checkInCount = reflectionsThis.length;
@@ -108,22 +114,36 @@ export const sendIndividualMonthlySummaries = async () => {
 				: null;
 		const gapDelta = gapThis != null && gapLast != null ? +(gapThis - gapLast).toFixed(1) : null;
 
-		try {
-			const template = emailTemplates.individualMonthlySummary({
-				individualName: user.name || undefined,
-				objectiveTitle: objective.title,
-				checkInCount,
-				feedbackCount: feedbacksThis.length,
-				myEffortThis,
-				myPerfThis,
-				reviewerEffortThis,
-				reviewerPerfThis,
-				gapDelta
-			});
-			await sendEmail({ to: user.email, ...template });
-			sent++;
-		} catch (err) {
-			console.error(`[job:individual-monthly-summary] Failed to send to ${user.email}`, err);
+		if (wantsEmail(user.deliveryMethod)) {
+			try {
+				const template = emailTemplates.individualMonthlySummary({
+					individualName: user.name || undefined,
+					goalTitle: goal.title,
+					checkInCount,
+					feedbackCount: feedbacksThis.length,
+					myEffortThis,
+					myPerfThis,
+					reviewerEffortThis,
+					reviewerPerfThis,
+					gapDelta
+				});
+				await sendEmail({ to: user.email, ...template });
+				sent++;
+			} catch (err) {
+				console.error(`[job:individual-monthly-summary] Failed to send to ${user.email}`, err);
+			}
+		}
+
+		if (wantsSms(user.deliveryMethod)) {
+			await trySendSms(
+				user.phone,
+				smsTemplates.individualMonthlySummary({
+					goalTitle: goal.title,
+					checkInCount,
+					feedbackCount: feedbacksThis.length,
+					appUrl: getAppUrl()
+				})
+			);
 		}
 	}
 

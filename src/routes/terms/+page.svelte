@@ -19,9 +19,9 @@
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">2. Program Description</h2>
 			<p>
 				Forbetra is a personal development platform that provides goal-setting, weekly
-				self-assessment, stakeholder feedback, and AI-generated coaching insights. The Service is
+				self-assessment, reviewer feedback, and AI-generated coaching insights. The Service is
 				designed for individuals working with coaches to improve performance through structured
-				development cycles.
+				development journeys.
 			</p>
 		</div>
 
@@ -86,9 +86,9 @@
 		<div>
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">6. Reviewer Invitations</h2>
 			<p>
-				When you invite stakeholders, you represent that you have a legitimate relationship with
-				those individuals and that they would reasonably expect to receive communications from you
-				through the platform.
+				When you invite reviewers, you represent that you have a legitimate relationship with those
+				individuals and that they would reasonably expect to receive communications from you through
+				the platform.
 			</p>
 		</div>
 

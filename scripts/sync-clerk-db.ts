@@ -98,7 +98,7 @@ async function syncWithClerk() {
 		console.log('📥 Fetching users from Prisma database...');
 		const prismaUsers = await prisma.user.findMany({
 			include: {
-				objectives: true,
+				goals: true,
 				coachNotesAuthored: true,
 				coachNotesReceived: true
 			}
@@ -124,7 +124,7 @@ async function syncWithClerk() {
 
 					// Check if user has related data
 					const hasData =
-						prismaUser.objectives.length > 0 ||
+						prismaUser.goals.length > 0 ||
 						prismaUser.coachNotesAuthored.length > 0 ||
 						prismaUser.coachNotesReceived.length > 0;
 

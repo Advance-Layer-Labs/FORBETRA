@@ -7,6 +7,8 @@ const config = {
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
 	kit: {
+		// Replaced in hooks.server.ts so the Twilio SMS webhook can post without an Origin header.
+		csrf: { checkOrigin: false },
 		adapter: adapter({ runtime: 'nodejs22.x' }),
 		alias: {
 			$jobs: 'src/jobs'

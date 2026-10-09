@@ -1,13 +1,13 @@
 /**
  * Weekly Insight Generation Job
  *
- * Finds all active cycles and generates WEEKLY_SYNTHESIS insights
+ * Finds all active journeys and generates WEEKLY_SYNTHESIS insights
  * for the current week. Runs Sunday evening.
  */
 
 import prisma from '$lib/server/prisma';
 import { generateWeeklySynthesis } from '$lib/server/ai/generateInsight';
-import { computeWeekNumber } from '$lib/server/coachUtils';
+import { currentWeekNumber } from '$lib/server/domain/week';
 
 export async function generateWeeklyInsights(): Promise<{
 	generated: number;
@@ -16,55 +16,56 @@ export async function generateWeeklyInsights(): Promise<{
 }> {
 	console.log('[insights:weekly] Starting weekly insight generation...');
 
-	const activeCycles = await prisma.cycle.findMany({
+	const activeCycles = await prisma.journey.findMany({
 		where: { status: 'ACTIVE' },
 		select: {
 			id: true,
 			userId: true,
-			startDate: true
+			startDate: true,
+			user: { select: { timezone: true } }
 		}
 	});
 
 	const cycleTargets = activeCycles.map((c) => ({
 		...c,
-		weekNumber: computeWeekNumber(c.startDate)
+		weekNumber: currentWeekNumber(c.startDate, new Date(), c.user.timezone)
 	}));
 
 	const existingInsights = await prisma.insight.findMany({
 		where: {
 			type: 'WEEKLY_SYNTHESIS',
-			cycleId: { in: cycleTargets.map((c) => c.id) }
+			journeyId: { in: cycleTargets.map((c) => c.id) }
 		},
-		select: { cycleId: true, weekNumber: true }
+		select: { journeyId: true, weekNumber: true }
 	});
-	const existingKey = (cycleId: string, weekNumber: number) => `${cycleId}:${weekNumber}`;
+	const existingKey = (journeyId: string, weekNumber: number) => `${journeyId}:${weekNumber}`;
 	const existingSet = new Set(
 		existingInsights
-			.filter((i) => i.cycleId !== null && i.weekNumber !== null)
-			.map((i) => existingKey(i.cycleId as string, i.weekNumber as number))
+			.filter((i) => i.journeyId !== null && i.weekNumber !== null)
+			.map((i) => existingKey(i.journeyId as string, i.weekNumber as number))
 	);
 
 	let generated = 0;
 	let skipped = 0;
 	let failed = 0;
 
-	for (const cycle of cycleTargets) {
-		const { weekNumber } = cycle;
+	for (const journey of cycleTargets) {
+		const { weekNumber } = journey;
 
-		if (existingSet.has(existingKey(cycle.id, weekNumber))) {
+		if (existingSet.has(existingKey(journey.id, weekNumber))) {
 			skipped++;
 			continue;
 		}
 
 		try {
-			const insightId = await generateWeeklySynthesis(cycle.userId, cycle.id, weekNumber);
+			const insightId = await generateWeeklySynthesis(journey.userId, journey.id, weekNumber);
 			if (insightId) {
 				generated++;
 			} else {
 				failed++;
 			}
 		} catch (error) {
-			console.error(`[insights:weekly] Failed for cycle ${cycle.id}`, error);
+			console.error(`[insights:weekly] Failed for journey ${journey.id}`, error);
 			failed++;
 		}
 	}

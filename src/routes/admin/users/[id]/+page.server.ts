@@ -1,11 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
+import { weekNumberForDate } from '$lib/server/domain';
 import { clerkClient } from 'svelte-clerk/server';
 import type { Actions, PageServerLoad } from './$types';
 import type { UserRole } from '@prisma/client';
 
-const ALLOWED_ROLES: UserRole[] = ['INDIVIDUAL', 'COACH', 'STAKEHOLDER', 'ADMIN', 'ORG_ADMIN'];
+const ALLOWED_ROLES: UserRole[] = ['INDIVIDUAL', 'COACH', 'ADMIN', 'ORG_ADMIN'];
 
 export const load: PageServerLoad = async (event) => {
 	requireRole(event, 'ADMIN');
@@ -15,19 +16,17 @@ export const load: PageServerLoad = async (event) => {
 	const user = await prisma.user.findUnique({
 		where: { id },
 		include: {
-			objectives: {
+			goals: {
 				include: {
-					subgoals: { orderBy: { order: 'asc' } },
-					cycles: {
+					focusAreas: { orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
+					journeys: {
 						orderBy: { startDate: 'desc' },
 						include: {
-							reflections: {
+							checkIns: {
 								orderBy: { submittedAt: 'desc' },
 								take: 20,
 								select: {
 									id: true,
-									reflectionType: true,
-									weekNumber: true,
 									effortScore: true,
 									performanceScore: true,
 									submittedAt: true
@@ -44,14 +43,15 @@ export const load: PageServerLoad = async (event) => {
 									coach: { select: { name: true } }
 								}
 							},
-							_count: { select: { reflections: true } }
-						}
-					},
-					stakeholders: {
-						include: {
-							_count: { select: { feedbacks: true } }
+							_count: { select: { checkIns: true } }
 						}
 					}
+				}
+			},
+			reviewers: {
+				orderBy: { createdAt: 'asc' },
+				include: {
+					_count: { select: { feedback: true } }
 				}
 			},
 			coachClientsManaged: {
@@ -67,7 +67,24 @@ export const load: PageServerLoad = async (event) => {
 		throw redirect(303, '/admin/users');
 	}
 
-	return { user, roles: ALLOWED_ROLES };
+	const { reviewers, ...rest } = user;
+	return {
+		user: {
+			...rest,
+			goals: rest.goals.map((goal) => ({
+				...goal,
+				journeys: goal.journeys.map((journey) => ({
+					...journey,
+					checkIns: journey.checkIns.map((checkIn) => ({
+						...checkIn,
+						weekNumber: weekNumberForDate(journey.startDate, checkIn.submittedAt, user.timezone)
+					}))
+				})),
+				reviewers: reviewers.filter((r) => !r.goalId || r.goalId === goal.id)
+			}))
+		},
+		roles: ALLOWED_ROLES
+	};
 };
 
 export const actions: Actions = {

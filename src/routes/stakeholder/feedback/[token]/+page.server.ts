@@ -1,77 +1,48 @@
 import { fail, redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
-import { stakeholderFeedbackSchema } from '$lib/validation/feedback';
+import { reviewerFeedbackSchema } from '$lib/validation/feedback';
 import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
+import { wantsEmail, wantsSms } from '$lib/notifications/preferences';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { rateLimit } from '$lib/server/rateLimit';
 import { hashToken } from '$lib/server/tokenHash';
-import type { Prisma } from '@prisma/client';
+import {
+	average,
+	DuplicateFeedbackError,
+	submitFeedback,
+	weekNumberForDate
+} from '$lib/server/domain';
 import type { Actions, PageServerLoad } from './$types';
+
+const INVALID_PATH = '/stakeholder/invalid';
 
 const sanitizeToken = (value: string | undefined) => {
 	if (!value) return null;
 	return /^[a-f0-9]{64}$/i.test(value) ? value : null;
 };
 
-/**
- * Lookup a token by URL value. Hashes the URL value first and queries by
- * the hash; falls back to the raw value to keep already-emailed pre-hashing
- * links working during the rollout window (PR-1 of 3). The fallback path
- * becomes dead code after PR-2 backfills all rows and is removed in PR-3.
- */
-async function findTokenByUrlValue<T extends Prisma.TokenInclude>(tokenParam: string, include: T) {
-	const hashed = hashToken(tokenParam);
-	const byHash = await prisma.token.findUnique({
-		where: { tokenHash: hashed },
-		include
-	});
-	if (byHash) return byHash;
-	return prisma.token.findUnique({
-		where: { tokenHash: tokenParam },
-		include
-	});
-}
-
-async function findTokenByUrlValueSelect<T extends Prisma.TokenSelect>(
-	tokenParam: string,
-	select: T
-) {
-	const hashed = hashToken(tokenParam);
-	const byHash = await prisma.token.findUnique({
-		where: { tokenHash: hashed },
-		select
-	});
-	if (byHash) return byHash;
-	return prisma.token.findUnique({
-		where: { tokenHash: tokenParam },
-		select
-	});
-}
+const roundOne = (value: number | null) => (value === null ? null : Math.round(value * 10) / 10);
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const isPreview = url.searchParams.get('preview') === 'true';
-	const tokenParam = sanitizeToken(params.token);
 
-	// Preview mode - return mock data
 	if (isPreview && params.token === 'preview') {
 		return {
 			token: 'preview',
-			stakeholder: {
+			reviewer: {
 				id: 'preview',
-				name: 'Sample Stakeholder',
-				phone: null
+				name: 'Sample Reviewer',
+				phone: null as string | null
 			},
-			reflection: {
-				type: 'RATING_B' as const,
+			invite: {
 				weekNumber: 3,
-				checkInDate: new Date().toISOString(),
-				cycleLabel: 'Q1 2026 Leadership Cycle',
+				journeyLabel: 'Q1 2026 Leadership Journey',
 				participantName: 'John Doe',
-				objectiveTitle: 'Improve executive presence'
+				goalTitle: 'Improve executive presence'
 			},
-			subgoals: [
+			focusAreas: [
 				{
 					label: 'Active listening in meetings',
 					description: 'Make eye contact, paraphrase others, ask clarifying questions'
@@ -82,170 +53,122 @@ export const load: PageServerLoad = async ({ params, url }) => {
 				}
 			],
 			isPreview: true,
+			isAlreadySubmitted: false,
 			isFirstFeedback: true,
 			previousRatings: {
 				weekNumber: 2,
-				effortScore: 7,
-				performanceScore: 6
+				effortScore: 7 as number | null,
+				performanceScore: 6 as number | null
 			},
 			historicRatings: [
-				{ weekNumber: 2, effortScore: 7, performanceScore: 6 },
-				{ weekNumber: 1, effortScore: 6, performanceScore: 5 }
-			]
+				{ weekNumber: 2, effortScore: 7 as number | null, performanceScore: 6 as number | null },
+				{ weekNumber: 1, effortScore: 6 as number | null, performanceScore: 5 as number | null }
+			],
+			feedbackCount: 0
 		};
 	}
 
+	const tokenParam = sanitizeToken(params.token);
 	if (!tokenParam) {
-		throw redirect(302, '/stakeholder/invalid');
+		throw redirect(302, INVALID_PATH);
 	}
 
-	const token = await findTokenByUrlValue(tokenParam, {
-		stakeholder: true,
-		reflection: {
-			select: {
-				id: true,
-				reflectionType: true,
-				weekNumber: true,
-				checkInDate: true,
-				cycleId: true,
-				cycle: {
-					select: {
-						label: true,
-						revealScores: true,
-						objective: {
-							select: {
-								title: true,
-								description: true,
-								subgoals: {
-									where: { active: true },
-									orderBy: { createdAt: 'asc' },
-									select: { id: true, label: true, description: true }
-								}
+	const token = await prisma.token.findUnique({
+		where: { tokenHash: hashToken(tokenParam) },
+		include: {
+			reviewer: true,
+			journey: {
+				include: {
+					user: { select: { name: true } },
+					goal: {
+						include: {
+							focusAreas: {
+								where: { active: true },
+								orderBy: [{ order: 'asc' }, { createdAt: 'asc' }]
 							}
 						}
 					}
-				},
-				user: {
-					select: {
-						name: true
-					}
 				}
 			}
 		}
 	});
 
-	if (!token || !token.stakeholder || !token.reflection) {
-		throw redirect(302, '/stakeholder/invalid');
+	if (
+		!token ||
+		token.type !== 'FEEDBACK_INVITE' ||
+		!token.reviewer ||
+		!token.journey ||
+		!token.reviewerId ||
+		!token.journeyId ||
+		token.weekNumber === null
+	) {
+		throw redirect(302, INVALID_PATH);
 	}
 
-	const isAlreadySubmitted = !!token.usedAt;
+	const weekNumber = token.weekNumber;
 
-	// Check expiry AFTER usedAt — so returning stakeholders who already submitted
-	// see "already submitted" instead of a confusing "invalid link" error
-	if (!isAlreadySubmitted && token.expiresAt < new Date()) {
-		throw redirect(302, '/stakeholder/invalid');
-	}
-
-	// Fetch previous feedback ratings from this stakeholder (only if not Week 1)
-	let previousRatings: {
-		weekNumber: number;
-		effortScore: number | null;
-		performanceScore: number | null;
-	} | null = null;
-	let historicRatings: Array<{
-		weekNumber: number;
-		effortScore: number | null;
-		performanceScore: number | null;
-	}> = [];
-
-	if (token.reflection.weekNumber > 1 && token.stakeholderId) {
-		// Get all feedback submitted by this stakeholder for any reflection in the same cycle
-		const allFeedbacks = await prisma.feedback.findMany({
-			where: {
-				stakeholderId: token.stakeholderId,
-				reflection: {
-					cycleId: token.reflection.cycleId,
-					weekNumber: { lt: token.reflection.weekNumber }
-				}
-			},
-			orderBy: {
-				submittedAt: 'desc'
-			},
-			select: {
-				effortScore: true,
-				performanceScore: true,
-				reflection: {
-					select: {
-						weekNumber: true
-					}
-				}
+	const existingFeedback = await prisma.feedback.findUnique({
+		where: {
+			reviewerId_journeyId_weekNumber: {
+				reviewerId: token.reviewerId,
+				journeyId: token.journeyId,
+				weekNumber
 			}
-		});
+		},
+		select: { id: true }
+	});
 
-		if (allFeedbacks.length > 0) {
-			// Get last feedback (most recent)
-			const lastFeedback = allFeedbacks[0];
-			previousRatings = {
-				weekNumber: lastFeedback.reflection.weekNumber,
-				effortScore: lastFeedback.effortScore,
-				performanceScore: lastFeedback.performanceScore
-			};
+	const isAlreadySubmitted = !!token.usedAt || !!existingFeedback;
 
-			// Build historic ratings map by week
-			const historicMap = new Map<
-				number,
-				{ effortScore: number | null; performanceScore: number | null }
-			>();
-
-			allFeedbacks.forEach((feedback) => {
-				const week = feedback.reflection.weekNumber;
-				if (!historicMap.has(week)) {
-					historicMap.set(week, { effortScore: null, performanceScore: null });
-				}
-				const weekData = historicMap.get(week)!;
-				if (feedback.effortScore !== null) weekData.effortScore = feedback.effortScore;
-				if (feedback.performanceScore !== null)
-					weekData.performanceScore = feedback.performanceScore;
-			});
-
-			// Convert to array sorted by week number (descending)
-			historicRatings = Array.from(historicMap.entries())
-				.map(([weekNumber, scores]) => ({ weekNumber, ...scores }))
-				.sort((a, b) => b.weekNumber - a.weekNumber);
-		}
+	// Expiry is checked after the submitted state so returning reviewers see
+	// "already submitted" instead of an invalid-link page.
+	if (!isAlreadySubmitted && token.expiresAt < new Date()) {
+		throw redirect(302, INVALID_PATH);
 	}
 
+	const priorFeedback = await prisma.feedback.findMany({
+		where: {
+			reviewerId: token.reviewerId,
+			journeyId: token.journeyId,
+			weekNumber: { lt: weekNumber }
+		},
+		orderBy: { weekNumber: 'desc' },
+		select: { weekNumber: true, effortScore: true, performanceScore: true }
+	});
+
+	const historicRatings = priorFeedback.map((feedback) => ({
+		weekNumber: feedback.weekNumber,
+		effortScore: feedback.effortScore,
+		performanceScore: feedback.performanceScore
+	}));
+	const previousRatings = historicRatings[0] ?? null;
 	const isFirstFeedback = historicRatings.length === 0;
 
-	// Count total feedbacks from this stakeholder (for conversion funnel)
 	const feedbackCount = await prisma.feedback.count({
-		where: { stakeholderId: token.stakeholderId! }
+		where: { reviewerId: token.reviewerId }
 	});
 
-	const subgoals = (token.reflection.cycle.objective?.subgoals ?? []).map((s) => ({
-		label: s.label,
-		description: s.description
+	const focusAreas = token.journey.goal.focusAreas.map((focusArea) => ({
+		label: focusArea.label,
+		description: focusArea.description
 	}));
 
 	return {
 		// Pass the URL value (plaintext) through, not the stored hash. The action
-		// handler re-hashes it on submit to look up the token.
+		// re-hashes it on submit to look up the token.
 		token: tokenParam,
-		stakeholder: {
-			id: token.stakeholder.id,
-			name: token.stakeholder.name,
-			phone: token.stakeholder.phone
+		reviewer: {
+			id: token.reviewer.id,
+			name: token.reviewer.name,
+			phone: token.reviewer.phone
 		},
-		reflection: {
-			type: token.reflection.reflectionType,
-			weekNumber: token.reflection.weekNumber,
-			checkInDate: token.reflection.checkInDate.toISOString(),
-			cycleLabel: token.reflection.cycle.label ?? 'Cycle',
-			participantName: token.reflection.user.name ?? 'Participant',
-			objectiveTitle: token.reflection.cycle.objective?.title?.trim() || 'the objective'
+		invite: {
+			weekNumber,
+			journeyLabel: token.journey.label ?? 'Journey',
+			participantName: token.journey.user.name ?? 'Participant',
+			goalTitle: token.journey.goal.title?.trim() || 'the goal'
 		},
-		subgoals,
-		revealScores: token.reflection.cycle.revealScores,
+		focusAreas,
 		isPreview: false,
 		isAlreadySubmitted,
 		isFirstFeedback,
@@ -263,14 +186,11 @@ export const actions: Actions = {
 		}
 
 		const isPreview = url.searchParams.get('preview') === 'true';
-
-		// Prevent submission in preview mode
 		if (isPreview && params.token === 'preview') {
 			return fail(400, { error: 'Preview mode - submissions are disabled.' });
 		}
 
 		const tokenParam = sanitizeToken(params.token);
-
 		if (!tokenParam) {
 			return fail(400, { error: 'Invalid or expired feedback token.' });
 		}
@@ -279,8 +199,7 @@ export const actions: Actions = {
 		const payload = Object.fromEntries(formData) as Record<string, string>;
 		payload.token = tokenParam;
 
-		const parsed = stakeholderFeedbackSchema.safeParse(payload);
-
+		const parsed = reviewerFeedbackSchema.safeParse(payload);
 		if (!parsed.success) {
 			const errors = parsed.error.flatten();
 			return fail(400, {
@@ -291,199 +210,223 @@ export const actions: Actions = {
 
 		const data = parsed.data;
 
-		const token = await findTokenByUrlValueSelect(data.token, {
-			id: true,
-			usedAt: true,
-			expiresAt: true,
-			stakeholderId: true,
-			reflectionId: true
+		const token = await prisma.token.findUnique({
+			where: { tokenHash: hashToken(data.token) },
+			select: {
+				id: true,
+				type: true,
+				usedAt: true,
+				expiresAt: true,
+				reviewerId: true,
+				journeyId: true,
+				weekNumber: true
+			}
 		});
 
-		if (!token || token.usedAt || !token.reflectionId || !token.stakeholderId) {
+		if (
+			!token ||
+			token.type !== 'FEEDBACK_INVITE' ||
+			!token.reviewerId ||
+			!token.journeyId ||
+			token.weekNumber === null
+		) {
 			return fail(400, { error: 'This feedback link is no longer valid.' });
 		}
 
+		if (token.usedAt) {
+			return fail(409, { alreadySubmitted: true });
+		}
+
 		if (token.expiresAt < new Date()) {
-			return fail(400, { error: 'This feedback link has expired.' });
+			return fail(400, {
+				error: 'This feedback link has expired.',
+				expired: true
+			});
 		}
 
-		// Fetch stakeholder and reflection details for notification
-		const stakeholder = await prisma.stakeholder.findUnique({
-			where: { id: token.stakeholderId! },
-			select: {
-				name: true,
-				email: true,
-				phone: true,
-				individual: { select: { id: true, name: true, email: true, phone: true } }
+		const reviewerId = token.reviewerId;
+		const journeyId = token.journeyId;
+		const weekNumber = token.weekNumber;
+
+		try {
+			await submitFeedback({
+				journeyId,
+				reviewerId,
+				weekNumber,
+				effortScore: data.effortScore ?? null,
+				performanceScore: data.performanceScore ?? null,
+				comment: data.comment ?? null,
+				behavioralObservation: data.behavioralObservation ?? null,
+				suggestion: data.suggestion ?? null
+			});
+		} catch (error) {
+			if (error instanceof DuplicateFeedbackError) {
+				await prisma.token.update({ where: { id: token.id }, data: { usedAt: new Date() } });
+				return fail(409, { alreadySubmitted: true });
 			}
+			throw error;
+		}
+
+		await prisma.token.update({
+			where: { id: token.id },
+			data: { usedAt: new Date() }
 		});
 
-		const reflection = await prisma.reflection.findUnique({
-			where: { id: token.reflectionId! },
-			select: {
-				effortScore: true,
-				performanceScore: true,
-				weekNumber: true,
-				user: {
-					select: {
-						name: true
-					}
-				},
-				cycle: {
-					select: {
-						revealScores: true,
-						objective: {
-							select: {
-								title: true
-							}
-						}
+		const [reviewer, journey] = await Promise.all([
+			prisma.reviewer.findUnique({
+				where: { id: reviewerId },
+				select: {
+					name: true,
+					email: true,
+					phone: true,
+					individual: {
+						select: { id: true, name: true, email: true, phone: true, deliveryMethod: true }
 					}
 				}
-			}
-		});
-
-		await prisma.$transaction(async (tx) => {
-			await tx.feedback.upsert({
-				where: {
-					stakeholderId_reflectionId: {
-						stakeholderId: token.stakeholderId!,
-						reflectionId: token.reflectionId!
+			}),
+			prisma.journey.findUnique({
+				where: { id: journeyId },
+				select: {
+					startDate: true,
+					user: { select: { name: true, timezone: true } },
+					checkIns: {
+						select: { effortScore: true, performanceScore: true, submittedAt: true }
 					}
-				},
-				update: {
-					effortScore: data.effortScore ?? null,
-					performanceScore: data.performanceScore ?? null,
-					comment: data.comment ?? null,
-					behavioralObservation: data.behavioralObservation ?? null,
-					suggestion: data.suggestion ?? null,
-					submittedAt: new Date()
-				},
-				create: {
-					stakeholderId: token.stakeholderId!,
-					reflectionId: token.reflectionId!,
-					effortScore: data.effortScore ?? null,
-					performanceScore: data.performanceScore ?? null,
-					comment: data.comment ?? null,
-					behavioralObservation: data.behavioralObservation ?? null,
-					suggestion: data.suggestion ?? null,
-					submittedAt: new Date()
 				}
-			});
+			})
+		]);
 
-			await tx.token.update({
-				where: { id: token.id },
-				data: { usedAt: new Date() }
-			});
-		});
+		const participantName = journey?.user.name ?? 'Participant';
 
-		// Send notification email to individual when stakeholder submits feedback
-		if (stakeholder?.individual && reflection) {
+		// Send notification email to individual when reviewer submits feedback
+		if (reviewer?.individual && wantsEmail(reviewer.individual.deliveryMethod)) {
 			try {
-				const template = emailTemplates.stakeholderFeedbackReceived({
-					individualName: stakeholder.individual.name || undefined,
-					stakeholderName: stakeholder.name || undefined,
+				const template = emailTemplates.reviewerFeedbackReceived({
+					individualName: reviewer.individual.name || undefined,
+					reviewerName: reviewer.name || undefined,
 					appUrl: url.origin
 				});
 				await sendEmail({
-					to: stakeholder.individual.email,
+					to: reviewer.individual.email,
 					...template
 				});
 			} catch (error) {
-				console.error('[email:error] Failed to send stakeholder feedback notification', error);
-				// Don't fail the request if email fails
+				console.error('[email:error] Failed to send reviewer feedback notification', error);
 			}
+		}
 
-			// Send SMS to individual
+		if (reviewer?.individual && wantsSms(reviewer.individual.deliveryMethod)) {
 			await trySendSms(
-				stakeholder.individual.phone,
-				smsTemplates.stakeholderFeedbackReceived({
-					stakeholderName: stakeholder.name || undefined,
+				reviewer.individual.phone,
+				smsTemplates.reviewerFeedbackReceived({
+					reviewerName: reviewer.name || undefined,
 					appUrl: url.origin
 				})
 			);
 		}
 
-		// Send thank-you email to stakeholder
-		if (stakeholder?.email && reflection) {
+		// Send thank-you email to reviewer
+		if (reviewer?.email) {
 			try {
-				const template = emailTemplates.stakeholderThankYou({
-					stakeholderName: stakeholder.name || undefined,
-					individualName: reflection.user.name || undefined,
-					weekNumber: reflection.weekNumber
+				const template = emailTemplates.reviewerThankYou({
+					reviewerName: reviewer.name || undefined,
+					individualName: journey?.user.name || undefined,
+					weekNumber
 				});
 				await sendEmail({
-					to: stakeholder.email,
+					to: reviewer.email,
 					...template
 				});
 			} catch (error) {
-				console.error('[email:error] Failed to send stakeholder thank-you email', error);
+				console.error('[email:error] Failed to send reviewer thank-you email', error);
 			}
 
-			// Send thank-you SMS to stakeholder
 			await trySendSms(
-				stakeholder.phone,
-				smsTemplates.stakeholderThankYou({
-					individualName: reflection.user.name || undefined,
-					weekNumber: reflection.weekNumber
+				reviewer.phone,
+				smsTemplates.reviewerThankYou({
+					individualName: journey?.user.name || undefined,
+					weekNumber
 				})
 			);
 		}
 
-		// Notify coach if the individual has one
-		if (stakeholder?.individual && reflection) {
+		// Notify every active coach linked to this individual
+		if (reviewer?.individual) {
 			try {
-				const coachClient = await prisma.coachClient.findFirst({
+				const coachClients = await prisma.coachClient.findMany({
 					where: {
-						individualId: stakeholder.individual.id,
+						individualId: reviewer.individual.id,
 						archivedAt: null
 					},
 					select: {
 						coach: {
-							select: { email: true, name: true, phone: true }
+							select: { email: true, name: true, phone: true, deliveryMethod: true }
 						}
 					}
 				});
 
-				if (coachClient?.coach) {
-					const coachTemplate = emailTemplates.coachStakeholderFeedbackReceived({
-						coachName: coachClient.coach.name ?? 'Coach',
-						individualName: stakeholder.individual.name || 'a client',
-						stakeholderName: stakeholder.name || undefined,
-						weekNumber: reflection.weekNumber,
-						appUrl: url.origin
-					});
-					await sendEmail({
-						to: coachClient.coach.email,
-						...coachTemplate
-					});
+				for (const coachClient of coachClients) {
+					const coach = coachClient.coach;
+					if (wantsEmail(coach.deliveryMethod)) {
+						const coachTemplate = emailTemplates.coachReviewerFeedbackReceived({
+							coachName: coach.name ?? 'Coach',
+							individualName: reviewer.individual.name || 'a client',
+							reviewerName: reviewer.name || undefined,
+							weekNumber,
+							appUrl: url.origin
+						});
+						await sendEmail({
+							to: coach.email,
+							...coachTemplate
+						});
+					}
 
-					await trySendSms(
-						coachClient.coach.phone,
-						`Forbetra: ${stakeholder.name || 'A reviewer'} submitted feedback for your client ${stakeholder.individual.name || 'a client'} (Week ${reflection.weekNumber}). ${url.origin}/coach/roster`
-					);
+					if (wantsSms(coach.deliveryMethod)) {
+						await trySendSms(
+							coach.phone,
+							smsTemplates.coachReviewerFeedbackReceived({
+								reviewerName: reviewer.name || undefined,
+								individualName: reviewer.individual.name || undefined,
+								weekNumber,
+								appUrl: url.origin
+							})
+						);
+					}
 				}
 			} catch (error) {
 				console.error('[email:error] Failed to send coach feedback notification', error);
 			}
 		}
 
-		// Count feedbacks for conversion funnel
 		const totalFeedbacks = await prisma.feedback.count({
-			where: { stakeholderId: token.stakeholderId! }
+			where: { reviewerId }
 		});
+
+		const weekCheckIns = journey
+			? journey.checkIns.filter(
+					(checkIn) =>
+						weekNumberForDate(journey.startDate, checkIn.submittedAt, journey.user.timezone) ===
+						weekNumber
+				)
+			: [];
+
+		const individualScores =
+			weekCheckIns.length > 0
+				? {
+						effortScore: roundOne(average(weekCheckIns.map((checkIn) => checkIn.effortScore))),
+						performanceScore: roundOne(
+							average(weekCheckIns.map((checkIn) => checkIn.performanceScore))
+						),
+						checkInCount: weekCheckIns.length,
+						participantName
+					}
+				: null;
 
 		return {
 			success: true,
 			feedbackCount: totalFeedbacks,
-			individualFirstName: reflection?.user.name?.split(' ')[0] ?? 'them',
-			individualScores:
-				reflection && reflection.cycle.revealScores
-					? {
-							effortScore: reflection.effortScore,
-							performanceScore: reflection.performanceScore,
-							participantName: reflection.user.name ?? 'Participant'
-						}
-					: null
+			individualFirstName: journey?.user.name?.split(' ')[0] ?? 'them',
+			individualScores
 		};
 	}
 };

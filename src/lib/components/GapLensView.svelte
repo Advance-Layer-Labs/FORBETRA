@@ -9,7 +9,7 @@
 	interface Props {
 		effortGaps: Array<{ weekNumber: number; difference: number }>;
 		performanceGaps: Array<{ weekNumber: number; difference: number }>;
-		stakeholders?: Array<{
+		reviewers?: Array<{
 			id: string;
 			name: string;
 			effortGaps: Array<{ weekNumber: number; difference: number }>;
@@ -17,7 +17,7 @@
 		}>;
 	}
 
-	const { effortGaps, performanceGaps, stakeholders = [] }: Props = $props();
+	const { effortGaps, performanceGaps, reviewers = [] }: Props = $props();
 
 	let effortChartCanvas = $state<HTMLCanvasElement | null>(null);
 	let performanceChartCanvas = $state<HTMLCanvasElement | null>(null);
@@ -25,27 +25,27 @@
 	let performanceChartInstance = $state<Chart | null>(null);
 	let showEffort = $state(true);
 	let showPerformance = $state(true);
-	let selectedStakeholderId = $state<string | null>(null); // null = "All Stakeholders"
+	let selectedReviewerId = $state<string | null>(null); // null = "All Reviewers"
 	let isMounted = $state(false);
 
-	// Get active gaps based on selected stakeholder
+	// Get active gaps based on selected reviewer
 	const activeEffortGaps = $derived(
 		(() => {
-			if (selectedStakeholderId === null) {
+			if (selectedReviewerId === null) {
 				return effortGaps;
 			}
-			const stakeholder = stakeholders.find((s) => s.id === selectedStakeholderId);
-			return stakeholder?.effortGaps ?? [];
+			const reviewer = reviewers.find((s) => s.id === selectedReviewerId);
+			return reviewer?.effortGaps ?? [];
 		})()
 	);
 
 	const activePerformanceGaps = $derived(
 		(() => {
-			if (selectedStakeholderId === null) {
+			if (selectedReviewerId === null) {
 				return performanceGaps;
 			}
-			const stakeholder = stakeholders.find((s) => s.id === selectedStakeholderId);
-			return stakeholder?.performanceGaps ?? [];
+			const reviewer = reviewers.find((s) => s.id === selectedReviewerId);
+			return reviewer?.performanceGaps ?? [];
 		})()
 	);
 
@@ -59,11 +59,11 @@
 		})()
 	);
 
-	// Get selected stakeholder name
-	const selectedStakeholderName = $derived(
+	// Get selected reviewer name
+	const selectedReviewerName = $derived(
 		(() => {
-			if (selectedStakeholderId === null) return 'All Stakeholders';
-			return stakeholders.find((s) => s.id === selectedStakeholderId)?.name ?? 'Unknown';
+			if (selectedReviewerId === null) return 'All Reviewers';
+			return reviewers.find((s) => s.id === selectedReviewerId)?.name ?? 'Unknown';
 		})()
 	);
 
@@ -84,9 +84,9 @@
 					datasets: [
 						{
 							label:
-								selectedStakeholderId === null
-									? 'Effort Gap (Self - Stakeholders)'
-									: `Effort Gap (Self - ${selectedStakeholderName})`,
+								selectedReviewerId === null
+									? 'Effort Gap (Self - Reviewers)'
+									: `Effort Gap (Self - ${selectedReviewerName})`,
 							data,
 							borderColor: CHART_COLORS.effort.individual.border,
 							backgroundColor: CHART_COLORS.effort.individual.bg,
@@ -135,7 +135,7 @@
 										value > 0
 											? ' (You see higher)'
 											: value < 0
-												? ' (Stakeholders see higher)'
+												? ' (Reviewers see higher)'
 												: ' (Aligned)';
 									return `Gap: ${sign}${value.toFixed(1)}${interpretation}`;
 								}
@@ -148,7 +148,7 @@
 							position: 'left' as const,
 							title: {
 								display: true,
-								text: 'Difference (Self - Stakeholders)',
+								text: 'Difference (Self - Reviewers)',
 								color: '#a1a1aa',
 								font: {
 									size: 12,
@@ -217,9 +217,9 @@
 					datasets: [
 						{
 							label:
-								selectedStakeholderId === null
-									? 'Performance Gap (Self - Stakeholders)'
-									: `Performance Gap (Self - ${selectedStakeholderName})`,
+								selectedReviewerId === null
+									? 'Performance Gap (Self - Reviewers)'
+									: `Performance Gap (Self - ${selectedReviewerName})`,
 							data,
 							borderColor: CHART_COLORS.performance.individual.border,
 							backgroundColor: CHART_COLORS.performance.individual.bg,
@@ -268,7 +268,7 @@
 										value > 0
 											? ' (You see higher)'
 											: value < 0
-												? ' (Stakeholders see higher)'
+												? ' (Reviewers see higher)'
 												: ' (Aligned)';
 									return `Gap: ${sign}${value.toFixed(1)}${interpretation}`;
 								}
@@ -281,7 +281,7 @@
 							position: 'left' as const,
 							title: {
 								display: true,
-								text: 'Difference (Self - Stakeholders)',
+								text: 'Difference (Self - Reviewers)',
 								color: '#a1a1aa',
 								font: {
 									size: 12,
@@ -372,7 +372,7 @@
 		const _effortGapsData = activeEffortGaps;
 		const showEff = showEffort;
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const _selectedStk1 = selectedStakeholderId;
+		const _selectedStk1 = selectedReviewerId;
 
 		const config = effortChartConfig;
 		const instance = effortChartInstance;
@@ -393,7 +393,7 @@
 		const _perfGapsData = activePerformanceGaps;
 		const showPerf = showPerformance;
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const _selectedStk2 = selectedStakeholderId;
+		const _selectedStk2 = selectedReviewerId;
 
 		const config = performanceChartConfig;
 		const instance = performanceChartInstance;
@@ -464,8 +464,8 @@
 	<div>
 		<h2 class="text-xl font-bold text-text-primary">Gap Lens</h2>
 		<p class="mt-1 text-sm text-text-secondary">
-			See the difference between your self-assessment and stakeholder observations. Positive values
-			mean you see yourself higher; negative means stakeholders see you higher. Reveals blind spots.
+			See the difference between your self-assessment and reviewer observations. Positive values
+			mean you see yourself higher; negative means reviewers see you higher. Reveals blind spots.
 		</p>
 	</div>
 
@@ -495,34 +495,34 @@
 			</div>
 		</div>
 
-		{#if stakeholders.length > 0}
+		{#if reviewers.length > 0}
 			<div
 				class="flex flex-wrap items-center gap-4 rounded-xl border border-border-default bg-surface-raised p-4"
 			>
 				<span class="text-xs font-semibold tracking-wide text-text-tertiary uppercase"
-					>Filter Stakeholder:</span
+					>Filter Reviewer:</span
 				>
 				<div class="flex flex-wrap items-center gap-2">
 					<label class="flex cursor-pointer items-center gap-2">
 						<input
 							type="radio"
-							name="stakeholder-filter"
-							checked={selectedStakeholderId === null}
-							onchange={() => (selectedStakeholderId = null)}
+							name="reviewer-filter"
+							checked={selectedReviewerId === null}
+							onchange={() => (selectedReviewerId = null)}
 							class="h-4 w-4 border-border-strong text-accent focus:ring-accent"
 						/>
-						<span class="text-sm font-medium text-text-secondary">All Stakeholders</span>
+						<span class="text-sm font-medium text-text-secondary">All Reviewers</span>
 					</label>
-					{#each stakeholders as stakeholder (stakeholder.id)}
+					{#each reviewers as reviewer (reviewer.id)}
 						<label class="flex cursor-pointer items-center gap-2">
 							<input
 								type="radio"
-								name="stakeholder-filter"
-								checked={selectedStakeholderId === stakeholder.id}
-								onchange={() => (selectedStakeholderId = stakeholder.id)}
+								name="reviewer-filter"
+								checked={selectedReviewerId === reviewer.id}
+								onchange={() => (selectedReviewerId = reviewer.id)}
 								class="h-4 w-4 border-border-strong text-accent focus:ring-accent"
 							/>
-							<span class="text-sm font-medium text-text-secondary">{stakeholder.name}</span>
+							<span class="text-sm font-medium text-text-secondary">{reviewer.name}</span>
 						</label>
 					{/each}
 				</div>
@@ -547,7 +547,7 @@
 								{currentEffortGap > 0
 									? '(You see higher)'
 									: currentEffortGap < 0
-										? '(Stakeholders see higher)'
+										? '(Reviewers see higher)'
 										: '(Aligned)'}
 							</span>
 						</div>
@@ -568,7 +568,7 @@
 								{currentPerformanceGap > 0
 									? '(You see higher)'
 									: currentPerformanceGap < 0
-										? '(Stakeholders see higher)'
+										? '(Reviewers see higher)'
 										: '(Aligned)'}
 							</span>
 						</div>
@@ -578,9 +578,9 @@
 			<div class="mt-3 border-t border-border-default pt-3">
 				<p class="text-xs text-text-secondary">
 					<strong>What this means:</strong> Gap shows the difference between your self-assessment and
-					stakeholder observations. Positive values mean you rate yourself higher than stakeholders see
-					you. Negative values mean stakeholders see you higher than you see yourself. Values closer to
-					zero indicate better alignment. Large gaps reveal potential blind spots in self-awareness.
+					reviewer observations. Positive values mean you rate yourself higher than reviewers see you.
+					Negative values mean reviewers see you higher than you see yourself. Values closer to zero indicate
+					better alignment. Large gaps reveal potential blind spots in self-awareness.
 				</p>
 			</div>
 		</div>
@@ -596,9 +596,9 @@
 				<div class="flex items-center gap-2">
 					<div class="h-1 w-8 rounded-full bg-cyan-500"></div>
 					<span class="text-sm font-medium text-text-secondary">
-						Effort Gap {selectedStakeholderId === null
-							? '(Self - Stakeholders)'
-							: `(Self - ${selectedStakeholderName})`}
+						Effort Gap {selectedReviewerId === null
+							? '(Self - Reviewers)'
+							: `(Self - ${selectedReviewerName})`}
 					</span>
 				</div>
 			{/if}
@@ -606,9 +606,9 @@
 				<div class="flex items-center gap-2">
 					<div class="h-1 w-8 rounded-full bg-amber-500"></div>
 					<span class="text-sm font-medium text-text-secondary">
-						Performance Gap {selectedStakeholderId === null
-							? '(Self - Stakeholders)'
-							: `(Self - ${selectedStakeholderName})`}
+						Performance Gap {selectedReviewerId === null
+							? '(Self - Reviewers)'
+							: `(Self - ${selectedReviewerName})`}
 					</span>
 				</div>
 			{/if}
@@ -626,7 +626,7 @@
 					{:else if activeEffortGaps.length === 1}
 						<div class="flex h-full flex-col items-center justify-center gap-2 text-text-tertiary">
 							<p class="text-sm font-medium">
-								Gap analysis requires stakeholder feedback from at least 2 weeks.
+								Gap analysis requires reviewer feedback from at least 2 weeks.
 							</p>
 							<p class="text-xs">You have 1 week so far. Keep going!</p>
 						</div>
@@ -648,7 +648,7 @@
 					{:else if activePerformanceGaps.length === 1}
 						<div class="flex h-full flex-col items-center justify-center gap-2 text-text-tertiary">
 							<p class="text-sm font-medium">
-								Gap analysis requires stakeholder feedback from at least 2 weeks.
+								Gap analysis requires reviewer feedback from at least 2 weeks.
 							</p>
 							<p class="text-xs">You have 1 week so far. Keep going!</p>
 						</div>
@@ -667,7 +667,7 @@
 			<div class="flex h-[200px] items-center justify-center text-text-tertiary">
 				<p>
 					Select at least one metric to view the gap analysis, or complete more check-ins and
-					stakeholder feedback to see data.
+					reviewer feedback to see data.
 				</p>
 			</div>
 		</div>

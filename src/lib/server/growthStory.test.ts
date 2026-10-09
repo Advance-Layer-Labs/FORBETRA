@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildScoreTrend, selectTopComments, findKeyMoments } from './growthStory';
 
 describe('buildScoreTrend', () => {
-	it('groups reflections by week and averages scores', () => {
+	it('groups checkIns by week and averages scores', () => {
 		const result = buildScoreTrend([
 			{ weekNumber: 1, effortScore: 6, performanceScore: 5 },
 			{ weekNumber: 1, effortScore: 8, performanceScore: 7 },
@@ -25,7 +25,7 @@ describe('buildScoreTrend', () => {
 		]);
 	});
 
-	it('returns empty array for no reflections', () => {
+	it('returns empty array for no checkIns', () => {
 		expect(buildScoreTrend([])).toEqual([]);
 	});
 
@@ -42,15 +42,15 @@ describe('buildScoreTrend', () => {
 describe('selectTopComments', () => {
 	it('selects longest comments up to limit', () => {
 		const result = selectTopComments([
-			{ comment: 'Short comment here.', stakeholderName: 'Alice', weekNumber: 1 },
+			{ comment: 'Short comment here.', reviewerName: 'Alice', weekNumber: 1 },
 			{
 				comment: 'This is a much longer and more detailed comment about growth.',
-				stakeholderName: 'Bob',
+				reviewerName: 'Bob',
 				weekNumber: 2
 			},
 			{
 				comment: 'Medium length comment with details.',
-				stakeholderName: 'Carol',
+				reviewerName: 'Carol',
 				weekNumber: 3
 			}
 		]);
@@ -61,11 +61,11 @@ describe('selectTopComments', () => {
 
 	it('filters out null and short comments', () => {
 		const result = selectTopComments([
-			{ comment: null, stakeholderName: 'Alice', weekNumber: 1 },
-			{ comment: 'Too short', stakeholderName: 'Bob', weekNumber: 2 },
+			{ comment: null, reviewerName: 'Alice', weekNumber: 1 },
+			{ comment: 'Too short', reviewerName: 'Bob', weekNumber: 2 },
 			{
 				comment: 'This is a valid comment with enough length.',
-				stakeholderName: 'Carol',
+				reviewerName: 'Carol',
 				weekNumber: 3
 			}
 		]);
@@ -75,8 +75,8 @@ describe('selectTopComments', () => {
 
 	it('returns empty when no feedback has comments', () => {
 		const result = selectTopComments([
-			{ comment: null, stakeholderName: 'Alice', weekNumber: 1 },
-			{ comment: null, stakeholderName: 'Bob', weekNumber: 2 }
+			{ comment: null, reviewerName: 'Alice', weekNumber: 1 },
+			{ comment: null, reviewerName: 'Bob', weekNumber: 2 }
 		]);
 		expect(result).toEqual([]);
 	});

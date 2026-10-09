@@ -1,4 +1,3 @@
-import { redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
 import type { PageServerLoad } from './$types';
@@ -6,74 +5,8 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
-	const objective = await prisma.objective.findFirst({
-		where: { userId: dbUser.id, active: true },
-		orderBy: { createdAt: 'desc' },
-		include: {
-			cycles: {
-				orderBy: { startDate: 'desc' },
-				take: 1,
-				include: {
-					reflections: {
-						select: {
-							id: true,
-							reflectionType: true,
-							weekNumber: true,
-							submittedAt: true,
-							effortScore: true,
-							performanceScore: true,
-							notes: true
-						}
-					}
-				}
-			},
-			stakeholders: {
-				orderBy: { createdAt: 'asc' },
-				include: {
-					feedbacks: {
-						orderBy: { submittedAt: 'desc' },
-						include: {
-							reflection: {
-								select: {
-									weekNumber: true
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	});
+	const { goal, journey, checkIns, feedback: allFeedbacks } = await event.parent();
 
-	if (!objective) {
-		throw redirect(303, '/onboarding');
-	}
-
-	const cycle = objective.cycles[0] ?? null;
-
-	// Fetch all feedbacks for visualizations (needed for correlation and gap lens)
-	const allFeedbacks = cycle
-		? await prisma.feedback.findMany({
-				where: {
-					reflection: {
-						cycleId: cycle.id
-					}
-				},
-				include: {
-					reflection: {
-						select: {
-							weekNumber: true
-						}
-					},
-					stakeholder: {
-						select: {
-							id: true,
-							name: true
-						}
-					}
-				}
-			})
-		: [];
 	const reflectionTrendMap = new Map<
 		number,
 		{
@@ -83,40 +16,32 @@ export const load: PageServerLoad = async (event) => {
 		}
 	>();
 
-	if (cycle) {
-		cycle.reflections.forEach((reflection) => {
-			const weekEntry = reflectionTrendMap.get(reflection.weekNumber) ?? {
-				weekNumber: reflection.weekNumber,
-				effortScores: [],
-				performanceScores: []
-			};
-			if (reflection.reflectionType === 'RATING_A' || reflection.reflectionType === 'RATING_B') {
-				if (reflection.effortScore !== null) {
-					weekEntry.effortScores.push(reflection.effortScore);
-				}
-				if (reflection.performanceScore !== null) {
-					weekEntry.performanceScores.push(reflection.performanceScore);
-				}
-			}
-			reflectionTrendMap.set(reflection.weekNumber, weekEntry);
-		});
-	}
+	checkIns.forEach((checkIn) => {
+		const weekEntry = reflectionTrendMap.get(checkIn.weekNumber) ?? {
+			weekNumber: checkIn.weekNumber,
+			effortScores: [],
+			performanceScores: []
+		};
+		weekEntry.effortScores.push(checkIn.effortScore);
+		weekEntry.performanceScores.push(checkIn.performanceScore);
+		reflectionTrendMap.set(checkIn.weekNumber, weekEntry);
+	});
 
 	// Prepare data for Correlation View and Gap Lens
 	let correlationData: {
 		individual: Array<{ effort: number; progress: number; weekNumber: number }>;
-		stakeholders: Array<{
+		reviewers: Array<{
 			effort: number;
 			progress: number;
 			weekNumber: number;
-			stakeholderName: string;
+			reviewerName: string;
 		}>;
 	} | null = null;
 
 	let gapLensData: {
 		effort: Array<{ weekNumber: number; difference: number }>;
 		performance: Array<{ weekNumber: number; difference: number }>;
-		stakeholders: Array<{
+		reviewers: Array<{
 			id: string;
 			name: string;
 			effortGaps: Array<{ weekNumber: number; difference: number }>;
@@ -124,7 +49,7 @@ export const load: PageServerLoad = async (event) => {
 		}>;
 	} | null = null;
 
-	if (cycle) {
+	if (journey) {
 		// Build individual weekly data
 		const allReflectionWeeks = Array.from(reflectionTrendMap.values()).sort(
 			(a, b) => a.weekNumber - b.weekNumber
@@ -165,51 +90,47 @@ export const load: PageServerLoad = async (event) => {
 				weekNumber: week.weekNumber
 			}));
 
-		// Prepare stakeholder correlation data (exclude Week 13)
-		const stakeholderCorrelation: Array<{
+		// Prepare reviewer correlation data (exclude Week 13)
+		const reviewerCorrelation: Array<{
 			effort: number;
 			progress: number;
 			weekNumber: number;
-			stakeholderName: string;
+			reviewerName: string;
 		}> = [];
 
 		allFeedbacks.forEach((feedback) => {
-			if (
-				feedback.reflection &&
-				feedback.effortScore !== null &&
-				feedback.performanceScore !== null
-			) {
-				stakeholderCorrelation.push({
+			if (feedback.effortScore !== null && feedback.performanceScore !== null) {
+				reviewerCorrelation.push({
 					effort: feedback.effortScore,
 					progress: feedback.performanceScore,
-					weekNumber: feedback.reflection.weekNumber,
-					stakeholderName: feedback.stakeholder.name
+					weekNumber: feedback.weekNumber,
+					reviewerName: feedback.reviewer.name
 				});
 			}
 		});
 
 		correlationData = {
 			individual: individualCorrelation,
-			stakeholders: stakeholderCorrelation
+			reviewers: reviewerCorrelation
 		};
 
-		// Prepare Gap Lens data (Self - Stakeholder difference)
-		// Average gap across all stakeholders
+		// Prepare Gap Lens data (Self - Reviewer difference)
+		// Average gap across all reviewers
 		const gapLensEffort: Array<{ weekNumber: number; difference: number }> = [];
 		const gapLensPerformance: Array<{ weekNumber: number; difference: number }> = [];
 
-		// Per-stakeholder gaps
-		const gapLensEffortByStakeholder: Map<
+		// Per-reviewer gaps
+		const gapLensEffortByReviewer: Map<
 			string,
 			Array<{ weekNumber: number; difference: number }>
 		> = new Map();
-		const gapLensPerformanceByStakeholder: Map<
+		const gapLensPerformanceByReviewer: Map<
 			string,
 			Array<{ weekNumber: number; difference: number }>
 		> = new Map();
 
-		// Group stakeholder feedbacks by week and calculate averages
-		const stakeholderWeeklyMap = new Map<
+		// Group reviewer feedbacks by week and calculate averages
+		const reviewerWeeklyMap = new Map<
 			number,
 			{
 				effortScores: number[];
@@ -217,22 +138,22 @@ export const load: PageServerLoad = async (event) => {
 			}
 		>();
 
-		// Group by stakeholder for individual gap calculations
-		const stakeholderFeedbackMap = new Map<
+		// Group by reviewer for individual gap calculations
+		const reviewerFeedbackMap = new Map<
 			string,
 			Array<{ weekNumber: number; effortScore: number | null; performanceScore: number | null }>
 		>();
 
 		allFeedbacks.forEach((feedback) => {
-			if (feedback.reflection) {
-				const weekNumber = feedback.reflection.weekNumber;
-				const stakeholderId = feedback.stakeholder.id;
+			{
+				const weekNumber = feedback.weekNumber;
+				const reviewerId = feedback.reviewer.id;
 
 				// For average calculation
-				if (!stakeholderWeeklyMap.has(weekNumber)) {
-					stakeholderWeeklyMap.set(weekNumber, { effortScores: [], performanceScores: [] });
+				if (!reviewerWeeklyMap.has(weekNumber)) {
+					reviewerWeeklyMap.set(weekNumber, { effortScores: [], performanceScores: [] });
 				}
-				const weekData = stakeholderWeeklyMap.get(weekNumber)!;
+				const weekData = reviewerWeeklyMap.get(weekNumber)!;
 				if (feedback.effortScore !== null) {
 					weekData.effortScores.push(feedback.effortScore);
 				}
@@ -240,65 +161,65 @@ export const load: PageServerLoad = async (event) => {
 					weekData.performanceScores.push(feedback.performanceScore);
 				}
 
-				// For per-stakeholder calculation
-				if (!stakeholderFeedbackMap.has(stakeholderId)) {
-					stakeholderFeedbackMap.set(stakeholderId, []);
+				// For per-reviewer calculation
+				if (!reviewerFeedbackMap.has(reviewerId)) {
+					reviewerFeedbackMap.set(reviewerId, []);
 				}
-				stakeholderFeedbackMap.get(stakeholderId)!.push({
+				reviewerFeedbackMap.get(reviewerId)!.push({
 					weekNumber,
 					effortScore: feedback.effortScore,
 					performanceScore: feedback.performanceScore
 				});
 
-				// Initialize per-stakeholder gap arrays
-				if (!gapLensEffortByStakeholder.has(stakeholderId)) {
-					gapLensEffortByStakeholder.set(stakeholderId, []);
+				// Initialize per-reviewer gap arrays
+				if (!gapLensEffortByReviewer.has(reviewerId)) {
+					gapLensEffortByReviewer.set(reviewerId, []);
 				}
-				if (!gapLensPerformanceByStakeholder.has(stakeholderId)) {
-					gapLensPerformanceByStakeholder.set(stakeholderId, []);
+				if (!gapLensPerformanceByReviewer.has(reviewerId)) {
+					gapLensPerformanceByReviewer.set(reviewerId, []);
 				}
 			}
 		});
 
 		// Calculate average gaps for each week
 		individualWeeklyData.forEach((week) => {
-			const stakeholderWeekData = stakeholderWeeklyMap.get(week.weekNumber);
-			if (stakeholderWeekData) {
-				if (week.effortScore !== null && stakeholderWeekData.effortScores.length > 0) {
-					const stakeholderAvg =
-						stakeholderWeekData.effortScores.reduce((sum, score) => sum + score, 0) /
-						stakeholderWeekData.effortScores.length;
+			const reviewerWeekData = reviewerWeeklyMap.get(week.weekNumber);
+			if (reviewerWeekData) {
+				if (week.effortScore !== null && reviewerWeekData.effortScores.length > 0) {
+					const reviewerAvg =
+						reviewerWeekData.effortScores.reduce((sum, score) => sum + score, 0) /
+						reviewerWeekData.effortScores.length;
 					gapLensEffort.push({
 						weekNumber: week.weekNumber,
-						difference: Number((week.effortScore - stakeholderAvg).toFixed(1))
+						difference: Number((week.effortScore - reviewerAvg).toFixed(1))
 					});
 				}
-				if (week.performanceScore !== null && stakeholderWeekData.performanceScores.length > 0) {
-					const stakeholderAvg =
-						stakeholderWeekData.performanceScores.reduce((sum, score) => sum + score, 0) /
-						stakeholderWeekData.performanceScores.length;
+				if (week.performanceScore !== null && reviewerWeekData.performanceScores.length > 0) {
+					const reviewerAvg =
+						reviewerWeekData.performanceScores.reduce((sum, score) => sum + score, 0) /
+						reviewerWeekData.performanceScores.length;
 					gapLensPerformance.push({
 						weekNumber: week.weekNumber,
-						difference: Number((week.performanceScore - stakeholderAvg).toFixed(1))
+						difference: Number((week.performanceScore - reviewerAvg).toFixed(1))
 					});
 				}
 			}
 
-			// Calculate per-stakeholder gaps
-			stakeholderFeedbackMap.forEach((feedbacks, stakeholderId) => {
+			// Calculate per-reviewer gaps
+			reviewerFeedbackMap.forEach((feedbacks, reviewerId) => {
 				const weekFeedback = feedbacks.find((f) => f.weekNumber === week.weekNumber);
 				if (weekFeedback) {
-					// Effort gap for this stakeholder
+					// Effort gap for this reviewer
 					if (week.effortScore !== null && weekFeedback.effortScore !== null) {
-						const gapArray = gapLensEffortByStakeholder.get(stakeholderId)!;
+						const gapArray = gapLensEffortByReviewer.get(reviewerId)!;
 						gapArray.push({
 							weekNumber: week.weekNumber,
 							difference: Number((week.effortScore - weekFeedback.effortScore).toFixed(1))
 						});
 					}
-					// Performance gap for this stakeholder
+					// Performance gap for this reviewer
 					if (week.performanceScore !== null && weekFeedback.performanceScore !== null) {
-						const gapArray = gapLensPerformanceByStakeholder.get(stakeholderId)!;
+						const gapArray = gapLensPerformanceByReviewer.get(reviewerId)!;
 						gapArray.push({
 							weekNumber: week.weekNumber,
 							difference: Number((week.performanceScore - weekFeedback.performanceScore).toFixed(1))
@@ -312,19 +233,19 @@ export const load: PageServerLoad = async (event) => {
 		gapLensEffort.sort((a, b) => a.weekNumber - b.weekNumber);
 		gapLensPerformance.sort((a, b) => a.weekNumber - b.weekNumber);
 
-		// Sort per-stakeholder gaps
-		gapLensEffortByStakeholder.forEach((gaps) => gaps.sort((a, b) => a.weekNumber - b.weekNumber));
-		gapLensPerformanceByStakeholder.forEach((gaps) =>
+		// Sort per-reviewer gaps
+		gapLensEffortByReviewer.forEach((gaps) => gaps.sort((a, b) => a.weekNumber - b.weekNumber));
+		gapLensPerformanceByReviewer.forEach((gaps) =>
 			gaps.sort((a, b) => a.weekNumber - b.weekNumber)
 		);
 
-		// Build stakeholder list with their gap data
-		const stakeholdersWithGaps = objective.stakeholders.map((stakeholder) => {
-			const effortGaps = gapLensEffortByStakeholder.get(stakeholder.id) ?? [];
-			const performanceGaps = gapLensPerformanceByStakeholder.get(stakeholder.id) ?? [];
+		// Build reviewer list with their gap data
+		const reviewersWithGaps = goal.reviewers.map((reviewer) => {
+			const effortGaps = gapLensEffortByReviewer.get(reviewer.id) ?? [];
+			const performanceGaps = gapLensPerformanceByReviewer.get(reviewer.id) ?? [];
 			return {
-				id: stakeholder.id,
-				name: stakeholder.name,
+				id: reviewer.id,
+				name: reviewer.name,
 				effortGaps,
 				performanceGaps
 			};
@@ -333,7 +254,7 @@ export const load: PageServerLoad = async (event) => {
 		gapLensData = {
 			effort: gapLensEffort,
 			performance: gapLensPerformance,
-			stakeholders: stakeholdersWithGaps
+			reviewers: reviewersWithGaps
 		};
 	}
 
@@ -343,20 +264,38 @@ export const load: PageServerLoad = async (event) => {
 		createdAt: Date;
 		thumbs: number | null;
 	} | null = null;
-	if (cycle) {
-		cycleReport = await prisma.insight.findFirst({
-			where: { userId: dbUser.id, cycleId: cycle.id, status: 'COMPLETED', type: 'CYCLE_REPORT' },
-			orderBy: { createdAt: 'desc' },
-			select: { id: true, content: true, createdAt: true, thumbs: true }
-		});
+	let weeklyInsight: { id: string; content: string | null; weekNumber: number | null } | null =
+		null;
+	if (journey) {
+		[cycleReport, weeklyInsight] = await Promise.all([
+			prisma.insight.findFirst({
+				where: {
+					userId: dbUser.id,
+					journeyId: journey.id,
+					status: 'COMPLETED',
+					type: 'JOURNEY_REPORT'
+				},
+				orderBy: { createdAt: 'desc' },
+				select: { id: true, content: true, createdAt: true, thumbs: true }
+			}),
+			prisma.insight.findFirst({
+				where: {
+					userId: dbUser.id,
+					journeyId: journey.id,
+					status: 'COMPLETED',
+					type: { in: ['CHECK_IN', 'WEEKLY_SYNTHESIS'] }
+				},
+				orderBy: { createdAt: 'desc' },
+				select: { id: true, content: true, weekNumber: true }
+			})
+		]);
 	}
 
-	// History data: reflections grouped by week (merged from history page)
+	// History data: checkIns grouped by week (merged from history page)
 	type HistoryWeek = {
 		weekNumber: number;
-		reflections: Array<{
+		checkIns: Array<{
 			id: string;
-			type: string;
 			effortScore: number | null;
 			performanceScore: number | null;
 			notes: string | null;
@@ -365,34 +304,34 @@ export const load: PageServerLoad = async (event) => {
 	};
 	let historyWeeks: HistoryWeek[] = [];
 
-	if (cycle) {
-		const historyWeekMap = new Map<number, HistoryWeek['reflections']>();
-		for (const r of cycle.reflections) {
+	{
+		const historyWeekMap = new Map<number, HistoryWeek['checkIns']>();
+		for (const r of checkIns) {
 			if (!historyWeekMap.has(r.weekNumber)) {
 				historyWeekMap.set(r.weekNumber, []);
 			}
 			historyWeekMap.get(r.weekNumber)!.push({
 				id: r.id,
-				type: r.reflectionType,
 				effortScore: r.effortScore,
 				performanceScore: r.performanceScore,
 				notes: r.notes,
-				checkInDate: r.submittedAt?.toISOString() ?? new Date().toISOString()
+				checkInDate: r.submittedAt.toISOString()
 			});
 		}
 		historyWeeks = Array.from(historyWeekMap.entries())
-			.map(([weekNumber, reflections]) => ({ weekNumber, reflections }))
+			.map(([weekNumber, checkIns]) => ({ weekNumber, checkIns }))
 			.sort((a, b) => b.weekNumber - a.weekNumber);
 	}
 
 	return {
-		objective: {
-			id: objective.id,
-			title: objective.title
+		goal: {
+			id: goal.id,
+			title: goal.title
 		},
 		correlationData,
 		gapLensData,
 		cycleReport,
+		weeklyInsight,
 		historyWeeks
 	};
 };

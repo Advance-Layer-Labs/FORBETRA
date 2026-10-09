@@ -19,16 +19,16 @@ async function cleanSeedData() {
 	const seedUsers = await prisma.user.findMany({
 		where: { email: { contains: SEED_EMAIL_PATTERN } },
 		include: {
-			objectives: {
+			goals: {
 				include: {
-					cycles: {
+					journeys: {
 						include: {
-							reflections: { select: { id: true } },
+							checkIns: { select: { id: true } },
 							coachNotes: { select: { id: true } }
 						}
 					},
-					stakeholders: { select: { id: true } },
-					subgoals: { select: { id: true } }
+					reviewers: { select: { id: true } },
+					focusAreas: { select: { id: true } }
 				}
 			}
 		}
@@ -49,65 +49,55 @@ async function cleanSeedData() {
 
 	await prisma.$transaction(
 		async (tx) => {
-			let deletedFeedback = 0;
-			let deletedReflections = 0;
+			const deletedFeedback = 0;
+			const deletedReflections = 0;
 			let deletedCoachNotes = 0;
 			let deletedCycles = 0;
-			let deletedSubgoals = 0;
-			let deletedStakeholders = 0;
-			let deletedObjectives = 0;
+			let deletedFocusAreas = 0;
+			let deletedReviewers = 0;
+			let deletedGoals = 0;
 			let deletedCoachClients = 0;
 			let deletedCoachInvites = 0;
 			let deletedTokens = 0;
 
 			for (const user of seedUsers) {
-				for (const objective of user.objectives) {
-					for (const cycle of objective.cycles) {
-						// Delete feedback on reflections
-						for (const reflection of cycle.reflections) {
-							const result = await tx.feedback.deleteMany({
-								where: { reflectionId: reflection.id }
-							});
-							deletedFeedback += result.count;
-						}
+				for (const goal of user.goals) {
+					for (const journey of goal.journeys) {
+						// Delete feedback on checkIns
+						await tx.feedback.deleteMany({ where: { journeyId: journey.id } });
+						await tx.checkIn.deleteMany({ where: { journeyId: journey.id } });
 
-						// Delete reflections
-						const reflResult = await tx.reflection.deleteMany({
-							where: { cycleId: cycle.id }
-						});
-						deletedReflections += reflResult.count;
-
-						// Delete coach notes on cycle
+						// Delete coach notes on journey
 						const noteResult = await tx.coachNote.deleteMany({
-							where: { cycleId: cycle.id }
+							where: { journeyId: journey.id }
 						});
 						deletedCoachNotes += noteResult.count;
 					}
 
-					// Delete cycles
-					const cycleResult = await tx.cycle.deleteMany({
-						where: { objectiveId: objective.id }
+					// Delete journeys
+					const cycleResult = await tx.journey.deleteMany({
+						where: { goalId: goal.id }
 					});
 					deletedCycles += cycleResult.count;
 
-					// Delete subgoals
-					const sgResult = await tx.subgoal.deleteMany({
-						where: { objectiveId: objective.id }
+					// Delete focusAreas
+					const sgResult = await tx.focusArea.deleteMany({
+						where: { goalId: goal.id }
 					});
-					deletedSubgoals += sgResult.count;
+					deletedFocusAreas += sgResult.count;
 
-					// Delete stakeholders
-					const shResult = await tx.stakeholder.deleteMany({
-						where: { objectiveId: objective.id }
+					// Delete reviewers
+					const shResult = await tx.reviewer.deleteMany({
+						where: { goalId: goal.id }
 					});
-					deletedStakeholders += shResult.count;
+					deletedReviewers += shResult.count;
 				}
 
-				// Delete objectives
-				const objResult = await tx.objective.deleteMany({
+				// Delete goals
+				const objResult = await tx.goal.deleteMany({
 					where: { userId: user.id }
 				});
-				deletedObjectives += objResult.count;
+				deletedGoals += objResult.count;
 
 				// Delete coach-related records
 				const ccResult = await tx.coachClient.deleteMany({
@@ -120,7 +110,7 @@ async function cleanSeedData() {
 				});
 				deletedCoachInvites += ciResult.count;
 
-				// Delete remaining coach notes (not tied to cycles)
+				// Delete remaining coach notes (not tied to journeys)
 				const cnResult = await tx.coachNote.deleteMany({
 					where: { OR: [{ coachId: user.id }, { individualId: user.id }] }
 				});
@@ -148,12 +138,12 @@ async function cleanSeedData() {
 
 			console.log('\nDeleted:');
 			console.log(`  Users: ${seedUsers.length}`);
-			console.log(`  Objectives: ${deletedObjectives}`);
-			console.log(`  Cycles: ${deletedCycles}`);
-			console.log(`  Subgoals: ${deletedSubgoals}`);
+			console.log(`  Goals: ${deletedGoals}`);
+			console.log(`  Journeys: ${deletedCycles}`);
+			console.log(`  FocusAreas: ${deletedFocusAreas}`);
 			console.log(`  Reflections: ${deletedReflections}`);
 			console.log(`  Feedback entries: ${deletedFeedback}`);
-			console.log(`  Stakeholders: ${deletedStakeholders}`);
+			console.log(`  Reviewers: ${deletedReviewers}`);
 			console.log(`  Coach notes: ${deletedCoachNotes}`);
 			console.log(`  Coach-client links: ${deletedCoachClients}`);
 			console.log(`  Coach invites: ${deletedCoachInvites}`);

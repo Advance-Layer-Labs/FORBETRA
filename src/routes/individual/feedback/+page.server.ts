@@ -7,32 +7,22 @@ import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
-import { createFeedbackToken } from '$lib/server/feedbackToken';
+import { createFeedbackToken, reissueFeedbackToken } from '$lib/server/feedbackToken';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
-	const { objective, cycle, currentWeek } = await event.parent();
-	const baseUrl = event.url.origin;
+	const { goal, journey, currentWeek, checkIns } = await event.parent();
 
-	const cycleEnd = cycle?.endDate ?? null;
-	const totalWeeks =
-		cycleEnd && cycle
-			? Math.max(
-					1,
-					Math.ceil((cycleEnd.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
-				)
-			: (currentWeek ?? 1);
+	const totalWeeks = Math.max(journey.lengthWeeks, currentWeek);
 
-	// Stakeholders with feedbacks + tokens
-	const stakeholdersWithFeedbacks = await prisma.stakeholder.findMany({
-		where: { objectiveId: objective.id },
+	// Reviewers with feedback + tokens
+	const reviewersWithFeedbacks = await prisma.reviewer.findMany({
+		where: { goalId: goal.id },
 		orderBy: { createdAt: 'asc' },
 		include: {
-			feedbacks: {
-				orderBy: { submittedAt: 'desc' },
-				include: {
-					reflection: { select: { weekNumber: true } }
-				}
+			feedback: {
+				where: { journeyId: journey.id },
+				orderBy: { submittedAt: 'desc' }
 			},
 			tokens: {
 				where: { type: 'FEEDBACK_INVITE' },
@@ -48,28 +38,26 @@ export const load: PageServerLoad = async (event) => {
 
 	// Self scores per week
 	const selfWeekMap = new Map<number, { effort: number | null; performance: number | null }>();
-	if (cycle) {
-		for (let wk = 1; wk <= totalWeeks; wk++) {
-			const refs = cycle.reflections.filter((r) => r.weekNumber === wk);
-			const effs = refs.map((r) => r.effortScore).filter((v): v is number => v !== null);
-			const prfs = refs.map((r) => r.performanceScore).filter((v): v is number => v !== null);
-			selfWeekMap.set(wk, { effort: avg(effs), performance: avg(prfs) });
-		}
+	for (let wk = 1; wk <= totalWeeks; wk++) {
+		const rows = checkIns.filter((r) => r.weekNumber === wk);
+		selfWeekMap.set(wk, {
+			effort: avg(rows.map((r) => r.effortScore)),
+			performance: avg(rows.map((r) => r.performanceScore))
+		});
 	}
 
-	const selfScores = selfWeekMap.get(currentWeek ?? 0);
+	const selfScores = selfWeekMap.get(currentWeek);
 	const myEffort = selfScores?.effort ?? null;
 	const myPerformance = selfScores?.performance ?? null;
 
-	// Group all feedbacks by stakeholder and week
+	// Group all feedbacks by reviewer and week
 	const shWeekMap = new Map<
 		string,
 		Map<number, { efforts: number[]; performances: number[]; comments: string[] }>
 	>();
-	for (const sh of stakeholdersWithFeedbacks) {
-		for (const fb of sh.feedbacks) {
-			if (!fb.reflection) continue;
-			const wk = fb.reflection.weekNumber;
+	for (const sh of reviewersWithFeedbacks) {
+		for (const fb of sh.feedback) {
+			const wk = fb.weekNumber;
 			if (!shWeekMap.has(sh.id)) shWeekMap.set(sh.id, new Map());
 			const shWeeks = shWeekMap.get(sh.id)!;
 			if (!shWeeks.has(wk)) shWeeks.set(wk, { efforts: [], performances: [], comments: [] });
@@ -107,12 +95,12 @@ export const load: PageServerLoad = async (event) => {
 	const allReviewerPerfs: number[] = [];
 
 	// Build reviewer cards
-	const reviewers = stakeholdersWithFeedbacks.map((sh) => {
+	const reviewers = reviewersWithFeedbacks.map((sh) => {
 		const pendingToken = sh.tokens.find((token) => !token.usedAt && token.expiresAt > currentTime);
-		const latestFeedback = sh.feedbacks[0] ?? null;
+		const latestFeedback = sh.feedback[0] ?? null;
 
 		const shWeeks = shWeekMap.get(sh.id);
-		const viewData = shWeeks?.get(currentWeek ?? 0);
+		const viewData = shWeeks?.get(currentWeek);
 
 		const stkEffort = viewData ? avg(viewData.efforts) : null;
 		const stkPerf = viewData ? avg(viewData.performances) : null;
@@ -167,9 +155,7 @@ export const load: PageServerLoad = async (event) => {
 			email: sh.email,
 			phone: sh.phone,
 			lastFeedbackDate: latestFeedback?.submittedAt?.toISOString() ?? null,
-			pendingFeedbackLink: pendingToken
-				? `${baseUrl}/stakeholder/feedback/${pendingToken.tokenHash}`
-				: null,
+			hasPendingInvite: !!pendingToken,
 			stkEffort,
 			stkPerf,
 			effortGap,
@@ -184,22 +170,18 @@ export const load: PageServerLoad = async (event) => {
 	const reviewerAvgPerf = avg(allReviewerPerfs);
 
 	return {
-		objective: { id: objective.id, title: objective.title },
+		goal: { id: goal.id, title: goal.title },
 		reviewers,
 		myEffort,
 		myPerformance,
 		reviewerAvgEffort,
 		reviewerAvgPerf,
-		currentWeek,
-		// For the Reveal status badge — true means reviewers see your self-scores
-		// when they submit feedback; false means scored blind. Default is true;
-		// users can flip in /individual/settings.
-		revealScores: cycle?.revealScores ?? true
+		currentWeek
 	};
 };
 
 export const actions: Actions = {
-	addStakeholder: async (event) => {
+	addReviewer: async (event) => {
 		const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
 		const formData = await event.request.formData();
@@ -212,36 +194,36 @@ export const actions: Actions = {
 		const values = { name, email, phone };
 
 		if (!name || !email) {
-			return fail(400, { action: 'stakeholder', error: 'Name and email are required.', values });
+			return fail(400, { action: 'reviewer', error: 'Name and email are required.', values });
 		}
 
 		if (phone && !validatePhone(phone)) {
 			return fail(400, {
-				action: 'stakeholder',
+				action: 'reviewer',
 				error: 'Enter a valid phone number (7\u201315 digits, e.g. +1 555 123 4567).',
 				values
 			});
 		}
 
-		const objective = await prisma.objective.findFirst({
+		const goal = await prisma.goal.findFirst({
 			where: { userId: dbUser.id, active: true },
 			orderBy: { createdAt: 'desc' },
 			select: { id: true }
 		});
 
-		if (!objective) {
+		if (!goal) {
 			return fail(400, {
-				action: 'stakeholder',
+				action: 'reviewer',
 				error: 'Create a goal before adding reviewers.',
 				values
 			});
 		}
 
 		try {
-			const stakeholder = await prisma.stakeholder.create({
+			const reviewer = await prisma.reviewer.create({
 				data: {
 					individualId: dbUser.id,
-					objectiveId: objective.id,
+					goalId: goal.id,
 					name,
 					email,
 					phone: phone.length > 0 ? normalizePhone(phone) : null
@@ -249,9 +231,9 @@ export const actions: Actions = {
 			});
 
 			try {
-				const template = emailTemplates.welcomeStakeholder({
+				const template = emailTemplates.welcomeReviewer({
 					individualName: dbUser.name || undefined,
-					stakeholderName: name || undefined,
+					reviewerName: name || undefined,
 					appUrl: event.url.origin
 				});
 				await sendEmail({ to: email, ...template });
@@ -259,10 +241,10 @@ export const actions: Actions = {
 				console.error('[email:error] Failed to send reviewer welcome email', error);
 			}
 
-			if (stakeholder.phone) {
+			if (reviewer.phone) {
 				await trySendSms(
-					stakeholder.phone,
-					smsTemplates.welcomeStakeholder({
+					reviewer.phone,
+					smsTemplates.welcomeReviewer({
 						individualName: dbUser.name || undefined,
 						appUrl: event.url.origin
 					})
@@ -271,7 +253,7 @@ export const actions: Actions = {
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
 				return fail(400, {
-					action: 'stakeholder',
+					action: 'reviewer',
 					error: 'You already have a reviewer with that email.',
 					values
 				});
@@ -279,19 +261,42 @@ export const actions: Actions = {
 			throw error;
 		}
 
-		return { action: 'stakeholder', success: true };
+		return { action: 'reviewer', success: true };
+	},
+
+	reissueFeedback: async (event) => {
+		const { dbUser } = requireRole(event, 'INDIVIDUAL');
+		const formData = await event.request.formData();
+		const reviewerId = formData.get('reviewerId');
+
+		if (typeof reviewerId !== 'string' || reviewerId.length === 0) {
+			return fail(400, { action: 'feedback', error: 'Missing reviewer selection.' });
+		}
+
+		const result = await reissueFeedbackToken(dbUser, reviewerId, event.url.origin);
+		if (!result.ok) {
+			return fail(result.status as 400 | 404, { action: 'feedback', error: result.error });
+		}
+
+		return {
+			action: 'feedback',
+			success: true,
+			emailed: true,
+			expiresAt: result.expiresAt,
+			smsSent: result.smsSent
+		};
 	},
 
 	generateFeedback: async (event) => {
 		const { dbUser } = requireRole(event, 'INDIVIDUAL');
 		const formData = await event.request.formData();
-		const stakeholderId = formData.get('stakeholderId');
+		const reviewerId = formData.get('reviewerId');
 
-		if (typeof stakeholderId !== 'string' || stakeholderId.length === 0) {
+		if (typeof reviewerId !== 'string' || reviewerId.length === 0) {
 			return fail(400, { action: 'feedback', error: 'Missing reviewer selection.' });
 		}
 
-		const result = await createFeedbackToken(dbUser, stakeholderId, event.url.origin);
+		const result = await createFeedbackToken(dbUser, reviewerId, event.url.origin);
 		if (!result.ok) {
 			return fail(result.status as 400 | 404, { action: 'feedback', error: result.error });
 		}
@@ -308,10 +313,10 @@ export const actions: Actions = {
 	addPhoneAndGenerateFeedback: async (event) => {
 		const { dbUser } = requireRole(event, 'INDIVIDUAL');
 		const formData = await event.request.formData();
-		const stakeholderId = formData.get('stakeholderId');
+		const reviewerId = formData.get('reviewerId');
 		const phone = String(formData.get('phone') ?? '').trim();
 
-		if (typeof stakeholderId !== 'string' || stakeholderId.length === 0) {
+		if (typeof reviewerId !== 'string' || reviewerId.length === 0) {
 			return fail(400, { action: 'feedback', error: 'Missing reviewer selection.' });
 		}
 
@@ -319,16 +324,16 @@ export const actions: Actions = {
 			return fail(400, {
 				action: 'feedback',
 				error: 'Enter a valid phone number (7\u201315 digits, e.g. +1 555 123 4567).',
-				phonePromptFor: stakeholderId
+				phonePromptFor: reviewerId
 			});
 		}
 
-		await prisma.stakeholder.update({
-			where: { id: stakeholderId },
+		await prisma.reviewer.updateMany({
+			where: { id: reviewerId, individualId: dbUser.id },
 			data: { phone: normalizePhone(phone) }
 		});
 
-		const result = await createFeedbackToken(dbUser, stakeholderId, event.url.origin);
+		const result = await createFeedbackToken(dbUser, reviewerId, event.url.origin);
 		if (!result.ok) {
 			return fail(result.status as 400 | 404, { action: 'feedback', error: result.error });
 		}

@@ -1,7 +1,8 @@
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { buildClientSummary } from '$lib/server/buildClientSummary';
+import { clientSelect, toSummaryInput } from '../clientData';
 
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
@@ -21,78 +22,8 @@ export const load: PageServerLoad = async (event) => {
 
 	const individuals = individualIds.length
 		? await prisma.user.findMany({
-				where: {
-					id: { in: individualIds }
-				},
-				select: {
-					id: true,
-					email: true,
-					name: true,
-					objectives: {
-						where: { active: true },
-						orderBy: { createdAt: 'desc' },
-						include: {
-							subgoals: {
-								where: { active: true },
-								orderBy: { createdAt: 'asc' },
-								select: {
-									id: true,
-									label: true,
-									description: true
-								}
-							},
-							cycles: {
-								orderBy: { startDate: 'desc' },
-								take: 1,
-								include: {
-									reflections: {
-										orderBy: { submittedAt: 'desc' },
-										select: {
-											id: true,
-											weekNumber: true,
-											reflectionType: true,
-											submittedAt: true,
-											effortScore: true,
-											performanceScore: true,
-											notes: true
-										}
-									},
-									coachNotes: {
-										where: { coachId: dbUser.id },
-										orderBy: { createdAt: 'desc' },
-										take: 3,
-										select: {
-											id: true,
-											content: true,
-											weekNumber: true,
-											createdAt: true
-										}
-									}
-								}
-							},
-							stakeholders: {
-								orderBy: { createdAt: 'asc' },
-								include: {
-									feedbacks: {
-										orderBy: { submittedAt: 'desc' },
-										select: {
-											submittedAt: true,
-											effortScore: true,
-											performanceScore: true,
-											reflection: {
-												select: {
-													weekNumber: true,
-													effortScore: true,
-													performanceScore: true
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+				where: { id: { in: individualIds } },
+				select: clientSelect(dbUser.id, { noteTake: 3 })
 			})
 		: [];
 
@@ -102,7 +33,7 @@ export const load: PageServerLoad = async (event) => {
 		.map((relationship) => {
 			const individual = individualLookup.get(relationship.individualId);
 			if (!individual) return null;
-			return buildClientSummary(relationship, individual);
+			return buildClientSummary(relationship, toSummaryInput(individual));
 		})
 		.filter((value): value is NonNullable<typeof value> => value !== null);
 
@@ -112,4 +43,24 @@ export const load: PageServerLoad = async (event) => {
 		},
 		clients: clientSummaries
 	};
+};
+
+export const actions: Actions = {
+	archive: async (event) => {
+		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+		const formData = await event.request.formData();
+		const individualId = String(formData.get('individualId') ?? '').trim();
+		const restore = formData.get('archived') === 'true';
+
+		if (!individualId) {
+			return { success: false };
+		}
+
+		await prisma.coachClient.updateMany({
+			where: { coachId: dbUser.id, individualId },
+			data: { archivedAt: restore ? null : new Date() }
+		});
+
+		return { success: true };
+	}
 };

@@ -12,27 +12,28 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
 	}
 
-	const objective = await prisma.objective.findFirst({
+	const goal = await prisma.goal.findFirst({
 		where: { userId: dbUser.id, active: true },
 		orderBy: { createdAt: 'desc' },
 		include: {
-			cycles: {
+			journeys: {
+				where: { status: 'ACTIVE' },
 				orderBy: { startDate: 'desc' },
 				take: 1
 			}
 		}
 	});
 
-	if (!objective || objective.cycles.length === 0) {
-		return json({ error: 'No active cycle found' }, { status: 400 });
+	if (!goal || goal.journeys.length === 0) {
+		return json({ error: 'No active journey found' }, { status: 400 });
 	}
 
-	const cycle = objective.cycles[0];
+	const journey = goal.journeys[0];
 
 	// Check if client wants streaming via Accept header
 	const acceptHeader = event.request.headers.get('accept') ?? '';
 	if (acceptHeader.includes('text/event-stream')) {
-		const result = await generateCycleReportStreaming(dbUser.id, cycle.id);
+		const result = await generateCycleReportStreaming(dbUser.id, journey.id);
 
 		if (!result) {
 			return json({ error: 'Failed to generate report' }, { status: 500 });
@@ -76,7 +77,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Non-streaming fallback (backward compatible)
-	const insightId = await generateCycleReport(dbUser.id, cycle.id);
+	const insightId = await generateCycleReport(dbUser.id, journey.id);
 
 	if (!insightId) {
 		return json({ error: 'Failed to generate report' }, { status: 500 });

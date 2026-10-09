@@ -75,8 +75,8 @@
 			<div class="rounded-lg border border-border-default bg-accent-muted p-4">
 				<h3 class="font-semibold text-text-primary">Seed Comprehensive Data</h3>
 				<p class="mt-1 text-xs text-text-secondary">
-					Creates 8 individuals with diverse patterns, 3 coaches, ~24 stakeholders, 200+
-					reflections, 500+ feedback entries, and 20+ coach notes.
+					Creates 8 individuals with diverse patterns, 3 coaches, ~24 reviewers, 200+ checkIns, 500+
+					feedback entries, and 20+ coach notes.
 				</p>
 				<p class="mt-2 text-xs text-accent">
 					Run from terminal: <code class="rounded bg-accent-muted px-1.5 py-0.5 font-mono"
@@ -88,7 +88,7 @@
 			<div class="rounded-lg border border-border-default bg-warning-muted p-4">
 				<h3 class="font-semibold text-text-primary">Seed Basic Test Data</h3>
 				<p class="mt-1 text-xs text-text-secondary">
-					Creates 1 individual with 12 weeks of data and 3 stakeholders (the original seed).
+					Creates 1 individual with 12 weeks of data and 3 reviewers (the original seed).
 				</p>
 				<p class="mt-2 text-xs text-warning">
 					Run from terminal: <code class="rounded bg-warning-muted px-1.5 py-0.5 font-mono"

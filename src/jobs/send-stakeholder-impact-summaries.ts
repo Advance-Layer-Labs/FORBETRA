@@ -4,31 +4,22 @@ import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 
-export const sendStakeholderImpactSummaries = async () => {
+export const sendReviewerImpactSummaries = async () => {
 	const thirtyDaysAgo = new Date();
 	thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-	// Find stakeholders who gave feedback in the last 30 days
+	// Find reviewers who gave feedback in the last 30 days
 	const recentFeedbacks = await prisma.feedback.findMany({
 		where: {
 			submittedAt: { gte: thirtyDaysAgo }
 		},
 		select: {
-			stakeholderId: true,
+			reviewerId: true,
 			effortScore: true,
 			performanceScore: true,
 			submittedAt: true,
-			reflection: {
-				select: {
-					weekNumber: true,
-					user: {
-						select: {
-							name: true
-						}
-					}
-				}
-			},
-			stakeholder: {
+			weekNumber: true,
+			reviewer: {
 				select: {
 					name: true,
 					email: true,
@@ -44,17 +35,17 @@ export const sendStakeholderImpactSummaries = async () => {
 	});
 
 	if (recentFeedbacks.length === 0) {
-		console.info('[job:stakeholder-impact] No recent feedbacks found, skipping');
+		console.info('[job:reviewer-impact] No recent feedbacks found, skipping');
 		return;
 	}
 
-	// Group by stakeholder + individual pair
+	// Group by reviewer + individual pair
 	const grouped = new Map<
 		string,
 		{
-			stakeholderName: string;
-			stakeholderEmail: string;
-			stakeholderPhone: string | null;
+			reviewerName: string;
+			reviewerEmail: string;
+			reviewerPhone: string | null;
 			individualName: string;
 			feedbacks: Array<{
 				weekNumber: number;
@@ -65,20 +56,20 @@ export const sendStakeholderImpactSummaries = async () => {
 	>();
 
 	for (const fb of recentFeedbacks) {
-		if (!fb.stakeholder || !fb.reflection) continue;
+		if (!fb.reviewer) continue;
 
-		const key = fb.stakeholderId;
+		const key = fb.reviewerId;
 		if (!grouped.has(key)) {
 			grouped.set(key, {
-				stakeholderName: fb.stakeholder.name,
-				stakeholderEmail: fb.stakeholder.email,
-				stakeholderPhone: fb.stakeholder.phone,
-				individualName: fb.stakeholder.individual?.name || 'your participant',
+				reviewerName: fb.reviewer.name,
+				reviewerEmail: fb.reviewer.email,
+				reviewerPhone: fb.reviewer.phone,
+				individualName: fb.reviewer.individual?.name || 'your participant',
 				feedbacks: []
 			});
 		}
 		grouped.get(key)!.feedbacks.push({
-			weekNumber: fb.reflection.weekNumber,
+			weekNumber: fb.weekNumber,
 			effortScore: fb.effortScore,
 			performanceScore: fb.performanceScore
 		});
@@ -86,7 +77,7 @@ export const sendStakeholderImpactSummaries = async () => {
 
 	let sent = 0;
 	for (const [, data] of grouped) {
-		const { feedbacks, stakeholderName, stakeholderEmail, stakeholderPhone, individualName } = data;
+		const { feedbacks, reviewerName, reviewerEmail, reviewerPhone, individualName } = data;
 
 		// Compute stats
 		const uniqueWeeks = new Set(feedbacks.map((f) => f.weekNumber));
@@ -116,8 +107,8 @@ export const sendStakeholderImpactSummaries = async () => {
 		const performanceTrend = computeTrend(performanceScores);
 
 		try {
-			const template = emailTemplates.stakeholderImpactSummary({
-				stakeholderName: stakeholderName || undefined,
+			const template = emailTemplates.reviewerImpactSummary({
+				reviewerName: reviewerName || undefined,
 				individualName,
 				weeksContributed,
 				totalFeedbacks,
@@ -125,21 +116,21 @@ export const sendStakeholderImpactSummaries = async () => {
 				performanceTrend
 			});
 			await sendEmail({
-				to: stakeholderEmail,
+				to: reviewerEmail,
 				...template
 			});
 			sent++;
 		} catch (error) {
 			console.error(
-				`[job:stakeholder-impact] Failed to send impact summary to ${stakeholderEmail}`,
+				`[job:reviewer-impact] Failed to send impact summary to ${reviewerEmail}`,
 				error
 			);
 		}
 
 		// Send SMS impact summary
 		await trySendSms(
-			stakeholderPhone,
-			smsTemplates.stakeholderImpactSummary({
+			reviewerPhone,
+			smsTemplates.reviewerImpactSummary({
 				individualName,
 				weeksContributed,
 				totalFeedbacks
@@ -147,5 +138,5 @@ export const sendStakeholderImpactSummaries = async () => {
 		);
 	}
 
-	console.info(`[job:stakeholder-impact] Sent ${sent} impact summaries`);
+	console.info(`[job:reviewer-impact] Sent ${sent} impact summaries`);
 };

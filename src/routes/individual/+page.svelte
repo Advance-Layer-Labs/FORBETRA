@@ -1,363 +1,292 @@
 <script lang="ts">
-	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { ArrowRight } from 'lucide-svelte';
-	import RatingBar from '$lib/components/RatingBar.svelte';
+	import InfoTip from '$lib/components/InfoTip.svelte';
+	import type { ActionData, PageData } from './$types';
 
 	const { data, form }: { data: PageData; form: ActionData | null } = $props();
 
-	// Inline check-in state
-	let effortScore: number | null = $state(null);
-	let performanceScore: number | null = $state(null);
-	let notes = $state('');
-	let isSubmitting = $state(false);
-	let justSaved = $state(false);
+	const featured = $derived(
+		data.journeys.find((journey) => journey.status === 'ACTIVE') ?? data.journeys[0] ?? null
+	);
+	const pastJourneys = $derived(
+		featured ? data.journeys.filter((journey) => journey.id !== featured.id) : []
+	);
+	const isCurrent = $derived(
+		!!featured && featured.status === 'ACTIVE' && featured.id === data.currentJourneyId
+	);
+	const weekCovered = $derived(
+		isCurrent && !!featured && featured.checkInCount > 0 && data.checkedInThisWeek
+	);
+	const needsReviewer = $derived(
+		!!featured &&
+			featured.status === 'ACTIVE' &&
+			featured.checkInCount >= 1 &&
+			featured.reviewerCount === 0
+	);
 
-	const bothScoresSelected = $derived(effortScore !== null && performanceScore !== null);
+	let editing = $state(false);
+	let goalTitle = $state(data.goal.title);
+	let goalDescription = $state(data.goal.description ?? '');
+	let isSaving = $state(false);
 
-	// After successful form submission, switch to caught-up state
-	$effect(() => {
-		if (form?.success) {
-			justSaved = true;
-			isSubmitting = false;
-		}
-	});
+	const formatDate = (value: string) =>
+		new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+			new Date(value)
+		);
 
-	// Determine screen state
-	const screenState = $derived.by(() => {
-		if (!data.isOnboardingComplete) return 'welcome' as const;
-		if (data.cycle?.isCycleCompleted) return 'complete' as const;
-		if (justSaved) return 'caught-up' as const;
-		if (data.isCheckInDue) return 'check-in' as const;
-		return 'caught-up' as const;
-	});
+	function actionLabel(journey: NonNullable<typeof featured>) {
+		if (journey.status === 'COMPLETED') return 'View journey';
+		if (journey.checkInCount === 0) return 'Set your baseline';
+		return 'Check in';
+	}
+
+	function actionHref(journey: NonNullable<typeof featured>) {
+		if (journey.status === 'COMPLETED') return `/individual/journey/${journey.id}`;
+		return '/individual/today';
+	}
 </script>
 
 <svelte:head>
-	<title>Today | Forbetra</title>
+	<title>Journeys | Forbetra</title>
 </svelte:head>
 
-<section class="mx-auto max-w-lg px-6 pb-24">
-	{#if screenState === 'welcome'}
-		<!-- ═══ Welcome — no cycle yet ═══ -->
-		<div class="anim-fade-in py-20 text-center">
-			<div
-				class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-border-strong"
-			>
-				<span class="text-3xl font-extralight text-accent">/</span>
-			</div>
-			<h1 class="text-3xl font-bold tracking-tight text-text-primary">Start your growth journey</h1>
-			<p class="mx-auto mt-4 max-w-xs text-base leading-relaxed text-text-secondary">
-				Set a goal, invite your reviewers, and begin tracking your progress.
+<section class="mx-auto max-w-lg px-6 pt-10 pb-24">
+	<p class="text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+		Your journeys
+	</p>
+	<h1 class="mt-2 text-3xl font-bold tracking-tight text-text-primary">
+		{data.dbUserName ? `${data.dbUserName.split(' ')[0]}'s board` : 'Journey board'}
+	</h1>
+
+	{#if data.showFocusAreaPrompt}
+		<div class="mt-8 rounded-xl border border-accent/25 bg-accent-muted/40 px-5 py-4">
+			<p class="text-sm leading-relaxed text-text-secondary">
+				It's been a couple of weeks. Adding focus areas can make the next check-in clearer — a few
+				things to watch for, not a new score.
 			</p>
-			<!-- eslint-disable svelte/no-navigation-without-resolve -->
-			<a
-				href="/onboarding"
-				class="mt-10 inline-flex items-center gap-2.5 rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-surface-base shadow-[0_0_24px_rgba(224,181,128,0.2)] transition-all duration-350 hover:bg-accent-hover hover:shadow-[0_0_32px_rgba(224,181,128,0.3)] active:scale-[0.98]"
-			>
-				Get Started <ArrowRight class="h-4 w-4" />
-			</a>
-			<!-- eslint-enable svelte/no-navigation-without-resolve -->
-		</div>
-	{:else if screenState === 'complete'}
-		<!-- ═══ Cycle complete — celebration ═══ -->
-		<div class="anim-fade-in py-16">
-			<div class="text-center">
-				<div
-					class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-border-strong"
+			<div class="mt-4 flex flex-wrap gap-3">
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					href="/individual/focus-areas"
+					class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-surface-base"
 				>
-					<span class="text-3xl font-extralight text-accent">&#10003;</span>
-				</div>
-				<h1 class="text-3xl font-bold tracking-tight text-text-primary">Journey complete</h1>
-				{#if data.cycleSummary}
-					<p class="mx-auto mt-4 max-w-sm text-base leading-relaxed text-text-secondary">
-						{data.cycleSummary.durationWeeks} weeks, {data.cycleSummary.totalCheckIns} check-ins,
-						{data.cycleSummary.totalFeedbacks}
-						{data.cycleSummary.totalFeedbacks === 1 ? 'response' : 'responses'} from your reviewers. You
-						did the work.
-					</p>
-				{:else}
-					<p class="mx-auto mt-4 max-w-xs text-base leading-relaxed text-text-secondary">
-						You did the work. See what the data says.
-					</p>
+					Add focus areas <ArrowRight class="h-4 w-4" />
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				<form method="POST" action="?/dismissFocusPrompt" use:enhance>
+					<button type="submit" class="rounded-full px-4 py-2.5 text-sm text-text-secondary">
+						Not now
+					</button>
+				</form>
+			</div>
+		</div>
+	{/if}
+
+	{#if featured}
+		<article class="mt-8 rounded-2xl border border-border-strong bg-surface-raised p-6">
+			<div class="flex items-center justify-between gap-3">
+				<p class="text-[11px] font-semibold tracking-[0.08em] text-accent uppercase">
+					{featured.status === 'ACTIVE' ? 'Active' : 'Latest'}
+				</p>
+				{#if featured.status === 'ACTIVE' && featured.goalId === data.goal.id && !editing}
+					<button type="button" onclick={() => (editing = true)} class="text-sm text-text-muted">
+						Edit goal
+					</button>
 				{/if}
 			</div>
 
-			{#if data.cycleSummary}
-				{@const s = data.cycleSummary}
-				{@const delta = s.biggestDelta}
-
-				<!-- Headline movement -->
-				{#if delta && delta.magnitude >= 0.3}
-					{@const isGapMetric = delta.label.toLowerCase().includes('gap')}
-					{@const isWin = isGapMetric ? delta.direction === 'down' : delta.direction === 'up'}
-					<div class="mt-10 border-l-2 border-accent/30 py-3 pr-4 pl-5">
-						<p class="text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
-							The biggest move
-						</p>
-						<p class="mt-2 text-[15px] leading-relaxed text-text-secondary">
-							<span class="font-semibold text-text-primary">{delta.label}</span>
-							{#if isGapMetric}
-								{delta.direction === 'down'
-									? `closed by ${delta.magnitude.toFixed(1)} points`
-									: delta.direction === 'up'
-										? `widened by ${delta.magnitude.toFixed(1)} points`
-										: 'held steady'}
-							{:else}
-								{delta.direction === 'up'
-									? `climbed ${delta.magnitude.toFixed(1)} points`
-									: delta.direction === 'down'
-										? `dropped ${delta.magnitude.toFixed(1)} points`
-										: 'held steady'}
-							{/if}
-							{#if isWin}
-								<span class="text-accent">— the kind of shift this is built for.</span>
-							{:else if delta.direction !== 'flat'}
-								<span class="text-text-tertiary">— a real signal to bring to your next cycle.</span>
-							{/if}
-						</p>
+			{#if editing && featured.goalId === data.goal.id}
+				<form
+					method="POST"
+					action="?/renameGoal"
+					class="mt-3 space-y-3"
+					use:enhance={() => {
+						isSaving = true;
+						return async ({ result, update }) => {
+							await update();
+							isSaving = false;
+							if (result.type === 'success') editing = false;
+						};
+					}}
+				>
+					<input
+						name="goalTitle"
+						bind:value={goalTitle}
+						required
+						minlength="3"
+						maxlength="200"
+						class="w-full rounded-[10px] border border-border-default bg-surface-base px-3 py-2.5 text-sm text-text-primary focus:border-border-accent focus:outline-none"
+					/>
+					<textarea
+						name="goalDescription"
+						rows="3"
+						maxlength="1000"
+						bind:value={goalDescription}
+						class="w-full rounded-[10px] border border-border-default bg-surface-base px-3 py-2.5 text-sm text-text-primary focus:border-border-accent focus:outline-none"
+						placeholder="Optional description"
+					></textarea>
+					{#if form?.error && form?.rename}
+						<p class="text-sm text-signal-attention">{form.error}</p>
+					{/if}
+					<div class="flex gap-3">
+						<button
+							type="submit"
+							disabled={isSaving}
+							class="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-surface-base disabled:opacity-40"
+						>
+							{isSaving ? 'Saving…' : 'Save'}
+						</button>
+						<button
+							type="button"
+							onclick={() => (editing = false)}
+							class="rounded-full px-4 py-2 text-sm text-text-secondary"
+						>
+							Cancel
+						</button>
 					</div>
+				</form>
+			{:else}
+				<h2 class="mt-2 text-xl font-semibold tracking-tight text-text-primary">
+					{featured.goalTitle}
+				</h2>
+				{#if featured.goalDescription}
+					<p class="mt-2 text-sm leading-relaxed text-text-secondary">{featured.goalDescription}</p>
 				{/if}
+			{/if}
 
-				<!-- Stats grid -->
-				<dl class="mt-10 grid grid-cols-2 gap-x-6 gap-y-6">
-					{#if s.selfEffortStart != null && s.selfEffortEnd != null}
-						<div>
-							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Your effort</dt>
-							<dd class="mt-1 font-mono text-[15px] text-text-primary">
-								{s.selfEffortStart.toFixed(1)} → {s.selfEffortEnd.toFixed(1)}
-							</dd>
-						</div>
+			{#if featured.status === 'COMPLETED'}
+				<p class="mt-5 font-mono text-[11px] tracking-[0.06em] text-text-muted">
+					{formatDate(featured.startDate)}
+					{#if featured.endDate}
+						— {formatDate(featured.endDate)}
 					{/if}
-					{#if s.selfPerfStart != null && s.selfPerfEnd != null}
-						<div>
-							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">
-								Your performance
-							</dt>
-							<dd class="mt-1 font-mono text-[15px] text-text-primary">
-								{s.selfPerfStart.toFixed(1)} → {s.selfPerfEnd.toFixed(1)}
-							</dd>
-						</div>
-					{/if}
-					{#if s.effortGapStart != null && s.effortGapEnd != null}
-						<div>
-							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Effort gap</dt>
-							<dd class="mt-1 font-mono text-[15px] text-text-primary">
-								{s.effortGapStart.toFixed(1)} → {s.effortGapEnd.toFixed(1)}
-							</dd>
-						</div>
-					{/if}
-					{#if s.perfGapStart != null && s.perfGapEnd != null}
-						<div>
-							<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Perf gap</dt>
-							<dd class="mt-1 font-mono text-[15px] text-text-primary">
-								{s.perfGapStart.toFixed(1)} → {s.perfGapEnd.toFixed(1)}
-							</dd>
-						</div>
-					{/if}
+					· {featured.checkInCount}
+					{featured.checkInCount === 1 ? 'check-in' : 'check-ins'}
+				</p>
+			{:else}
+				<h3 class="mt-5 text-2xl font-semibold tracking-tight text-text-primary">
+					Week {featured.currentWeek} of {featured.lengthWeeks}
+				</h3>
+			{/if}
+
+			{#if isCurrent && data.baseline}
+				<p
+					class="mt-4 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] text-text-muted uppercase"
+				>
+					Baseline
+					<InfoTip text="Your first check-in. Later weeks are compared with these scores." />
+				</p>
+				<dl class="mt-2 grid grid-cols-2 gap-3">
+					<div>
+						<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Effort</dt>
+						<dd class="mt-1 font-mono text-lg text-text-primary">
+							{data.baseline.effort ?? '—'}/10
+						</dd>
+					</div>
+					<div>
+						<dt class="text-[11px] tracking-[0.06em] text-text-muted uppercase">Performance</dt>
+						<dd class="mt-1 font-mono text-lg text-text-primary">
+							{data.baseline.performance ?? '—'}/10
+						</dd>
+					</div>
 				</dl>
 			{/if}
 
-			<div class="mt-12 flex flex-wrap justify-center gap-3">
+			{#if isCurrent && featured.checkInCount === 0}
+				<p class="mt-4 text-sm leading-relaxed text-text-secondary">
+					The first check-in is what the rest of the journey is compared to.
+				</p>
+			{/if}
+
+			<div class="mt-6 flex flex-wrap gap-3">
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href="/individual/progress"
-					class="inline-flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 text-sm font-semibold text-surface-base shadow-[0_0_24px_rgba(224,181,128,0.2)] transition-all duration-350 hover:bg-accent-hover active:scale-[0.98]"
-				>
-					View Report <ArrowRight class="h-4 w-4" />
-				</a>
-				<a
-					href="/onboarding"
-					class="rounded-full border border-border-strong px-7 py-3.5 text-sm font-semibold text-text-primary transition-all duration-350 hover:bg-surface-raised active:scale-[0.98]"
-				>
-					Start New
-				</a>
+				{#if weekCovered}
+					{#if needsReviewer}
+						<a
+							href="/individual/stakeholders"
+							class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-surface-base"
+						>
+							Add a reviewer
+							<ArrowRight class="h-4 w-4" />
+						</a>
+					{/if}
+					<a
+						href="/individual/checkin"
+						class="rounded-full border border-border-strong px-6 py-3 text-sm font-semibold text-text-primary"
+					>
+						Add another check-in
+					</a>
+				{:else}
+					<a
+						href={actionHref(featured)}
+						class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-surface-base"
+					>
+						{actionLabel(featured)}
+						<ArrowRight class="h-4 w-4" />
+					</a>
+					{#if featured.status === 'COMPLETED'}
+						<a
+							href="/individual/new-cycle"
+							class="rounded-full border border-border-strong px-6 py-3 text-sm font-semibold text-text-primary"
+						>
+							Start new
+						</a>
+					{/if}
+				{/if}
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			</div>
-		</div>
-	{:else}
-		<!-- ═══ Active journey — Today screen ═══ -->
-		<div class="pt-10">
-			<!-- First-cycle orientation banner: decays after Week 2 OR once user
-			     has 4+ reflections (whichever comes first), so seasoned users
-			     never see it again. -->
-			{#if data.maturityStage === 'new' && data.currentWeek !== null && data.currentWeek <= 2}
-				<div
-					class="mb-6 rounded-lg border border-accent/20 bg-accent-muted/30 px-4 py-3 text-[12px] leading-relaxed text-text-secondary"
-				>
-					<p>
-						<span class="font-semibold text-accent">You're early</span> — Insights, Scorecard, and Feedback
-						views fill in once you have ~2 weeks of check-ins and reviewer responses. Just keep showing
-						up here each week.
-					</p>
-				</div>
-			{/if}
 
-			<!-- Identity anchor -->
-			{#if data.identityAnchor}
-				<p class="mb-2 text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
-					I am becoming {data.identityAnchor.length > 80
-						? data.identityAnchor.slice(0, 80) + '...'
-						: data.identityAnchor}
+			{#if weekCovered}
+				<p class="mt-6 text-base leading-relaxed text-text-primary">
+					<span class="font-semibold">
+						{featured.currentWeek === 1 ? 'Initial rating is in.' : 'This week is done.'}
+					</span>
+					Check in again when next week starts.
 				</p>
 			{/if}
 
-			<!-- Week indicator -->
-			{#if data.currentWeek && data.totalWeeks}
-				<p class="mb-8 font-mono text-[11px] tracking-[0.06em] text-text-muted">
-					Week {data.currentWeek} of {data.totalWeeks}
-				</p>
-			{/if}
-
-			{#if screenState === 'check-in'}
-				<!-- ═══ Check-in due — inline form ═══ -->
-				<div class="pt-8">
-					<!-- Prompt -->
-					<p class="mb-8 text-[13px] text-text-tertiary">How would you describe your week?</p>
-
-					<!-- Rating bars -->
-					<form
-						method="POST"
-						action="?/checkin"
-						use:enhance={() => {
-							isSubmitting = true;
-							return async ({
-								update
-							}: {
-								update: (opts?: { reset?: boolean }) => Promise<void>;
-							}) => {
-								await update({ reset: false });
-								isSubmitting = false;
-							};
-						}}
-					>
-						<input type="hidden" name="effortScore" value={effortScore ?? ''} />
-						<input type="hidden" name="performanceScore" value={performanceScore ?? ''} />
-
-						<div class="mb-5 flex justify-center gap-12">
-							<RatingBar
-								dimension="effort"
-								bind:value={effortScore}
-								lastValue={data.lastEffortScore}
-							/>
-							<RatingBar
-								dimension="performance"
-								bind:value={performanceScore}
-								lastValue={data.lastPerformanceScore}
-							/>
-						</div>
-
-						<!-- Note prompt (always visible) -->
-						<div class="mt-8">
-							<p class="mb-3 text-sm text-text-secondary">
-								What shaped your week? <span class="text-text-tertiary"
-									>-- even one sentence helps your coach</span
-								>
-							</p>
-							<textarea
-								name="notes"
-								rows="3"
-								maxlength="500"
-								bind:value={notes}
-								class="w-full rounded-[10px] border border-border-default bg-surface-raised px-4 py-3.5 text-sm leading-relaxed text-text-primary placeholder:text-text-muted focus:border-border-accent focus:outline-none"
-								placeholder="A specific moment, a challenge, something you noticed..."
-							></textarea>
-						</div>
-
-						<!-- Error display -->
-						{#if form?.error}
-							<div
-								class="mt-4 rounded-lg border border-signal-attention/30 bg-signal-attention-muted px-4 py-3 text-sm text-signal-attention"
-							>
-								{form.error}
-							</div>
-						{/if}
-
-						<!-- Submit button -->
-						<button
-							type="submit"
-							disabled={!bothScoresSelected || isSubmitting}
-							class="mt-6 w-full rounded-lg bg-accent px-6 py-3.5 text-sm font-semibold text-surface-base transition-all duration-350 hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-						>
-							{#if isSubmitting}
-								Saving...
-							{:else}
-								Save check-in
-							{/if}
-						</button>
-					</form>
-				</div>
-			{:else}
-				<!-- ═══ Caught up ═══ -->
-				<div class="py-12 text-center">
-					<p class="text-[15px] leading-relaxed text-text-secondary">
-						{#if justSaved}
-							Check-in saved. Your next check-in opens {data.nextCheckInDay}.
-						{:else}
-							You're on track. Your next check-in opens {data.nextCheckInDay}.
-						{/if}
-					</p>
-				</div>
-			{/if}
-
-			<!-- One ambient nudge at a time, in priority order: new feedback >
-			     scorecard ready > need more reviewers. -->
-			{#if data.hasNewFeedback}
-				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href="/individual/feedback"
-					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
-				>
-					<p class="text-[13px] text-text-secondary">
-						{data.newFeedbackRaterName ?? 'A reviewer'} shared their perspective.
-						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
-							>View scores</span
-						>
-					</p>
-				</a>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
-			{:else if data.signals?.scorecardReady}
-				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href="/individual/feedback"
-					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
-				>
-					<p class="text-[13px] text-text-secondary">
-						Your blind-spot view is ready — see how your self-rating compares to your reviewers'.
-						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
-							>Open scorecard</span
-						>
-					</p>
-				</a>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
-			{:else if data.signals?.needsMoreReviewers}
+			{#if needsReviewer && !weekCovered}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
 					href="/individual/stakeholders"
-					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
+					class="mt-6 block border-l-2 border-accent/30 py-2 pr-2 pl-4 text-sm text-text-secondary"
 				>
-					<p class="text-[13px] text-text-secondary">
-						Add another reviewer to sharpen your blind-spot data. 2–3 perspectives is the sweet
-						spot.
-						<span class="font-semibold text-accent transition-colors group-hover:text-accent-hover"
-							>Manage reviewers</span
-						>
-					</p>
+					Add a reviewer so you can see the gap between your view and theirs.
+					<span class="font-semibold text-accent">Add a reviewer</span>
 				</a>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{/if}
+		</article>
+	{/if}
 
-			<!-- Coach nudge -->
-			{#if data.coachNudge}
-				<div class="mt-8 border-l-2 border-accent/20 py-4 pr-4 pl-5">
-					<p class="text-sm leading-relaxed text-text-secondary italic">
-						"{data.coachNudge.text}"
-					</p>
-					<p class="mt-2 text-[11px] text-text-muted">
-						-- Your coach, {data.coachNudge.coachName}
-					</p>
-				</div>
-			{/if}
-		</div>
+	{#if pastJourneys.length > 0}
+		<h2 class="mt-12 text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+			Earlier journeys
+		</h2>
+		<ul class="mt-4 space-y-3">
+			{#each pastJourneys as journey (journey.id)}
+				<li>
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						href="/individual/journey/{journey.id}"
+						class="block rounded-xl border border-border-default bg-surface-raised px-5 py-4 transition-colors hover:border-border-strong"
+					>
+						<p class="text-sm font-semibold text-text-primary">{journey.goalTitle}</p>
+						<p class="mt-1 text-[13px] text-text-secondary">
+							{journey.label ?? 'Journey'} · {formatDate(journey.startDate)}
+							{#if journey.endDate}
+								— {formatDate(journey.endDate)}
+							{/if}
+						</p>
+						<p class="mt-2 font-mono text-[11px] tracking-[0.06em] text-text-muted">
+							{journey.lengthWeeks} weeks · {journey.checkInCount}
+							{journey.checkInCount === 1 ? 'check-in' : 'check-ins'}
+						</p>
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				</li>
+			{/each}
+		</ul>
 	{/if}
 </section>

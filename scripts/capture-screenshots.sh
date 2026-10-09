@@ -42,8 +42,8 @@ case "${1:-all}" in
     capture "12-coach-analytics" "/coach/analytics"
     capture "13-coach-invitations" "/coach/invitations"
     ;;
-  stakeholder)
-    capture "20-stakeholder-feedback" "/stakeholder/feedback/preview?preview=true"
+  reviewer)
+    capture "20-reviewer-feedback" "/reviewer/feedback/preview?preview=true"
     ;;
   admin)
     capture "30-admin-dashboard" "/admin"
@@ -54,7 +54,7 @@ case "${1:-all}" in
     echo "Run each role separately:"
     echo "  1. Impersonate Jamie Torres, then: bash scripts/capture-screenshots.sh individual"
     echo "  2. Impersonate Marcus Thompson, then: bash scripts/capture-screenshots.sh coach"
-    echo "  3. No impersonation: bash scripts/capture-screenshots.sh stakeholder"
+    echo "  3. No impersonation: bash scripts/capture-screenshots.sh reviewer"
     echo "  4. No impersonation: bash scripts/capture-screenshots.sh admin"
     ;;
 esac

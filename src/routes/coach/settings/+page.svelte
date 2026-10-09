@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { browserTimeZone } from '$lib/notifications/preferences';
 	import { addToast } from '$lib/stores/toasts.svelte';
-	import { Settings2, User, Globe } from 'lucide-svelte';
+	import { Settings2, User, Globe, Mail, Smartphone } from 'lucide-svelte';
 
 	const { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -11,11 +12,26 @@
 	let name = $state(data.user.name ?? '');
 	let phone = $state(data.user.phone ?? '');
 	let timezone = $state(data.user.timezone ?? '');
+	let deliveryMethod = $state(data.user.deliveryMethod ?? 'email');
+	let extraTimezone = $state('');
+	let appliedEmptyTimezone = false;
 
 	$effect(() => {
 		name = data.user.name ?? '';
 		phone = data.user.phone ?? '';
-		timezone = data.user.timezone ?? '';
+		deliveryMethod = data.user.deliveryMethod ?? 'email';
+		const saved = data.user.timezone ?? '';
+		if (saved) {
+			timezone = saved;
+			if (!timezones.includes(saved)) extraTimezone = saved;
+			return;
+		}
+		if (appliedEmptyTimezone) return;
+		appliedEmptyTimezone = true;
+		const detected = browserTimeZone();
+		if (!detected) return;
+		extraTimezone = detected;
+		timezone = detected;
 	});
 
 	const timezones = [
@@ -34,6 +50,10 @@
 		'Australia/Sydney',
 		'Pacific/Auckland'
 	];
+
+	const timezoneOptions = $derived(
+		extraTimezone && !timezones.includes(extraTimezone) ? [extraTimezone, ...timezones] : timezones
+	);
 </script>
 
 <svelte:head>
@@ -165,11 +185,53 @@
 					bind:value={timezone}
 					class="w-full rounded-xl border border-border-default bg-surface-subtle px-4 py-2.5 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 				>
-					<option value="">Auto-detect</option>
-					{#each timezones as tz (tz)}
+					<option value="">UTC</option>
+					{#each timezoneOptions as tz (tz)}
 						<option value={tz}>{tz.replace(/_/g, ' ')}</option>
 					{/each}
 				</select>
+			</div>
+			<div class="mt-4">
+				<p class="mb-1.5 text-sm font-medium text-text-secondary">Delivery Method</p>
+				<div class="flex gap-2">
+					<button
+						type="button"
+						onclick={() => (deliveryMethod = 'email')}
+						class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors {deliveryMethod ===
+						'email'
+							? 'border-accent bg-accent/10 text-accent'
+							: 'border-border-default bg-surface-subtle text-text-secondary hover:border-border-strong'}"
+					>
+						<Mail class="h-4 w-4" /> Email
+					</button>
+					<button
+						type="button"
+						onclick={() => (deliveryMethod = 'sms')}
+						class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors {deliveryMethod ===
+						'sms'
+							? 'border-accent bg-accent/10 text-accent'
+							: 'border-border-default bg-surface-subtle text-text-secondary hover:border-border-strong'}"
+					>
+						<Smartphone class="h-4 w-4" /> SMS
+					</button>
+					<button
+						type="button"
+						onclick={() => (deliveryMethod = 'both')}
+						class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors {deliveryMethod ===
+						'both'
+							? 'border-accent bg-accent/10 text-accent'
+							: 'border-border-default bg-surface-subtle text-text-secondary hover:border-border-strong'}"
+					>
+						Both
+					</button>
+				</div>
+				<input type="hidden" name="deliveryMethod" value={deliveryMethod} />
+				{#if deliveryMethod === 'sms' || deliveryMethod === 'both'}
+					<p class="mt-2 text-xs leading-relaxed text-text-muted">
+						By enabling SMS, you agree to receive automated text messages from Forbetra. Msg & data
+						rates may apply. Reply STOP to opt out.
+					</p>
+				{/if}
 			</div>
 		</div>
 

@@ -351,11 +351,6 @@
 							Go to coach dashboard
 						</a>
 					</div>
-				{:else if data.dbUser.role === 'STAKEHOLDER'}
-					<p class="text-sm text-text-secondary">
-						Stay tuned—feedback prompts arrive when your participant submits reflections for the
-						week.
-					</p>
 				{:else}
 					<p class="text-sm text-text-secondary">
 						Continue to <a href="/admin/users" class="font-semibold text-text-primary underline"

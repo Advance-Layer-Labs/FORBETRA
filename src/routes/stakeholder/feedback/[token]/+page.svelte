@@ -8,6 +8,7 @@
 		getFocusRing,
 		getScoreLabel
 	} from '$lib/utils/scoreColors';
+	import InfoTip from '$lib/components/InfoTip.svelte';
 
 	import { enhance } from '$app/forms';
 	import { onMount } from 'svelte';
@@ -46,17 +47,19 @@
 	let isSubmitting = $state(false);
 	let showReveal = $state(false);
 	let scoresRequired = $state(false);
-	let stakeholderScores = $state<{
+	let reviewerScores = $state<{
 		effortScore: number | null;
 		performanceScore: number | null;
 	} | null>(null);
 	let previewIndividualScores = $state<{
-		effortScore: number;
-		performanceScore: number;
+		effortScore: number | null;
+		performanceScore: number | null;
+		checkInCount: number;
 		participantName: string;
 	} | null>(null);
 
 	const hasAtLeastOneScore = $derived(effortScore !== null || performanceScore !== null);
+	const contributionCount = $derived((data.historicRatings?.length ?? 0) + 1);
 
 	const enhanceSubmit = ({ cancel }: { cancel: () => void }) => {
 		if (!hasAtLeastOneScore && !notes.trim()) {
@@ -66,7 +69,7 @@
 		}
 		scoresRequired = false;
 		isSubmitting = true;
-		stakeholderScores = { effortScore, performanceScore };
+		reviewerScores = { effortScore, performanceScore };
 		return async ({ update }: { update: () => Promise<void> }) => {
 			isSubmitting = false;
 			await update();
@@ -108,11 +111,12 @@
 
 	// Simulate reveal for preview mode
 	const simulateReveal = () => {
-		stakeholderScores = { effortScore: effortScore ?? 0, performanceScore: performanceScore ?? 0 };
+		reviewerScores = { effortScore: effortScore ?? 0, performanceScore: performanceScore ?? 0 };
 		previewIndividualScores = {
 			effortScore: 7,
 			performanceScore: 6,
-			participantName: data.reflection.participantName
+			checkInCount: 1,
+			participantName: data.invite.participantName
 		};
 		setTimeout(() => {
 			showReveal = true;
@@ -122,12 +126,12 @@
 	// Get individual scores from either form response or preview data
 	const individualScores = $derived(form?.individualScores ?? previewIndividualScores);
 	const participantName = $derived(
-		individualScores?.participantName ?? data.reflection.participantName
+		individualScores?.participantName ?? data.invite.participantName
 	);
 
 	// Show reveal when form is successfully submitted (only if reveal is enabled)
 	$effect(() => {
-		if (form?.success && form?.individualScores && data.revealScores !== false) {
+		if (form?.success && form?.individualScores) {
 			// Small delay for better UX
 			const timer = setTimeout(() => {
 				showReveal = true;
@@ -214,10 +218,10 @@
 />
 
 <svelte:head>
-	<title>Feedback for {data.reflection.participantName} | Forbetra</title>
+	<title>Feedback for {data.invite.participantName} | Forbetra</title>
 </svelte:head>
 
-{#if data.isAlreadySubmitted}
+{#if data.isAlreadySubmitted || form?.alreadySubmitted}
 	<div class="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
 		<div class="max-w-md rounded-xl border border-border-default bg-surface-raised p-8 shadow-lg">
 			<div
@@ -236,40 +240,38 @@
 			<span
 				class="mb-3 inline-block rounded-full bg-accent-muted px-3 py-1 text-xs font-semibold text-accent"
 			>
-				Week {data.reflection.weekNumber} Check-in
+				Week {data.invite.weekNumber} Check-in
 			</span>
 			<h1 class="mb-2 text-xl font-bold text-text-primary">
 				You've already shared your perspective
 			</h1>
 			<p class="text-sm text-text-secondary">
-				You've already submitted your feedback for {data.reflection?.participantName ??
-					'this person'} this week. Thank you!
+				You've already submitted your feedback for {data.invite?.participantName ?? 'this person'} this
+				week. Thank you!
 			</p>
-			{#if data.historicRatings && data.historicRatings.length > 0}
-				<div class="mt-3 rounded-lg bg-surface-subtle px-4 py-3">
-					<p class="text-xs font-semibold text-accent">
-						Contribution #{data.historicRatings.length}
-					</p>
-					<p class="mt-1 text-xs text-text-secondary">
-						{#if data.historicRatings.length >= 4}
-							Your consistent feedback is building a detailed picture — that's exactly what drives
-							real growth.
-						{:else if data.historicRatings.length >= 2}
-							You've contributed {data.historicRatings.length} times — that consistency makes a real difference.
-						{:else}
-							Your first contribution is in — every data point helps {data.reflection
-								?.participantName ?? 'them'} see what they can't see alone.
-						{/if}
-					</p>
-				</div>
-			{/if}
+			<div class="mt-3 rounded-lg bg-surface-subtle px-4 py-3">
+				<p class="text-xs font-semibold text-accent">
+					Contribution #{contributionCount}
+				</p>
+				<p class="mt-1 text-xs text-text-secondary">
+					{#if contributionCount >= 4}
+						Your consistent feedback is building a detailed picture — that's exactly what drives
+						real growth.
+					{:else if contributionCount >= 2}
+						You've contributed {contributionCount} times — that consistency makes a real difference.
+					{:else}
+						Your first contribution is in — every data point helps {data.invite?.participantName ??
+							'them'} see what they can't see alone.
+					{/if}
+				</p>
+			</div>
 			<div class="mt-3 rounded-lg border border-border-default bg-surface-subtle px-4 py-3">
 				<p class="text-xs text-text-secondary">
-					We'll send you a quick link next week — same ~60 seconds, same real impact.
+					We'll send another link when they ask for feedback again.
 				</p>
 			</div>
 			<p class="text-2xs mt-3 text-text-tertiary">
-				Need to change your response? Ask {data.reflection?.participantName ??
+				Need to change your response? Ask {data.invite?.participantName ??
 					'the person who invited you'} to request a new link for you.
 			</p>
 		</div>
@@ -317,7 +319,7 @@
 					class="inline-flex items-center gap-2 rounded-full bg-accent-muted px-4 py-1.5 text-xs font-medium text-accent"
 				>
 					<span class="h-2 w-2 rounded-full bg-accent"></span>
-					Week {data.reflection.weekNumber} Check-in
+					Week {data.invite.weekNumber} Check-in
 				</div>
 				{#if !data.isFirstFeedback && data.historicRatings && data.historicRatings.length > 0}
 					<span
@@ -328,7 +330,7 @@
 				{/if}
 			</div>
 			<h1 class="text-3xl font-bold text-text-primary">
-				Help {data.reflection.participantName} see what you see.
+				Help {data.invite.participantName} see what you see.
 			</h1>
 			<p class="text-base text-text-secondary">This takes about 60 seconds.</p>
 		</header>
@@ -339,6 +341,13 @@
 					class="mx-auto max-w-2xl rounded-xl border border-error-muted bg-error-muted p-4 text-sm text-error"
 				>
 					<p class="font-medium"><AlertTriangle class="inline h-4 w-4" /> {form.error}</p>
+					{#if 'expired' in form && form.expired}
+						<!-- eslint-disable svelte/no-navigation-without-resolve -->
+						<a href="/stakeholder/invalid" class="mt-2 inline-block font-semibold underline">
+							Request a new link
+						</a>
+						<!-- eslint-enable svelte/no-navigation-without-resolve -->
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -352,17 +361,17 @@
 						>
 							<Hand class="h-7 w-7 text-white" />
 						</div>
-						<h2 class="text-2xl font-bold text-text-primary">Welcome, {data.stakeholder.name}</h2>
+						<h2 class="text-2xl font-bold text-text-primary">Welcome, {data.reviewer.name}</h2>
 						<p class="mt-2 text-base text-text-secondary">
-							<strong>{data.reflection.participantName}</strong> is working on their growth and values
-							your honest perspective. What takes you 60 seconds gives them insights they can't get any
-							other way.
+							<strong>{data.invite.participantName}</strong> is working on their growth and values your
+							honest perspective. What takes you 60 seconds gives them insights they can't get any other
+							way.
 						</p>
 					</div>
 
 					<div class="mb-5 rounded-xl border border-accent/30 bg-surface-raised p-4">
 						<p class="mb-1 text-xs font-semibold tracking-wide text-accent uppercase">Their goal</p>
-						<p class="text-base font-bold text-text-primary">{data.reflection.objectiveTitle}</p>
+						<p class="text-base font-bold text-text-primary">{data.invite.goalTitle}</p>
 					</div>
 
 					<div class="mb-5 rounded-lg border border-border-default bg-surface-raised p-4">
@@ -389,8 +398,8 @@
 						<div class="flex items-center gap-2 text-xs text-text-muted">
 							<Shield class="h-3.5 w-3.5 shrink-0" />
 							<span
-								>Your feedback goes to {data.reflection.participantName} and their coach. No anonymous
-								aggregation — your name is attached, which keeps feedback honest and actionable.</span
+								>Your feedback goes to {data.invite.participantName} and their coach. No anonymous aggregation
+								— your name is attached, which keeps feedback honest and actionable.</span
 							>
 						</div>
 						<p class="text-2xs text-center text-text-muted">
@@ -435,12 +444,12 @@
 						<CircleCheck class="h-8 w-8 text-success" />
 					</div>
 					<p class="text-lg font-semibold text-success">
-						Thank you, {data.stakeholder.name}!
+						Thank you, {data.reviewer.name}!
 					</p>
 					<p class="mt-1 text-sm text-success">Your perspective matters more than you know.</p>
 					<p class="mt-2 text-xs text-text-secondary">
-						Your ratings are combined with {data.reflection.participantName}'s self-assessment to
-						reveal perception gaps — the blind spots that drive real growth.
+						Your ratings are combined with {data.invite.participantName}'s self-assessment to reveal
+						perception gaps — the blind spots that drive real growth.
 					</p>
 					{#if data.historicRatings && data.historicRatings.length > 0}
 						<p class="mt-2 text-xs text-success/80">
@@ -462,7 +471,7 @@
 								>1</span
 							>
 							<span
-								>Your scores are compared with {data.reflection.participantName}'s self-rating to
+								>Your scores are compared with {data.invite.participantName}'s self-rating to
 								surface blind spots</span
 							>
 						</div>
@@ -485,8 +494,8 @@
 					</div>
 				</div>
 
-				<!-- Reveal Section (only when revealScores is enabled) -->
-				{#if showReveal && individualScores && data.revealScores !== false}
+				<!-- Reveal Section -->
+				{#if showReveal && individualScores}
 					<div
 						class="rounded-2xl border border-accent/30 bg-surface-base p-8"
 						transition:fly={{ y: 16, duration: 400 }}
@@ -494,10 +503,15 @@
 						<div class="mb-6 text-center">
 							<Gift class="mx-auto mb-3 h-12 w-12 text-accent" />
 							<h2 class="text-2xl font-bold text-text-primary">
-								Here's what {participantName} rated themselves:
+								Here's what {participantName} rated themselves in Week {data.invite.weekNumber}:
 							</h2>
 							<p class="mt-2 text-sm text-text-secondary">
-								Compare your perspective with their self-assessment
+								{#if individualScores.checkInCount > 1}
+									Average of their {individualScores.checkInCount} check-ins this week, compared with
+									your perspective on their goal
+								{:else}
+									Compare your perspective with their self-assessment on their goal
+								{/if}
 							</p>
 						</div>
 
@@ -518,24 +532,24 @@
 										<div class="flex items-center gap-2">
 											<div
 												class="flex h-10 w-10 items-center justify-center rounded-full border-2 {getScoreBgColor(
-													stakeholderScores?.effortScore ?? 0,
+													reviewerScores?.effortScore ?? 0,
 													'effort'
 												)}"
 											>
 												<span
 													class="text-lg font-bold {getScoreColor(
-														stakeholderScores?.effortScore ?? 0,
+														reviewerScores?.effortScore ?? 0,
 														'effort'
 													)}"
 												>
-													{stakeholderScores?.effortScore ?? '—'}
+													{reviewerScores?.effortScore ?? '—'}
 												</span>
 											</div>
 										</div>
 									</div>
-									{#if data.previousRatings?.effortScore !== null && data.previousRatings?.effortScore !== undefined && stakeholderScores?.effortScore !== null && stakeholderScores?.effortScore !== undefined}
+									{#if data.previousRatings?.effortScore !== null && data.previousRatings?.effortScore !== undefined && reviewerScores?.effortScore !== null && reviewerScores?.effortScore !== undefined}
 										{@const effortDelta =
-											stakeholderScores.effortScore - data.previousRatings.effortScore}
+											reviewerScores.effortScore - data.previousRatings.effortScore}
 										<p class="text-xs text-text-tertiary">
 											Last time you rated effort {data.previousRatings.effortScore} —
 											{#if effortDelta > 0}
@@ -596,24 +610,24 @@
 										<div class="flex items-center gap-2">
 											<div
 												class="flex h-10 w-10 items-center justify-center rounded-full border-2 {getScoreBgColor(
-													stakeholderScores?.performanceScore ?? 0,
+													reviewerScores?.performanceScore ?? 0,
 													'performance'
 												)}"
 											>
 												<span
 													class="text-lg font-bold {getScoreColor(
-														stakeholderScores?.performanceScore ?? 0,
+														reviewerScores?.performanceScore ?? 0,
 														'performance'
 													)}"
 												>
-													{stakeholderScores?.performanceScore ?? '—'}
+													{reviewerScores?.performanceScore ?? '—'}
 												</span>
 											</div>
 										</div>
 									</div>
-									{#if data.previousRatings?.performanceScore !== null && data.previousRatings?.performanceScore !== undefined && stakeholderScores?.performanceScore !== null && stakeholderScores?.performanceScore !== undefined}
+									{#if data.previousRatings?.performanceScore !== null && data.previousRatings?.performanceScore !== undefined && reviewerScores?.performanceScore !== null && reviewerScores?.performanceScore !== undefined}
 										{@const perfDelta =
-											stakeholderScores.performanceScore - data.previousRatings.performanceScore}
+											reviewerScores.performanceScore - data.previousRatings.performanceScore}
 										<p class="text-xs text-text-tertiary">
 											Last time you rated performance {data.previousRatings.performanceScore} —
 											{#if perfDelta > 0}
@@ -664,42 +678,48 @@
 						<p class="text-center text-sm font-semibold text-accent">
 							Your perspective is shaping real change
 						</p>
-						{#if stakeholderScores}
+						{#if reviewerScores}
 							<div class="mt-3 flex justify-center gap-6">
-								{#if stakeholderScores.effortScore !== null}
+								{#if reviewerScores.effortScore !== null}
 									<div class="text-center">
 										<p class="text-2xs font-medium tracking-wider text-text-muted uppercase">
 											Effort
 										</p>
 										<p
 											class="text-lg font-bold {getScoreColor(
-												stakeholderScores.effortScore ?? 0,
+												reviewerScores.effortScore ?? 0,
 												'effort'
 											)}"
 										>
-											{stakeholderScores.effortScore}/10
+											{reviewerScores.effortScore}/10
 										</p>
 									</div>
 								{/if}
-								{#if stakeholderScores.performanceScore !== null}
+								{#if reviewerScores.performanceScore !== null}
 									<div class="text-center">
 										<p class="text-2xs font-medium tracking-wider text-text-muted uppercase">
 											Performance
 										</p>
 										<p
 											class="text-lg font-bold {getScoreColor(
-												stakeholderScores.performanceScore ?? 0,
+												reviewerScores.performanceScore ?? 0,
 												'performance'
 											)}"
 										>
-											{stakeholderScores.performanceScore}/10
+											{reviewerScores.performanceScore}/10
 										</p>
 									</div>
 								{/if}
 							</div>
 						{/if}
+						{#if form?.success && !individualScores}
+							<p class="mt-3 text-center text-xs text-text-secondary">
+								{data.invite.participantName} hasn't logged a Week {data.invite.weekNumber} check-in yet,
+								so there's no self-rating to compare against.
+							</p>
+						{/if}
 						<p class="mt-3 text-center text-xs text-text-secondary">
-							Your ratings have been shared with {data.reflection.participantName}'s coach and are
+							Your ratings have been shared with {data.invite.participantName}'s coach and are
 							already informing their next session.
 						</p>
 					</div>
@@ -709,15 +729,15 @@
 				<div
 					class="rounded-xl border border-border-default bg-surface-subtle px-5 py-4 text-center"
 				>
-					{#if data.previousRatings && (data.previousRatings.effortScore !== null || data.previousRatings.performanceScore !== null) && stakeholderScores}
+					{#if data.previousRatings && (data.previousRatings.effortScore !== null || data.previousRatings.performanceScore !== null) && reviewerScores}
 						{@const effortDelta =
-							stakeholderScores.effortScore !== null && data.previousRatings.effortScore !== null
-								? stakeholderScores.effortScore - data.previousRatings.effortScore
+							reviewerScores.effortScore !== null && data.previousRatings.effortScore !== null
+								? reviewerScores.effortScore - data.previousRatings.effortScore
 								: null}
 						{@const perfDelta =
-							stakeholderScores.performanceScore !== null &&
+							reviewerScores.performanceScore !== null &&
 							data.previousRatings.performanceScore !== null
-								? stakeholderScores.performanceScore - data.previousRatings.performanceScore
+								? reviewerScores.performanceScore - data.previousRatings.performanceScore
 								: null}
 						{@const anyHigher =
 							(effortDelta !== null && effortDelta > 0) || (perfDelta !== null && perfDelta > 0)}
@@ -725,18 +745,18 @@
 						<p class="mt-1 text-xs text-text-secondary">
 							{#if anyHigher}
 								You rated {effortDelta !== null && effortDelta > 0 ? 'effort' : 'performance'} higher
-								this week — that kind of observation is exactly what helps {data.reflection
+								this week — that kind of observation is exactly what helps {data.invite
 									.participantName}'s coach spot real momentum.
 							{:else}
-								Your consistent perspective helps {data.reflection.participantName}'s coach track
-								what's actually shifting over time.
+								Your consistent perspective helps {data.invite.participantName}'s coach track what's
+								actually shifting over time.
 							{/if}
 						</p>
 					{:else}
 						<p class="text-sm font-medium text-text-primary">Your first rating is in</p>
 						<p class="mt-1 text-xs text-text-secondary">
-							{data.reflection.participantName}'s coach will use this in their next session. We'll
-							send you a quick link next week — same ~60 seconds, same real impact.
+							{data.invite.participantName}'s coach will use this in their next session. You'll get
+							another link when they ask for feedback again.
 						</p>
 					{/if}
 				</div>
@@ -752,14 +772,14 @@
 						<p class="mt-1 text-sm leading-relaxed text-text-secondary">
 							Forbetra is a coaching platform that combines weekly self-reflection with 360-degree
 							feedback from people like you.
-							{data.reflection.participantName} is working on a professional development goal and has
-							asked for your honest perspective. Your ratings help reveal blind spots between self-perception
+							{data.invite.participantName} is working on a professional development goal and has asked
+							for your honest perspective. Your ratings help reveal blind spots between self-perception
 							and outside observation — the kind of insight that drives real growth.
 						</p>
 					</div>
 				{/if}
 
-				<!-- Returning stakeholder welcome-back + impact summary -->
+				<!-- Returning reviewer welcome-back + impact summary -->
 				{#if !data.isFirstFeedback && data.historicRatings && data.historicRatings.length > 0}
 					{@const avgEffort =
 						data.historicRatings.filter((r) => r.effortScore !== null).length > 0
@@ -803,10 +823,10 @@
 						class="rounded-xl border border-accent/20 bg-gradient-to-r from-accent/5 to-transparent p-4"
 					>
 						<p class="text-sm font-semibold text-text-primary">
-							Welcome back, {data.stakeholder.name}
+							Welcome back, {data.reviewer.name}
 						</p>
 						<p class="mt-0.5 mb-2 text-xs text-text-secondary">
-							Your impact on {data.reflection.participantName}'s journey so far:
+							Your impact on {data.invite.participantName}'s journey so far:
 						</p>
 						<div class="flex flex-wrap items-center gap-x-5 gap-y-2">
 							<div class="flex items-center gap-1.5">
@@ -821,7 +841,12 @@
 							</div>
 							{#if avgEffort !== null}
 								<div class="flex items-center gap-1.5">
-									<span class="text-xs text-text-muted">Effort:</span>
+									<span class="flex items-center gap-1 text-xs text-text-muted">
+										Effort:
+										<InfoTip
+											text="How much energy they are investing. 0 is none, 10 is exceptional."
+										/>
+									</span>
 									<span class="text-xs font-bold {getScoreColor(avgEffort, 'effort')}"
 										>{avgEffort}/10</span
 									>
@@ -834,7 +859,10 @@
 							{/if}
 							{#if avgPerf !== null}
 								<div class="flex items-center gap-1.5">
-									<span class="text-xs text-text-muted">Perf:</span>
+									<span class="flex items-center gap-1 text-xs text-text-muted">
+										Performance:
+										<InfoTip text="What results you can see. 0 is none, 10 is exceptional." />
+									</span>
 									<span class="text-xs font-bold {getScoreColor(avgPerf, 'performance')}"
 										>{avgPerf}/10</span
 									>
@@ -848,19 +876,19 @@
 						</div>
 						{#if (effortTrend !== null && effortTrend > 0) || (perfTrend !== null && perfTrend > 0)}
 							<p class="text-2xs mt-2 text-success">
-								Your feedback is part of {data.reflection.participantName}'s upward trajectory —
-								they're growing, and your perspective is helping.
+								Your feedback is part of {data.invite.participantName}'s upward trajectory — they're
+								growing, and your perspective is helping.
 							</p>
 						{:else}
 							<p class="text-2xs mt-2 text-text-tertiary">
-								Your ongoing perspective helps {data.reflection.participantName}'s coach track real
+								Your ongoing perspective helps {data.invite.participantName}'s coach track real
 								progress over time.
 							</p>
 						{/if}
 					</div>
 				{:else if !data.isFirstFeedback}
 					<p class="text-center text-sm font-semibold text-text-primary">
-						Welcome back, {data.stakeholder.name}
+						Welcome back, {data.reviewer.name}
 					</p>
 				{/if}
 
@@ -904,8 +932,8 @@
 				>
 					<Shield class="h-3.5 w-3.5 shrink-0 text-text-muted" />
 					<span
-						>Your name is attached to this feedback — shared only with {data.reflection
-							.participantName} and their coach.</span
+						>Your name is attached to this feedback — shared only with {data.invite.participantName} and
+						their coach.</span
 					>
 				</div>
 
@@ -919,28 +947,28 @@
 						<input type="hidden" name="performanceScore" value={performanceScore} />
 					{/if}
 
-					<!-- Objective Display -->
+					<!-- Goal Display -->
 					<div class="rounded-xl border border-border-default bg-surface-subtle px-5 py-4">
 						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-text-secondary">
 							<div class="flex items-center gap-2">
 								<Target class="h-5 w-5 shrink-0 text-accent" />
-								<span class="font-medium">Objective:</span>
+								<span class="font-medium">Goal:</span>
 							</div>
 							<span class="text-lg font-semibold text-text-primary"
-								>{data.reflection.objectiveTitle || 'the goal'}</span
+								>{data.invite.goalTitle || 'the goal'}</span
 							>
 						</div>
 					</div>
 
-					{#if data.subgoals && data.subgoals.length > 0}
+					{#if data.focusAreas && data.focusAreas.length > 0}
 						<div class="rounded-xl border border-accent/30 bg-surface-base px-5 py-4">
 							<p class="mb-3 text-sm font-semibold text-accent">Behaviors to observe</p>
 							<div class="space-y-2">
-								{#each data.subgoals as subgoal (subgoal.label)}
+								{#each data.focusAreas as focusArea (focusArea.label)}
 									<div class="rounded-lg border border-border-default bg-surface-raised px-4 py-3">
-										<p class="text-sm font-semibold text-text-primary">{subgoal.label}</p>
-										{#if subgoal.description}
-											<p class="mt-1 text-xs text-text-secondary">{subgoal.description}</p>
+										<p class="text-sm font-semibold text-text-primary">{focusArea.label}</p>
+										{#if focusArea.description}
+											<p class="mt-1 text-xs text-text-secondary">{focusArea.description}</p>
 										{/if}
 									</div>
 								{/each}
@@ -972,9 +1000,8 @@
 										Effort
 									</span>
 									<p class="text-xs text-text-tertiary">
-										How much intentional effort have you noticed from {data.reflection
-											.participantName} on "{data.reflection.objectiveTitle || 'their goal'}"
-										recently?
+										How much intentional effort have you noticed from {data.invite.participantName} on
+										"{data.invite.goalTitle || 'their goal'}" recently?
 									</p>
 								</div>
 							</div>
@@ -1060,8 +1087,8 @@
 										Performance
 									</span>
 									<p class="text-xs text-text-tertiary">
-										How effectively is {data.reflection.participantName} performing on "{data
-											.reflection.objectiveTitle || 'their goal'}" from your perspective?
+										How effectively is {data.invite.participantName} performing on "{data.invite
+											.goalTitle || 'their goal'}" from your perspective?
 									</p>
 								</div>
 							</div>
@@ -1145,8 +1172,8 @@
 						>
 							<CircleCheck class="h-4 w-4 shrink-0 text-success" />
 							<p class="text-xs text-text-secondary">
-								Both scores recorded. Your perspective helps {data.reflection.participantName} see blind
-								spots they can't see alone.
+								Both scores recorded. Your perspective helps {data.invite.participantName} see blind spots
+								they can't see alone.
 							</p>
 						</div>
 					{/if}
@@ -1170,7 +1197,7 @@
 							></textarea>
 							<div class="mt-2 flex items-center justify-between">
 								<p class="text-xs text-text-tertiary">
-									Shared with {data.reflection.participantName} and their coach.
+									Shared with {data.invite.participantName} and their coach.
 								</p>
 								<span class="text-xs text-text-muted">{notes.length} / 500</span>
 							</div>
@@ -1198,7 +1225,7 @@
 									>Specific behavior you've observed</label
 								>
 								<p class="mb-2 text-xs text-text-muted">
-									What has {data.reflection.participantName} done well or struggled with recently?
+									What has {data.invite.participantName} done well or struggled with recently?
 								</p>
 								<textarea
 									name="behavioralObservation"
@@ -1220,7 +1247,7 @@
 									>Suggestion for improvement</label
 								>
 								<p class="mb-2 text-xs text-text-muted">
-									What's one thing {data.reflection.participantName} could try differently?
+									What's one thing {data.invite.participantName} could try differently?
 								</p>
 								<textarea
 									name="suggestion"
@@ -1248,17 +1275,15 @@
 						</button>
 					{/if}
 
-					{#if data.revealScores !== false}
-						<div
-							class="flex items-center gap-2 rounded-lg bg-accent-muted px-3 py-2 text-xs text-accent"
+					<div
+						class="flex items-center gap-2 rounded-lg bg-accent-muted px-3 py-2 text-xs text-accent"
+					>
+						<Eye class="h-3.5 w-3.5 shrink-0" />
+						<span
+							>After submitting, you'll see how {data.invite.participantName} rated themselves in Week
+							{data.invite.weekNumber} for comparison.</span
 						>
-							<Eye class="h-3.5 w-3.5 shrink-0" />
-							<span
-								>After submitting, you'll see how {data.reflection.participantName} rated themselves for
-								comparison.</span
-							>
-						</div>
-					{/if}
+					</div>
 
 					<!-- Validation message -->
 					<div aria-live="assertive">
@@ -1283,7 +1308,7 @@
 							<p class="font-semibold text-text-primary">Ready to submit your feedback?</p>
 							<p class="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
 								<Shield class="h-3.5 w-3.5 shrink-0 text-success" />
-								Shared only with {data.reflection.participantName} and their coach.
+								Shared only with {data.invite.participantName} and their coach.
 								<button
 									type="button"
 									onclick={() => (showPrivacyDetails = !showPrivacyDetails)}
@@ -1298,8 +1323,7 @@
 								>
 									<ul class="space-y-1">
 										<li>
-											Your name and scores are visible to {data.reflection.participantName} and their
-											coach.
+											Your name and scores are visible to {data.invite.participantName} and their coach.
 										</li>
 										<li>
 											Your feedback is never shared with HR, management, or anyone outside the

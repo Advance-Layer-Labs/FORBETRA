@@ -130,12 +130,12 @@
 				>
 					<p class="font-semibold text-success">You're connected!</p>
 					<p>
-						We've linked your account with {data.invite.coach.name}. Return to your
+						We've linked your account with {data.invite.coach.name}. Return to
 						<!-- eslint-disable svelte/no-navigation-without-resolve --><a
-							href="/individual"
+							href="/individual/today"
 							class="font-semibold text-success underline"
 						>
-							dashboard</a
+							Today</a
 						><!-- eslint-enable svelte/no-navigation-without-resolve --> to keep going.
 					</p>
 				</div>

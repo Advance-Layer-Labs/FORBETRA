@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
 	import { Search, AlertTriangle, ChevronRight } from 'lucide-svelte';
+	import InfoTip from '$lib/components/InfoTip.svelte';
 	import { formatRelativeDays } from '$lib/utils/dates';
 
 	const { data }: { data: PageData } = $props();
@@ -102,64 +104,96 @@
 			<p class="text-text-secondary">
 				{searchTerm ? 'No clients match your search.' : 'No clients yet.'}
 			</p>
+			{#if !searchTerm}
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					href="/coach/invitations"
+					class="mt-3 inline-block rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+				>
+					Send an Invitation
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+			{/if}
 		</div>
 	{:else}
 		<div class="space-y-2">
 			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			{#each filteredClients as client (client.id)}
-				<a
-					href="/coach/session/{client.id}"
-					class="group flex items-center justify-between rounded-xl border border-border-default bg-surface-raised p-4 transition-all hover:border-accent/30 {client.archived
+				<div
+					class="flex items-center gap-2 rounded-xl border border-border-default bg-surface-raised p-4 {client.archived
 						? 'opacity-60'
 						: ''}"
 				>
 					<div class="min-w-0 flex-1">
-						<div class="flex items-center gap-2">
-							<p class="font-medium text-text-primary">{client.name ?? client.email}</p>
-							{#if client.alerts && client.alerts.length > 0}
-								<span
-									class="flex items-center gap-0.5 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
-								>
-									<AlertTriangle class="h-3 w-3" />
-									{client.alerts.length}
-								</span>
-							{/if}
-							{#if client.archived}
-								<span class="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-muted"
-									>Archived</span
-								>
-							{/if}
-						</div>
-						{#if client.objective?.title}
-							<p class="mt-0.5 text-sm text-text-muted">{client.objective.title}</p>
-						{/if}
-						<div class="mt-1 flex items-center gap-2">
-							{#if client.objective?.cycle?.currentWeek}
+						<a
+							href="/coach/session/{client.id}"
+							class="group flex items-center justify-between transition-all"
+						>
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center gap-2">
+									<p class="font-medium text-text-primary">{client.name ?? client.email}</p>
+									{#if client.alerts && client.alerts.length > 0}
+										<span
+											class="flex items-center gap-0.5 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+										>
+											<AlertTriangle class="h-3 w-3" />
+											{client.alerts.length}
+										</span>
+									{/if}
+									{#if client.archived}
+										<span class="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-muted"
+											>Archived</span
+										>
+									{/if}
+								</div>
+								{#if client.goal?.title}
+									<p class="mt-0.5 text-sm text-text-muted">{client.goal.title}</p>
+								{/if}
+							</div>
+							<ChevronRight
+								class="h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
+							/>
+						</a>
+						<div class="mt-1 flex flex-wrap items-center gap-2">
+							{#if client.goal?.journey?.currentWeek}
 								<span class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-									Week {client.objective.cycle.currentWeek}
+									Week {client.goal.journey.currentWeek}
 								</span>
 							{/if}
-							{#if client.objective?.insights?.avgEffort !== null && client.objective?.insights?.avgEffort !== undefined}
-								<span class="text-xs text-text-muted tabular-nums"
-									>Effort: {client.objective.insights.avgEffort}/10</span
-								>
+							{#if client.goal?.insights?.avgEffort !== null && client.goal?.insights?.avgEffort !== undefined}
+								<span class="flex items-center gap-1 text-xs text-text-muted tabular-nums">
+									Effort: {client.goal.insights.avgEffort}/10
+									<InfoTip
+										text="How much attention they gave this goal, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
+									/>
+								</span>
 							{/if}
-							{#if client.objective?.insights?.avgProgress !== null && client.objective?.insights?.avgProgress !== undefined}
-								<span class="text-xs text-text-muted tabular-nums"
-									>Perf: {client.objective.insights.avgProgress}/10</span
-								>
+							{#if client.goal?.insights?.avgProgress !== null && client.goal?.insights?.avgProgress !== undefined}
+								<span class="flex items-center gap-1 text-xs text-text-muted tabular-nums">
+									Performance: {client.goal.insights.avgProgress}/10
+									<InfoTip
+										text="How effective that work was, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
+									/>
+								</span>
 							{/if}
-							{#if !client.objective?.cycle?.currentWeek && !client.objective?.insights}
+							{#if !client.goal?.journey?.currentWeek && !client.goal?.insights}
 								<span class="text-xs text-text-tertiary"
 									>Joined {formatRelativeDays(client.joinedAt)}</span
 								>
 							{/if}
 						</div>
 					</div>
-					<ChevronRight
-						class="h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
-					/>
-				</a>
+					<form method="post" action="?/archive" use:enhance>
+						<input type="hidden" name="individualId" value={client.id} />
+						<input type="hidden" name="archived" value={client.archived ? 'true' : 'false'} />
+						<button
+							type="submit"
+							class="shrink-0 rounded-lg border border-border-default px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text-primary"
+						>
+							{client.archived ? 'Restore' : 'Archive'}
+						</button>
+					</form>
+				</div>
 			{/each}
 			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</div>

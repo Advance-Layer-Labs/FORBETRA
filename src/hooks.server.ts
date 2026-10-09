@@ -2,9 +2,12 @@ import * as Sentry from '@sentry/sveltekit';
 import { sequence } from '@sveltejs/kit/hooks';
 import prisma from '$lib/server/prisma';
 import { clerkClient, withClerkHandler } from 'svelte-clerk/server';
+import { dev } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
 import type { Prisma, UserRole } from '@prisma/client';
 import { env } from '$env/dynamic/private';
+import { recordLastSeen } from '$lib/server/focusAreaPrompt';
+import { notifyCoachClientAccepted } from '$lib/notifications/notifyCoach';
 
 if (env.SENTRY_DSN) {
 	Sentry.init({
@@ -14,17 +17,40 @@ if (env.SENTRY_DSN) {
 }
 
 const DEFAULT_ROLE: UserRole = 'INDIVIDUAL';
-const ALLOWED_ROLES = new Set<UserRole>([
-	'INDIVIDUAL',
-	'COACH',
-	'STAKEHOLDER',
-	'ADMIN',
-	'ORG_ADMIN'
+const ALLOWED_ROLES = new Set<UserRole>(['INDIVIDUAL', 'COACH', 'ADMIN', 'ORG_ADMIN']);
+
+const FORM_CONTENT_TYPES = new Set([
+	'application/x-www-form-urlencoded',
+	'multipart/form-data',
+	'text/plain'
 ]);
+
+/** Same origin check SvelteKit applies, except the Twilio inbound SMS webhook has no Origin. */
+const csrfHandle: Handle = async ({ event, resolve }) => {
+	if (dev || event.url.pathname === '/api/webhooks/twilio') return resolve(event);
+
+	const method = event.request.method;
+	if (method !== 'POST' && method !== 'PUT' && method !== 'PATCH' && method !== 'DELETE') {
+		return resolve(event);
+	}
+
+	const contentType = event.request.headers.get('content-type')?.split(';', 1)[0]?.trim() ?? '';
+	if (!FORM_CONTENT_TYPES.has(contentType)) return resolve(event);
+
+	const origin = event.request.headers.get('origin');
+	if (origin === event.url.origin) return resolve(event);
+
+	return new Response(`Cross-site ${method} form submissions are forbidden`, { status: 403 });
+};
 
 const clerkHandle = withClerkHandler();
 
-const linkPendingCoachInvites = async (user: { id: string; email: string; role: UserRole }) => {
+const linkPendingCoachInvites = async (user: {
+	id: string;
+	email: string;
+	name: string | null;
+	role: UserRole;
+}) => {
 	if (user.role !== 'INDIVIDUAL') return;
 
 	const pendingInvites = await prisma.coachInvite.findMany({
@@ -82,12 +108,34 @@ const linkPendingCoachInvites = async (user: { id: string; email: string; role: 
 			});
 		}
 	});
+
+	for (const invite of pendingInvites) {
+		try {
+			await notifyCoachClientAccepted({
+				coachId: invite.coachId,
+				clientName: user.name ?? user.email,
+				clientEmail: user.email
+			});
+		} catch (error) {
+			console.warn('[coach:notify] Failed to notify coach of auto-accepted invite', error);
+		}
+	}
 };
 
 const IMPERSONATE_COOKIE = 'forbetra_impersonate';
 
 const impersonateHandle: Handle = async ({ event, resolve }) => {
 	event.locals.realUser = null;
+
+	// Stamp the signed-in user before any impersonation swap, so an admin
+	// preview does not look like the individual came back after two weeks.
+	if (event.locals.dbUser) {
+		try {
+			await recordLastSeen(event.locals.dbUser);
+		} catch (error) {
+			console.error('[auth:last-seen] Failed to record last seen', error);
+		}
+	}
 
 	// Never impersonate on admin routes — admin always sees real data
 	const isAdminRoute =
@@ -108,6 +156,7 @@ const impersonateHandle: Handle = async ({ event, resolve }) => {
 };
 
 export const handle = sequence(
+	csrfHandle,
 	clerkHandle,
 	async ({ event, resolve }) => {
 		const auth = event.locals.auth();

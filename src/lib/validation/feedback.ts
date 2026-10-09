@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const stakeholderFeedbackSchema = z
+export const reviewerFeedbackSchema = z
 	.object({
 		token: z.string({ error: 'Feedback token is required' }).length(64, 'Invalid token'),
 		effortScore: z.coerce
@@ -34,4 +34,4 @@ export const stakeholderFeedbackSchema = z
 		}
 	);
 
-export type StakeholderFeedbackData = z.infer<typeof stakeholderFeedbackSchema>;
+export type ReviewerFeedbackData = z.infer<typeof reviewerFeedbackSchema>;

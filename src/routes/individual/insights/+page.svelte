@@ -174,7 +174,7 @@
 					<a
 						href="/individual"
 						class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-						>Hub</a
+						>Journeys</a
 					>
 				</li>
 				<li aria-hidden="true" class="text-text-muted">/</li>
@@ -189,6 +189,17 @@
 			and reviewer feedback.
 		</p>
 	</header>
+
+	{#if data.weeklyInsight?.content}
+		<div class="rounded-lg border border-border-default bg-surface-raised p-6">
+			<p class="text-[11px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+				Weekly insight
+			</p>
+			<div class="prose-sm mt-3 text-sm leading-relaxed whitespace-pre-wrap text-text-secondary">
+				{data.weeklyInsight.content}
+			</div>
+		</div>
+	{/if}
 
 	<!-- AI Performance Report -->
 	<ErrorBoundary>
@@ -339,11 +350,11 @@
 
 	{#if showExplore}
 		<!-- Correlation View -->
-		{#if data.correlationData && (data.correlationData.individual.length > 0 || data.correlationData.stakeholders.length > 0)}
+		{#if data.correlationData && (data.correlationData.individual.length > 0 || data.correlationData.reviewers.length > 0)}
 			<div class="rounded-lg border border-border-default bg-surface-raised p-6">
 				<CorrelationView
 					individualData={data.correlationData.individual}
-					stakeholderData={data.correlationData.stakeholders}
+					reviewerData={data.correlationData.reviewers}
 				/>
 			</div>
 		{:else}
@@ -362,7 +373,7 @@
 				<GapLensView
 					effortGaps={data.gapLensData.effort}
 					performanceGaps={data.gapLensData.performance}
-					stakeholders={data.gapLensData.stakeholders ?? []}
+					reviewers={data.gapLensData.reviewers ?? []}
 				/>
 			</div>
 		{:else}
@@ -402,11 +413,9 @@
 								<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
 									<p class="mb-2 text-sm font-semibold text-text-primary">Week {week.weekNumber}</p>
 									<div class="space-y-2">
-										{#each week.reflections as reflection (reflection.id)}
+										{#each week.checkIns as reflection (reflection.id)}
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-text-secondary"
-													>{reflection.type === 'RATING_A' ? 'Check-in' : 'Rating'}</span
-												>
+												<span class="text-text-secondary">Check-in</span>
 												<div class="flex gap-4">
 													{#if reflection.effortScore !== null}
 														<span class="text-data-effort tabular-nums"

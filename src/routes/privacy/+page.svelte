@@ -26,8 +26,8 @@
 					during registration.
 				</li>
 				<li>
-					<strong>Development Data:</strong> Objectives, focus areas, weekly check-in scores, and notes
-					you enter into the platform.
+					<strong>Development Data:</strong> Goals, focus areas, weekly check-in scores, and notes you
+					enter into the platform.
 				</li>
 				<li>
 					<strong>Reviewer Feedback:</strong> Ratings and observations submitted by reviewers you invite.

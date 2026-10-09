@@ -33,16 +33,13 @@ export const actions: Actions = {
 			const seedUsers = await prisma.user.findMany({
 				where: { email: { contains: SEED_EMAIL_PATTERN } },
 				include: {
-					objectives: {
+					goals: {
 						include: {
-							cycles: {
-								include: {
-									reflections: { select: { id: true } },
-									coachNotes: { select: { id: true } }
-								}
+							journeys: {
+								select: { id: true }
 							},
-							stakeholders: { select: { id: true } },
-							subgoals: { select: { id: true } }
+							reviewers: { select: { id: true } },
+							focusAreas: { select: { id: true } }
 						}
 					}
 				}
@@ -54,19 +51,17 @@ export const actions: Actions = {
 
 			await prisma.$transaction(async (tx) => {
 				for (const user of seedUsers) {
-					for (const objective of user.objectives) {
-						for (const cycle of objective.cycles) {
-							for (const reflection of cycle.reflections) {
-								await tx.feedback.deleteMany({ where: { reflectionId: reflection.id } });
-							}
-							await tx.reflection.deleteMany({ where: { cycleId: cycle.id } });
-							await tx.coachNote.deleteMany({ where: { cycleId: cycle.id } });
+					for (const goal of user.goals) {
+						for (const journey of goal.journeys) {
+							await tx.coachNote.deleteMany({ where: { journeyId: journey.id } });
 						}
-						await tx.cycle.deleteMany({ where: { objectiveId: objective.id } });
-						await tx.subgoal.deleteMany({ where: { objectiveId: objective.id } });
-						await tx.stakeholder.deleteMany({ where: { objectiveId: objective.id } });
+						// Journeys cascade to their check-ins, feedback, and tokens
+						await tx.journey.deleteMany({ where: { goalId: goal.id } });
+						await tx.focusArea.deleteMany({ where: { goalId: goal.id } });
+						await tx.reviewer.deleteMany({ where: { goalId: goal.id } });
 					}
-					await tx.objective.deleteMany({ where: { userId: user.id } });
+					await tx.reviewer.deleteMany({ where: { individualId: user.id } });
+					await tx.goal.deleteMany({ where: { userId: user.id } });
 					await tx.coachClient.deleteMany({
 						where: { OR: [{ coachId: user.id }, { individualId: user.id }] }
 					});

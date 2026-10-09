@@ -52,13 +52,19 @@ export const sendSms = async (payload: SmsPayload) => {
 };
 
 /**
- * Non-blocking SMS helper. Sends SMS if phone exists, catches errors silently.
+ * Non-blocking SMS helper. Returns true only when a message was handed to the provider.
+ * A missing phone or a provider error returns false.
  */
-export const trySendSms = async (phone: string | null | undefined, body: string) => {
-	if (!phone) return;
+export const trySendSms = async (
+	phone: string | null | undefined,
+	body: string
+): Promise<boolean> => {
+	if (!phone) return false;
 	try {
 		await sendSms({ to: phone, body });
+		return true;
 	} catch (error) {
 		console.error('[sms:error]', error);
+		return false;
 	}
 };

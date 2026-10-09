@@ -19,7 +19,9 @@ import {
 	type CoachPrepContext,
 	type CycleReportContext
 } from './prompts';
-import { computeWeekNumber, stdDev } from '$lib/server/coachUtils';
+import { stdDev } from '$lib/server/coachUtils';
+import { currentWeekNumber, weekNumberForDate } from '$lib/server/domain/week';
+import { withCheckInWeeks } from '$lib/server/hubMetrics';
 import type { InsightType } from '@prisma/client';
 
 // Override via ANTHROPIC_MODEL_ID env var without a redeploy. When upgrading
@@ -72,15 +74,15 @@ function callClaudeStreaming(prompt: string, maxTokens: number = 4096): Readable
 
 export async function generateCycleReportStreaming(
 	userId: string,
-	cycleId: string
+	journeyId: string
 ): Promise<{ insightId: string; stream: ReadableStream<string> } | null> {
 	// Create PENDING insight record
 	const insight = await prisma.insight.create({
 		data: {
 			userId,
-			cycleId,
+			journeyId,
 			weekNumber: null,
-			type: 'CYCLE_REPORT',
+			type: 'JOURNEY_REPORT',
 			status: 'PENDING',
 			modelId: MODEL_ID
 		}
@@ -93,7 +95,7 @@ export async function generateCycleReportStreaming(
 		});
 
 		// Reuse the same context-gathering logic as generateCycleReport
-		const prompt = await buildCycleReportContext(userId, cycleId);
+		const prompt = await buildCycleReportContext(userId, journeyId);
 
 		const rawStream = callClaudeStreaming(prompt, 4096);
 		let accumulated = '';
@@ -137,7 +139,7 @@ export async function generateCycleReportStreaming(
 		return { insightId: insight.id, stream: wrappedStream };
 	} catch (error: unknown) {
 		const errMsg = error instanceof Error ? error.message : 'Unknown error';
-		console.error('[insight:error] Failed to start streaming CYCLE_REPORT', {
+		console.error('[insight:error] Failed to start streaming JOURNEY_REPORT', {
 			insightId: insight.id,
 			error: errMsg
 		});
@@ -156,7 +158,7 @@ export async function generateCycleReportStreaming(
 
 async function createAndGenerateInsight(
 	userId: string,
-	cycleId: string | null,
+	journeyId: string | null,
 	weekNumber: number | null,
 	type: InsightType,
 	promptBuilder: () => Promise<string>,
@@ -165,7 +167,7 @@ async function createAndGenerateInsight(
 	const insight = await prisma.insight.create({
 		data: {
 			userId,
-			cycleId,
+			journeyId,
 			weekNumber,
 			type,
 			status: 'PENDING',
@@ -213,7 +215,7 @@ async function createAndGenerateInsight(
 
 async function createAndGenerateInsightStreaming(
 	userId: string,
-	cycleId: string | null,
+	journeyId: string | null,
 	weekNumber: number | null,
 	type: InsightType,
 	promptBuilder: () => Promise<string>,
@@ -222,7 +224,7 @@ async function createAndGenerateInsightStreaming(
 	const insight = await prisma.insight.create({
 		data: {
 			userId,
-			cycleId,
+			journeyId,
 			weekNumber,
 			type,
 			status: 'PENDING',
@@ -338,23 +340,28 @@ function simpleHash(str: string): string {
 }
 
 // Helper to fetch the Week 1 identity anchor (notes from earliest check-in)
-async function getIdentityAnchor(cycleId: string, userId: string): Promise<string | null> {
-	const week1 = await prisma.reflection.findFirst({
-		where: {
-			cycleId,
-			userId,
-			weekNumber: 1,
-			notes: { not: null }
-		},
-		select: { notes: true },
+async function getIdentityAnchor(
+	journeyId: string,
+	userId: string,
+	journeyStart: Date,
+	timeZone?: string | null
+): Promise<string | null> {
+	const earliest = await prisma.checkIn.findFirst({
+		where: { journeyId, userId, notes: { not: null } },
+		select: { notes: true, submittedAt: true },
 		orderBy: { submittedAt: 'asc' }
 	});
-	return week1?.notes?.trim() || null;
+	if (!earliest || weekNumberForDate(journeyStart, earliest.submittedAt, timeZone) !== 1)
+		return null;
+	return earliest.notes?.trim() || null;
 }
 
-// Helper to get weekly averages from reflections
+const inWeekWindow = (weekNumber: number, from: number, to: number) =>
+	weekNumber >= from && weekNumber <= to;
+
+// Helper to get weekly averages from checkIns
 function getWeeklyAverages(
-	reflections: Array<{
+	checkIns: Array<{
 		weekNumber: number;
 		effortScore: number | null;
 		performanceScore: number | null;
@@ -362,7 +369,7 @@ function getWeeklyAverages(
 ): Array<{ weekNumber: number; effort: number | null; performance: number | null }> {
 	const weekMap = new Map<number, { efforts: number[]; performances: number[] }>();
 
-	for (const r of reflections) {
+	for (const r of checkIns) {
 		if (!weekMap.has(r.weekNumber)) {
 			weekMap.set(r.weekNumber, { efforts: [], performances: [] });
 		}
@@ -389,28 +396,25 @@ function getWeeklyAverages(
 }
 
 /**
- * Generate a CHECK_IN insight after a reflection submission.
+ * Generate a CHECK_IN insight after a check-in submission.
  */
 export async function generateCheckInInsight(
 	userId: string,
-	cycleId: string,
+	journeyId: string,
 	weekNumber: number
 ): Promise<string | null> {
-	return createAndGenerateInsight(userId, cycleId, weekNumber, 'CHECK_IN', async () => {
-		const cycle = await prisma.cycle.findUnique({
-			where: { id: cycleId },
+	return createAndGenerateInsight(userId, journeyId, weekNumber, 'CHECK_IN', async () => {
+		const journey = await prisma.journey.findUnique({
+			where: { id: journeyId },
 			include: {
-				objective: {
-					include: { subgoals: { where: { active: true } } }
+				goal: {
+					include: { focusAreas: { where: { active: true } } }
 				},
-				reflections: {
-					where: {
-						userId,
-						weekNumber: { lte: weekNumber, gte: Math.max(1, weekNumber - 3) }
-					},
+				user: { select: { timezone: true } },
+				checkIns: {
+					where: { userId },
 					select: {
-						weekNumber: true,
-						reflectionType: true,
+						submittedAt: true,
 						effortScore: true,
 						performanceScore: true
 					}
@@ -418,34 +422,36 @@ export async function generateCheckInInsight(
 			}
 		});
 
-		if (!cycle) throw new Error('Cycle not found');
+		if (!journey) throw new Error('Journey not found');
 
-		const weeklyAverages = getWeeklyAverages(cycle.reflections);
+		const checkIns = withCheckInWeeks(
+			journey.startDate,
+			journey.checkIns,
+			journey.user.timezone
+		).filter((c) => inWeekWindow(c.weekNumber, Math.max(1, weekNumber - 3), weekNumber));
+		const weeklyAverages = getWeeklyAverages(checkIns);
 		const thisWeek = weeklyAverages.find((w) => w.weekNumber === weekNumber);
 		const last3 = weeklyAverages.filter((w) => w.weekNumber < weekNumber).slice(-3);
 
-		// Get stakeholder feedback for this week
 		const feedback = await prisma.feedback.findMany({
-			where: {
-				reflection: { cycleId, weekNumber }
-			},
+			where: { journeyId, weekNumber },
 			include: {
-				stakeholder: { select: { name: true } }
+				reviewer: { select: { name: true } }
 			}
 		});
 
 		const context: CheckInContext = {
-			objectiveTitle: cycle.objective.title,
-			subgoals: cycle.objective.subgoals.map((s) => s.label),
+			goalTitle: journey.goal.title,
+			focusAreas: journey.goal.focusAreas.map((s) => s.label),
 			currentWeek: weekNumber,
 			thisWeekScores: {
 				effort: thisWeek?.effort ?? null,
 				performance: thisWeek?.performance ?? null
 			},
 			last3Weeks: last3,
-			stakeholderFeedback: feedback.map((f) => ({
+			reviewerFeedback: feedback.map((f) => ({
 				weekNumber,
-				stakeholderName: f.stakeholder.name,
+				reviewerName: f.reviewer.name,
 				effort: f.effortScore,
 				performance: f.performanceScore,
 				behavioralObservation: f.behavioralObservation,
@@ -463,23 +469,20 @@ export async function generateCheckInInsight(
  */
 async function buildWeeklySynthesisContext(
 	userId: string,
-	cycleId: string,
+	journeyId: string,
 	weekNumber: number
 ): Promise<string> {
-	const cycle = await prisma.cycle.findUnique({
-		where: { id: cycleId },
+	const journey = await prisma.journey.findUnique({
+		where: { id: journeyId },
 		include: {
-			objective: {
-				include: { subgoals: { where: { active: true } } }
+			goal: {
+				include: { focusAreas: { where: { active: true } } }
 			},
-			reflections: {
-				where: {
-					userId,
-					weekNumber: { lte: weekNumber, gte: Math.max(1, weekNumber - 3) }
-				},
+			checkIns: {
+				where: { userId },
+				orderBy: { submittedAt: 'asc' },
 				select: {
-					weekNumber: true,
-					reflectionType: true,
+					submittedAt: true,
 					effortScore: true,
 					performanceScore: true,
 					notes: true
@@ -488,58 +491,60 @@ async function buildWeeklySynthesisContext(
 			coachNotes: {
 				where: { weekNumber },
 				select: { content: true }
-			}
+			},
+			user: { select: { timezone: true } }
 		}
 	});
 
-	if (!cycle) throw new Error('Cycle not found');
+	if (!journey) throw new Error('Journey not found');
 
-	const [thisWeekReflectionsRaw, identityAnchor] = await Promise.all([
-		Promise.resolve(cycle.reflections.filter((r) => r.weekNumber === weekNumber)),
-		getIdentityAnchor(cycleId, userId)
-	]);
+	const checkIns = withCheckInWeeks(
+		journey.startDate,
+		journey.checkIns,
+		journey.user.timezone
+	).filter((c) => inWeekWindow(c.weekNumber, Math.max(1, weekNumber - 3), weekNumber));
+	const identityAnchor = await getIdentityAnchor(
+		journeyId,
+		userId,
+		journey.startDate,
+		journey.user.timezone
+	);
 
-	const thisWeekReflections = thisWeekReflectionsRaw.map((r) => ({
-		type: r.reflectionType,
-		effort: r.effortScore,
-		performance: r.performanceScore,
-		notes: r.notes
-	}));
+	const thisWeekCheckIns = checkIns
+		.filter((c) => c.weekNumber === weekNumber)
+		.map((c) => ({
+			label: `Check-in ${c.submittedAt.toISOString().slice(0, 10)}`,
+			effort: c.effortScore,
+			performance: c.performanceScore,
+			notes: c.notes
+		}));
 
-	const weeklyAverages = getWeeklyAverages(cycle.reflections);
+	const weeklyAverages = getWeeklyAverages(checkIns);
 	const last3 = weeklyAverages.filter((w) => w.weekNumber < weekNumber).slice(-3);
 
 	const feedback = await prisma.feedback.findMany({
-		where: {
-			reflection: {
-				cycleId,
-				weekNumber: { lte: weekNumber, gte: Math.max(1, weekNumber - 3) }
-			}
-		},
+		where: { journeyId, weekNumber },
 		include: {
-			stakeholder: { select: { name: true } },
-			reflection: { select: { weekNumber: true } }
+			reviewer: { select: { name: true } }
 		}
 	});
 
 	const context: WeeklySynthesisContext = {
-		objectiveTitle: cycle.objective.title,
-		subgoals: cycle.objective.subgoals.map((s) => s.label),
+		goalTitle: journey.goal.title,
+		focusAreas: journey.goal.focusAreas.map((s) => s.label),
 		currentWeek: weekNumber,
 		identityAnchor,
-		thisWeekReflections,
+		thisWeekCheckIns,
 		last3Weeks: last3,
-		stakeholderFeedback: feedback
-			.filter((f) => f.reflection.weekNumber === weekNumber)
-			.map((f) => ({
-				weekNumber: f.reflection.weekNumber,
-				stakeholderName: f.stakeholder.name,
-				effort: f.effortScore,
-				performance: f.performanceScore,
-				behavioralObservation: f.behavioralObservation,
-				suggestion: f.suggestion
-			})),
-		coachNotes: cycle.coachNotes.map((n) => n.content)
+		reviewerFeedback: feedback.map((f) => ({
+			weekNumber: f.weekNumber,
+			reviewerName: f.reviewer.name,
+			effort: f.effortScore,
+			performance: f.performanceScore,
+			behavioralObservation: f.behavioralObservation,
+			suggestion: f.suggestion
+		})),
+		coachNotes: journey.coachNotes.map((n) => n.content)
 	};
 
 	return buildWeeklySynthesisPrompt(context);
@@ -547,11 +552,11 @@ async function buildWeeklySynthesisContext(
 
 export async function generateWeeklySynthesis(
 	userId: string,
-	cycleId: string,
+	journeyId: string,
 	weekNumber: number
 ): Promise<string | null> {
-	return createAndGenerateInsight(userId, cycleId, weekNumber, 'WEEKLY_SYNTHESIS', () =>
-		buildWeeklySynthesisContext(userId, cycleId, weekNumber)
+	return createAndGenerateInsight(userId, journeyId, weekNumber, 'WEEKLY_SYNTHESIS', () =>
+		buildWeeklySynthesisContext(userId, journeyId, weekNumber)
 	);
 }
 
@@ -560,11 +565,11 @@ export async function generateWeeklySynthesis(
  */
 export async function generateWeeklySynthesisStreaming(
 	userId: string,
-	cycleId: string,
+	journeyId: string,
 	weekNumber: number
 ): Promise<{ insightId: string; stream: ReadableStream<string> } | null> {
-	return createAndGenerateInsightStreaming(userId, cycleId, weekNumber, 'WEEKLY_SYNTHESIS', () =>
-		buildWeeklySynthesisContext(userId, cycleId, weekNumber)
+	return createAndGenerateInsightStreaming(userId, journeyId, weekNumber, 'WEEKLY_SYNTHESIS', () =>
+		buildWeeklySynthesisContext(userId, journeyId, weekNumber)
 	);
 }
 
@@ -574,45 +579,28 @@ export async function generateWeeklySynthesisStreaming(
 async function buildCoachPrepContext(
 	coachId: string,
 	individualId: string,
-	cycleId: string
+	journeyId: string
 ): Promise<string> {
 	const individual = await prisma.user.findUnique({
 		where: { id: individualId },
-		select: { name: true, email: true }
+		select: { name: true, email: true, timezone: true }
 	});
 
-	const cycle = await prisma.cycle.findUnique({
-		where: { id: cycleId },
+	const journey = await prisma.journey.findUnique({
+		where: { id: journeyId },
 		include: {
-			objective: {
-				include: {
-					subgoals: { where: { active: true } },
-					stakeholders: {
-						include: {
-							feedbacks: {
-								orderBy: { submittedAt: 'desc' },
-								take: 20,
-								include: {
-									stakeholder: { select: { name: true } },
-									reflection: {
-										select: {
-											weekNumber: true,
-											effortScore: true,
-											performanceScore: true
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+			goal: { select: { title: true } },
+			feedback: {
+				orderBy: { submittedAt: 'desc' },
+				take: 40,
+				include: { reviewer: { select: { name: true } } }
 			},
-			reflections: {
+			checkIns: {
 				where: { userId: individualId },
-				orderBy: { weekNumber: 'desc' },
+				orderBy: { submittedAt: 'desc' },
 				take: 30,
 				select: {
-					weekNumber: true,
+					submittedAt: true,
 					effortScore: true,
 					performanceScore: true
 				}
@@ -626,10 +614,12 @@ async function buildCoachPrepContext(
 		}
 	});
 
-	if (!cycle || !individual) throw new Error('Data not found');
+	if (!journey || !individual) throw new Error('Data not found');
 
-	const currentWeek = computeWeekNumber(cycle.startDate);
-	const weeklyAverages = getWeeklyAverages(cycle.reflections);
+	const currentWeek = currentWeekNumber(journey.startDate, new Date(), individual?.timezone);
+	const weeklyAverages = getWeeklyAverages(
+		withCheckInWeeks(journey.startDate, journey.checkIns, individual?.timezone)
+	);
 	const last4 = weeklyAverages.slice(-4);
 
 	// Calculate stability
@@ -642,62 +632,48 @@ async function buildCoachPrepContext(
 	const stabilityScore =
 		combinedStd !== null ? Math.max(0, Math.round(100 - combinedStd * 10)) : null;
 
-	// Build stakeholder feedback and gap data
-	const allStakeholderFeedback: Array<{
+	// Build reviewer feedback and gap data
+	const allReviewerFeedback: Array<{
 		weekNumber: number;
-		stakeholderName: string;
+		reviewerName: string;
 		effort: number | null;
 		performance: number | null;
 	}> = [];
 
-	const gapByWeek = new Map<
-		number,
-		{ selfEffort: number[]; selfPerf: number[]; shEffort: number[]; shPerf: number[] }
-	>();
+	const reviewerByWeek = new Map<number, { effort: number[]; perf: number[] }>();
 
-	cycle.objective.stakeholders.forEach((sh) => {
-		sh.feedbacks.forEach((fb) => {
-			if (!fb.reflection) return;
-			const wk = fb.reflection.weekNumber;
-
-			allStakeholderFeedback.push({
-				weekNumber: wk,
-				stakeholderName: fb.stakeholder.name,
-				effort: fb.effortScore,
-				performance: fb.performanceScore
-			});
-
-			if (!gapByWeek.has(wk)) {
-				gapByWeek.set(wk, {
-					selfEffort: [],
-					selfPerf: [],
-					shEffort: [],
-					shPerf: []
-				});
-			}
-			const g = gapByWeek.get(wk)!;
-			if (fb.effortScore !== null) g.shEffort.push(fb.effortScore);
-			if (fb.performanceScore !== null) g.shPerf.push(fb.performanceScore);
-			if (fb.reflection.effortScore !== null) g.selfEffort.push(fb.reflection.effortScore);
-			if (fb.reflection.performanceScore !== null) g.selfPerf.push(fb.reflection.performanceScore);
+	for (const fb of journey.feedback) {
+		const wk = fb.weekNumber;
+		allReviewerFeedback.push({
+			weekNumber: wk,
+			reviewerName: fb.reviewer.name,
+			effort: fb.effortScore,
+			performance: fb.performanceScore
 		});
-	});
 
-	const stakeholderGapTrend = Array.from(gapByWeek.entries())
+		const bucket = reviewerByWeek.get(wk) ?? { effort: [], perf: [] };
+		if (fb.effortScore !== null) bucket.effort.push(fb.effortScore);
+		if (fb.performanceScore !== null) bucket.perf.push(fb.performanceScore);
+		reviewerByWeek.set(wk, bucket);
+	}
+
+	const mean = (xs: number[]) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+	const reviewerGapTrend = Array.from(reviewerByWeek.entries())
 		.filter(([wk]) => wk >= currentWeek - 4)
-		.map(([weekNumber, g]) => {
-			const selfE =
-				g.selfEffort.length > 0 ? g.selfEffort.reduce((a, b) => a + b, 0) / g.selfEffort.length : 0;
-			const shE =
-				g.shEffort.length > 0 ? g.shEffort.reduce((a, b) => a + b, 0) / g.shEffort.length : 0;
-			const selfP =
-				g.selfPerf.length > 0 ? g.selfPerf.reduce((a, b) => a + b, 0) / g.selfPerf.length : 0;
-			const shP = g.shPerf.length > 0 ? g.shPerf.reduce((a, b) => a + b, 0) / g.shPerf.length : 0;
-			return {
-				weekNumber,
-				effortGap: Number((selfE - shE).toFixed(1)),
-				performanceGap: Number((selfP - shP).toFixed(1))
-			};
+		.flatMap(([weekNumber, g]) => {
+			const self = weeklyAverages.find((w) => w.weekNumber === weekNumber);
+			const shE = mean(g.effort);
+			const shP = mean(g.perf);
+			if (!self || self.effort === null || self.performance === null) return [];
+			if (shE === null || shP === null) return [];
+			return [
+				{
+					weekNumber,
+					effortGap: Number((self.effort - shE).toFixed(1)),
+					performanceGap: Number((self.performance - shP).toFixed(1))
+				}
+			];
 		})
 		.sort((a, b) => a.weekNumber - b.weekNumber);
 
@@ -718,14 +694,14 @@ async function buildCoachPrepContext(
 
 	const context: CoachPrepContext = {
 		individualName: individual.name ?? individual.email,
-		objectiveTitle: cycle.objective.title,
+		goalTitle: journey.goal.title,
 		last4Weeks: last4,
-		stakeholderFeedback: allStakeholderFeedback
+		reviewerFeedback: allReviewerFeedback
 			.filter((f) => f.weekNumber >= currentWeek - 4)
 			.slice(0, 20),
-		stakeholderGapTrend,
+		reviewerGapTrend,
 		stabilityScore,
-		coachNotes: cycle.coachNotes.map((n) => n.content),
+		coachNotes: journey.coachNotes.map((n) => n.content),
 		alerts
 	};
 
@@ -735,10 +711,10 @@ async function buildCoachPrepContext(
 export async function generateCoachPrep(
 	coachId: string,
 	individualId: string,
-	cycleId: string
+	journeyId: string
 ): Promise<string | null> {
-	return createAndGenerateInsight(individualId, cycleId, null, 'COACH_PREP', () =>
-		buildCoachPrepContext(coachId, individualId, cycleId)
+	return createAndGenerateInsight(individualId, journeyId, null, 'COACH_PREP', () =>
+		buildCoachPrepContext(coachId, individualId, journeyId)
 	);
 }
 
@@ -748,48 +724,35 @@ export async function generateCoachPrep(
 export async function generateCoachPrepStreaming(
 	coachId: string,
 	individualId: string,
-	cycleId: string
+	journeyId: string
 ): Promise<{ insightId: string; stream: ReadableStream<string> } | null> {
-	return createAndGenerateInsightStreaming(individualId, cycleId, null, 'COACH_PREP', () =>
-		buildCoachPrepContext(coachId, individualId, cycleId)
+	return createAndGenerateInsightStreaming(individualId, journeyId, null, 'COACH_PREP', () =>
+		buildCoachPrepContext(coachId, individualId, journeyId)
 	);
 }
 
 /**
- * Generate a CYCLE_REPORT insight — comprehensive full-cycle analysis.
+ * Generate a JOURNEY_REPORT insight — comprehensive full-journey analysis.
  */
-async function buildCycleReportContext(userId: string, cycleId: string): Promise<string> {
-	const cycle = await prisma.cycle.findUnique({
-		where: { id: cycleId },
+async function buildCycleReportContext(userId: string, journeyId: string): Promise<string> {
+	const journey = await prisma.journey.findUnique({
+		where: { id: journeyId },
 		include: {
-			objective: {
+			goal: {
 				include: {
-					subgoals: { where: { active: true } },
-					stakeholders: {
-						include: {
-							feedbacks: {
-								orderBy: { submittedAt: 'desc' },
-								include: {
-									stakeholder: { select: { name: true } },
-									reflection: {
-										select: {
-											weekNumber: true,
-											effortScore: true,
-											performanceScore: true
-										}
-									}
-								}
-							}
-						}
-					}
+					focusAreas: { where: { active: true } },
+					reviewers: { select: { id: true } }
 				}
 			},
-			reflections: {
+			feedback: {
+				orderBy: { submittedAt: 'desc' },
+				include: { reviewer: { select: { name: true } } }
+			},
+			checkIns: {
 				where: { userId },
-				orderBy: { weekNumber: 'asc' },
+				orderBy: { submittedAt: 'asc' },
 				select: {
-					weekNumber: true,
-					reflectionType: true,
+					submittedAt: true,
 					effortScore: true,
 					performanceScore: true,
 					notes: true
@@ -799,22 +762,31 @@ async function buildCycleReportContext(userId: string, cycleId: string): Promise
 				orderBy: { createdAt: 'desc' },
 				take: 10,
 				select: { content: true }
-			}
+			},
+			user: { select: { timezone: true } }
 		}
 	});
 
-	if (!cycle) throw new Error('Cycle not found');
+	if (!journey) throw new Error('Journey not found');
 
-	const identityAnchor = await getIdentityAnchor(cycleId, userId);
-	const currentWeek = computeWeekNumber(cycle.startDate);
-	const totalWeeks = cycle.endDate
+	const identityAnchor = await getIdentityAnchor(
+		journeyId,
+		userId,
+		journey.startDate,
+		journey.user.timezone
+	);
+	const currentWeek = currentWeekNumber(journey.startDate, new Date(), journey.user.timezone);
+	const totalWeeks = journey.endDate
 		? Math.max(
 				1,
-				Math.ceil((cycle.endDate.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+				Math.ceil(
+					(journey.endDate.getTime() - journey.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+				)
 			)
-		: currentWeek;
+		: journey.lengthWeeks;
 
-	const weeklyAverages = getWeeklyAverages(cycle.reflections);
+	const checkIns = withCheckInWeeks(journey.startDate, journey.checkIns, journey.user.timezone);
+	const weeklyAverages = getWeeklyAverages(checkIns);
 
 	const effortValues = weeklyAverages.map((w) => w.effort).filter((v): v is number => v !== null);
 	const perfValues = weeklyAverages
@@ -847,63 +819,56 @@ async function buildCycleReportContext(userId: string, cycleId: string): Promise
 		}
 	}
 
-	const ratingWeeks = new Set(
-		cycle.reflections
-			.filter((r) => r.reflectionType === 'RATING_A' || r.reflectionType === 'RATING_B')
-			.map((r) => r.weekNumber)
-	);
+	const checkInWeeks = new Set(checkIns.map((c) => c.weekNumber));
 	const completionRate =
 		totalWeeks > 0
-			? Math.round((ratingWeeks.size / Math.min(currentWeek, totalWeeks)) * 100)
+			? Math.round((checkInWeeks.size / Math.min(currentWeek, totalWeeks)) * 100)
 			: null;
 
-	const allStakeholderFeedback: Array<{
+	const allReviewerFeedback: Array<{
 		weekNumber: number;
-		stakeholderName: string;
+		reviewerName: string;
 		effort: number | null;
 		performance: number | null;
 	}> = [];
 
-	const gapByStakeholder = new Map<
+	const gapByReviewer = new Map<
 		string,
 		Array<{ weekNumber: number; effortGap: number | null; performanceGap: number | null }>
 	>();
 
-	cycle.objective.stakeholders.forEach((sh) => {
-		sh.feedbacks.forEach((fb) => {
-			if (!fb.reflection) return;
-			const wk = fb.reflection.weekNumber;
+	for (const fb of journey.feedback) {
+		const wk = fb.weekNumber;
 
-			allStakeholderFeedback.push({
-				weekNumber: wk,
-				stakeholderName: fb.stakeholder.name,
-				effort: fb.effortScore,
-				performance: fb.performanceScore
-			});
-
-			const name = fb.stakeholder.name;
-			if (!gapByStakeholder.has(name)) {
-				gapByStakeholder.set(name, []);
-			}
-
-			const selfWeek = weeklyAverages.find((w) => w.weekNumber === wk);
-			const effortGap =
-				selfWeek?.effort !== null && selfWeek?.effort !== undefined && fb.effortScore !== null
-					? Number((selfWeek.effort - fb.effortScore).toFixed(1))
-					: null;
-			const performanceGap =
-				selfWeek?.performance !== null &&
-				selfWeek?.performance !== undefined &&
-				fb.performanceScore !== null
-					? Number((selfWeek.performance - fb.performanceScore).toFixed(1))
-					: null;
-
-			gapByStakeholder.get(name)!.push({ weekNumber: wk, effortGap, performanceGap });
+		allReviewerFeedback.push({
+			weekNumber: wk,
+			reviewerName: fb.reviewer.name,
+			effort: fb.effortScore,
+			performance: fb.performanceScore
 		});
-	});
+
+		const name = fb.reviewer.name;
+		if (!gapByReviewer.has(name)) {
+			gapByReviewer.set(name, []);
+		}
+
+		const selfWeek = weeklyAverages.find((w) => w.weekNumber === wk);
+		const effortGap =
+			selfWeek?.effort !== null && selfWeek?.effort !== undefined && fb.effortScore !== null
+				? Number((selfWeek.effort - fb.effortScore).toFixed(1))
+				: null;
+		const performanceGap =
+			selfWeek?.performance !== null &&
+			selfWeek?.performance !== undefined &&
+			fb.performanceScore !== null
+				? Number((selfWeek.performance - fb.performanceScore).toFixed(1))
+				: null;
+
+		gapByReviewer.get(name)!.push({ weekNumber: wk, effortGap, performanceGap });
+	}
 
 	const perceptionGaps: CycleReportContext['perceptionGaps'] = [];
-	gapByStakeholder.forEach((gaps, stakeholderName) => {
+	gapByReviewer.forEach((gaps, reviewerName) => {
 		const sorted = gaps.sort((a, b) => a.weekNumber - b.weekNumber);
 		const latest = sorted[sorted.length - 1];
 
@@ -920,7 +885,7 @@ async function buildCycleReportContext(userId: string, cycleId: string): Promise
 		};
 
 		perceptionGaps.push({
-			stakeholderName,
+			reviewerName,
 			latestEffortGap: latest?.effortGap ?? null,
 			latestPerformanceGap: latest?.performanceGap ?? null,
 			effortGapTrend: computeTrend((g) => g.effortGap),
@@ -928,46 +893,45 @@ async function buildCycleReportContext(userId: string, cycleId: string): Promise
 		});
 	});
 
-	let respondedThisWeek = 0;
-	cycle.objective.stakeholders.forEach((sh) => {
-		const hasThisWeek = sh.feedbacks.some(
-			(fb) => fb.reflection && fb.reflection.weekNumber === currentWeek
-		);
-		if (hasThisWeek) respondedThisWeek++;
-	});
+	const respondedThisWeek = new Set(
+		journey.feedback.filter((fb) => fb.weekNumber === currentWeek).map((fb) => fb.reviewerId)
+	).size;
 	const alignmentRatio =
-		cycle.objective.stakeholders.length > 0
-			? Math.round((respondedThisWeek / cycle.objective.stakeholders.length) * 100)
+		journey.goal.reviewers.length > 0
+			? Math.round((respondedThisWeek / journey.goal.reviewers.length) * 100)
 			: null;
 
 	const context: CycleReportContext = {
-		objectiveTitle: cycle.objective.title,
-		subgoals: cycle.objective.subgoals.map((s) => s.label),
-		cycleStartDate: cycle.startDate.toISOString().split('T')[0],
+		goalTitle: journey.goal.title,
+		focusAreas: journey.goal.focusAreas.map((s) => s.label),
+		cycleStartDate: journey.startDate.toISOString().split('T')[0],
 		currentWeek,
 		totalWeeks,
 		identityAnchor,
 		weeklyScores: weeklyAverages,
-		stakeholderFeedback: allStakeholderFeedback,
+		reviewerFeedback: allReviewerFeedback,
 		perceptionGaps,
 		stabilityScore,
 		trajectoryScore,
 		completionRate,
 		alignmentRatio,
-		coachNotes: cycle.coachNotes.map((n) => n.content)
+		coachNotes: journey.coachNotes.map((n) => n.content)
 	};
 
 	return buildCycleReportPrompt(context);
 }
 
-export async function generateCycleReport(userId: string, cycleId: string): Promise<string | null> {
+export async function generateCycleReport(
+	userId: string,
+	journeyId: string
+): Promise<string | null> {
 	return createAndGenerateInsight(
 		userId,
-		cycleId,
+		journeyId,
 		null,
-		'CYCLE_REPORT',
+		'JOURNEY_REPORT',
 		async () => {
-			return buildCycleReportContext(userId, cycleId);
+			return buildCycleReportContext(userId, journeyId);
 		},
 		4096
 	);

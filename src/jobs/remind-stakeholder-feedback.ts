@@ -1,95 +1,79 @@
 import prisma from '$lib/server/prisma';
-import { sendEmail } from '$lib/notifications/email';
-import { emailTemplates } from '$lib/notifications/emailTemplates';
-import { trySendSms } from '$lib/notifications/sms';
-import { smsTemplates } from '$lib/notifications/smsTemplates';
-import { computeWeekNumber } from '$lib/server/coachUtils';
-import { rateLimit } from '$lib/server/rateLimit';
+import { currentWeekNumber, isReviewerDue } from '$lib/server/domain/week';
+import { allowNotification } from '$lib/server/notificationCap';
 import { getAppUrl } from '$lib/server/appUrl';
+import { createFeedbackToken } from '$lib/server/feedbackToken';
 
-export const remindStakeholderFeedback = async () => {
-	const stakeholders = await prisma.stakeholder.findMany({
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const remindReviewerFeedback = async (now = new Date()) => {
+	const reviewers = await prisma.reviewer.findMany({
+		where: {
+			tokens: {
+				some: {
+					type: 'FEEDBACK_INVITE',
+					usedAt: null,
+					journey: { status: 'ACTIVE' }
+				}
+			}
+		},
 		include: {
 			individual: {
 				select: {
 					id: true,
-					email: true,
-					name: true
+					name: true,
+					timezone: true
 				}
 			},
 			tokens: {
-				where: { type: 'FEEDBACK_INVITE', usedAt: null },
-				orderBy: { expiresAt: 'asc' }
+				where: {
+					type: 'FEEDBACK_INVITE',
+					usedAt: null,
+					journey: { status: 'ACTIVE' }
+				},
+				orderBy: { createdAt: 'desc' },
+				include: { journey: { select: { startDate: true } } }
 			}
 		}
 	});
-
-	const individualIds = Array.from(new Set(stakeholders.map((s) => s.individual.id)));
-	const activeCycles = await prisma.cycle.findMany({
-		where: { userId: { in: individualIds }, status: 'ACTIVE' },
-		orderBy: { startDate: 'desc' },
-		select: { userId: true, stakeholderCadence: true, startDate: true }
-	});
-
-	const individualCycles = new Map<string, { stakeholderCadence: string; startDate: Date }>();
-	for (const cycle of activeCycles) {
-		if (!individualCycles.has(cycle.userId)) {
-			individualCycles.set(cycle.userId, {
-				stakeholderCadence: cycle.stakeholderCadence,
-				startDate: cycle.startDate
-			});
-		}
-	}
 
 	const baseUrl = getAppUrl();
 
-	for (const stakeholder of stakeholders) {
-		const pending = stakeholder.tokens.filter((token) => token.expiresAt > new Date());
-		if (pending.length === 0) continue;
+	for (const reviewer of reviewers) {
+		const open = reviewer.tokens.find((token) => token.expiresAt > now);
+		const expired = reviewer.tokens.find((token) => token.expiresAt <= now);
+		const anchor = open ?? expired;
+		if (!anchor?.journey) continue;
 
-		// Check biweekly cadence — skip on even weeks
-		const cycleInfo = individualCycles.get(stakeholder.individual.id);
-		if (cycleInfo && cycleInfo.stakeholderCadence === 'biweekly') {
-			const currentWeek = computeWeekNumber(cycleInfo.startDate);
-			if (currentWeek % 2 === 0) {
-				continue; // Only send on odd-numbered weeks
-			}
-		}
+		const currentWeek = currentWeekNumber(
+			anchor.journey.startDate,
+			now,
+			reviewer.individual.timezone
+		);
+		if (!isReviewerDue(reviewer.cadence, currentWeek)) continue;
 
-		// Limit to 2 reminders per stakeholder per week
-		const allowed = await rateLimit(`sh-remind:${stakeholder.id}`, 2, 7 * 24 * 60 * 60 * 1000);
+		const allowed = await allowNotification(`sh-remind:${reviewer.id}`, 2, WEEK_MS);
 		if (!allowed) continue;
 
-		// Get the most recent pending token
-		const latestToken = pending[0];
-		const feedbackLink = `${baseUrl}/stakeholder/feedback/${latestToken.tokenHash}`;
-
-		try {
-			const template = emailTemplates.reminderStakeholderFeedback({
-				individualName: stakeholder.individual.name || undefined,
-				stakeholderName: stakeholder.name || undefined,
-				feedbackLink
-			});
-			await sendEmail({
-				to: stakeholder.email,
-				...template
-			});
-			console.info('[job:remind-stakeholder-feedback] Sent reminder to', stakeholder.email);
-		} catch (error) {
+		const result = await createFeedbackToken(
+			{ id: reviewer.individual.id, name: reviewer.individual.name },
+			reviewer.id,
+			baseUrl,
+			'reminder'
+		);
+		if (!result.ok) {
 			console.error(
-				'[job:remind-stakeholder-feedback] Failed to send reminder to',
-				stakeholder.email,
-				error
+				'[job:remind-reviewer-feedback] Could not send reminder to',
+				reviewer.email,
+				result.error
 			);
+			continue;
 		}
-
-		// Send SMS reminder to stakeholder
-		await trySendSms(
-			stakeholder.phone,
-			smsTemplates.reminderStakeholderFeedback({
-				individualName: stakeholder.individual.name || undefined,
-				feedbackLink
-			})
+		console.info(
+			open
+				? '[job:remind-reviewer-feedback] Sent a reminder; earlier link still works for'
+				: '[job:remind-reviewer-feedback] Sent a reminder for an expired link to',
+			reviewer.email
 		);
 	}
 };

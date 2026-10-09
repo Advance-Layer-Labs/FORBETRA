@@ -55,16 +55,16 @@
 		}
 	};
 
-	// Per-index email errors for pre-fill stakeholder rows
-	let stakeholderEmailErrors = $state<string[]>([]);
-	const validateStakeholderEmail = (email: string, index: number) => {
-		const errors = [...stakeholderEmailErrors];
+	// Per-index email errors for pre-fill reviewer rows
+	let reviewerEmailErrors = $state<string[]>([]);
+	const validateReviewerEmail = (email: string, index: number) => {
+		const errors = [...reviewerEmailErrors];
 		if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
 			errors[index] = 'Please enter a valid email address.';
 		} else {
 			errors[index] = '';
 		}
-		stakeholderEmailErrors = errors;
+		reviewerEmailErrors = errors;
 	};
 
 	const formatTimeFromNow = (value: string | null | undefined) => {
@@ -125,8 +125,8 @@
 	let submittingResend = $state<string | null>(null);
 	let smsEnabled = $state(false);
 	let showPrefill = $state(false);
-	let prefillSubgoals = $state([{ label: '', description: '' }]);
-	let prefillStakeholders = $state([{ name: '', email: '' }]);
+	let prefillFocusAreas = $state([{ label: '', description: '' }]);
+	let prefillReviewers = $state([{ name: '', email: '' }]);
 
 	// --- Toast on form success ---
 	let toastShownForForm: typeof form = null;
@@ -407,12 +407,12 @@
 
 			{#if showPrefill}
 				<div class="mt-4 space-y-4">
-					<!-- Objective -->
+					<!-- Goal -->
 					<label class="space-y-1 text-sm">
 						<span class="font-semibold text-text-secondary">Goal Title</span>
 						<input
 							type="text"
-							name="objectiveTitle"
+							name="goalTitle"
 							class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 							placeholder="e.g. Develop executive presence"
 							maxlength="200"
@@ -423,7 +423,7 @@
 							>Goal Description <span class="font-normal text-text-muted">(optional)</span></span
 						>
 						<textarea
-							name="objectiveDescription"
+							name="goalDescription"
 							rows="2"
 							class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 							placeholder="What does success look like?"
@@ -431,26 +431,26 @@
 						></textarea>
 					</label>
 
-					<!-- Subgoals -->
+					<!-- FocusAreas -->
 					<div class="space-y-2">
 						<span class="text-sm font-semibold text-text-secondary"
 							>Focus Areas <span class="font-normal text-text-muted">(optional)</span></span
 						>
-						{#each prefillSubgoals as subgoal, i (i)}
+						{#each prefillFocusAreas as focusArea, i (i)}
 							<div class="flex gap-2">
 								<input
 									type="text"
-									name="subgoalLabel{i + 1}"
-									bind:value={subgoal.label}
+									name="focusAreaLabel{i + 1}"
+									bind:value={focusArea.label}
 									class="flex-1 rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 									placeholder="e.g. Active listening"
 									maxlength="200"
 								/>
-								{#if prefillSubgoals.length > 1}
+								{#if prefillFocusAreas.length > 1}
 									<button
 										type="button"
 										onclick={() =>
-											(prefillSubgoals = prefillSubgoals.filter((_, idx) => idx !== i))}
+											(prefillFocusAreas = prefillFocusAreas.filter((_, idx) => idx !== i))}
 										class="shrink-0 rounded-lg border border-border-default p-2 text-text-muted transition-colors hover:border-error/30 hover:text-error"
 										aria-label="Remove focus area"
 									>
@@ -459,11 +459,11 @@
 								{/if}
 							</div>
 						{/each}
-						{#if prefillSubgoals.length < 5}
+						{#if prefillFocusAreas.length < 5}
 							<button
 								type="button"
 								onclick={() =>
-									(prefillSubgoals = [...prefillSubgoals, { label: '', description: '' }])}
+									(prefillFocusAreas = [...prefillFocusAreas, { label: '', description: '' }])}
 								class="flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-accent-hover"
 							>
 								<Plus class="h-3.5 w-3.5" /> Add focus area
@@ -471,50 +471,47 @@
 						{/if}
 					</div>
 
-					<!-- Stakeholders -->
+					<!-- Reviewers -->
 					<div class="space-y-2">
 						<span class="text-sm font-semibold text-text-secondary"
 							>Suggested Reviewers <span class="font-normal text-text-muted">(optional)</span></span
 						>
-						{#each prefillStakeholders as stakeholder, i (i)}
+						{#each prefillReviewers as reviewer, i (i)}
 							<div class="space-y-1">
 								<div class="flex gap-2">
 									<input
 										type="text"
-										name="stakeholderName{i + 1}"
-										bind:value={stakeholder.name}
+										name="reviewerName{i + 1}"
+										bind:value={reviewer.name}
 										class="flex-1 rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 										placeholder="Name"
 										maxlength="120"
 									/>
 									<input
 										type="email"
-										name="stakeholderEmail{i + 1}"
-										bind:value={stakeholder.email}
-										aria-invalid={!!stakeholderEmailErrors[i]}
-										aria-describedby={stakeholderEmailErrors[i]
-											? `stakeholder-email-error-${i}`
+										name="reviewerEmail{i + 1}"
+										bind:value={reviewer.email}
+										aria-invalid={!!reviewerEmailErrors[i]}
+										aria-describedby={reviewerEmailErrors[i]
+											? `reviewer-email-error-${i}`
 											: undefined}
-										class="flex-1 rounded-lg border bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:ring-2 focus:outline-none {stakeholderEmailErrors[
+										class="flex-1 rounded-lg border bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:ring-2 focus:outline-none {reviewerEmailErrors[
 											i
 										]
 											? 'border-error focus:border-error focus:ring-error/30'
 											: 'border-border-default focus:border-accent focus:ring-accent/30'}"
 										placeholder="Email"
-										onblur={(e) => validateStakeholderEmail(e.currentTarget.value, i)}
+										onblur={(e) => validateReviewerEmail(e.currentTarget.value, i)}
 										oninput={(e) => {
-											if (stakeholderEmailErrors[i])
-												validateStakeholderEmail(e.currentTarget.value, i);
+											if (reviewerEmailErrors[i]) validateReviewerEmail(e.currentTarget.value, i);
 										}}
 									/>
-									{#if prefillStakeholders.length > 1}
+									{#if prefillReviewers.length > 1}
 										<button
 											type="button"
 											onclick={() => {
-												prefillStakeholders = prefillStakeholders.filter((_, idx) => idx !== i);
-												stakeholderEmailErrors = stakeholderEmailErrors.filter(
-													(_, idx) => idx !== i
-												);
+												prefillReviewers = prefillReviewers.filter((_, idx) => idx !== i);
+												reviewerEmailErrors = reviewerEmailErrors.filter((_, idx) => idx !== i);
 											}}
 											class="shrink-0 rounded-lg border border-border-default p-2 text-text-muted transition-colors hover:border-error/30 hover:text-error"
 											aria-label="Remove reviewer"
@@ -523,18 +520,17 @@
 										</button>
 									{/if}
 								</div>
-								{#if stakeholderEmailErrors[i]}
-									<p id="stakeholder-email-error-{i}" class="text-xs text-error">
-										{stakeholderEmailErrors[i]}
+								{#if reviewerEmailErrors[i]}
+									<p id="reviewer-email-error-{i}" class="text-xs text-error">
+										{reviewerEmailErrors[i]}
 									</p>
 								{/if}
 							</div>
 						{/each}
-						{#if prefillStakeholders.length < 5}
+						{#if prefillReviewers.length < 5}
 							<button
 								type="button"
-								onclick={() =>
-									(prefillStakeholders = [...prefillStakeholders, { name: '', email: '' }])}
+								onclick={() => (prefillReviewers = [...prefillReviewers, { name: '', email: '' }])}
 								class="flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-accent-hover"
 							>
 								<Plus class="h-3.5 w-3.5" /> Add reviewer

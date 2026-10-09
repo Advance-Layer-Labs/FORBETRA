@@ -5,7 +5,7 @@
  * Uses seeded randomness for reproducibility via a simple deterministic noise function.
  */
 
-import type { PersonaPattern, StakeholderBias } from './seed-config';
+import type { PersonaPattern, ReviewerBias } from './seed-config';
 
 // Deterministic pseudo-random noise based on seed values
 function noise(week: number, salt: number): number {
@@ -114,16 +114,16 @@ export function getScores(pattern: PersonaPattern, week: number): Scores {
 }
 
 /**
- * Apply stakeholder bias to individual scores.
- * Returns adjusted effort + performance from the stakeholder's perspective.
+ * Apply reviewer bias to individual scores.
+ * Returns adjusted effort + performance from the reviewer's perspective.
  */
-export function applyStakeholderBias(
+export function applyReviewerBias(
 	individualScores: Scores,
-	bias: StakeholderBias,
+	bias: ReviewerBias,
 	week: number,
-	stakeholderIndex: number
+	reviewerIndex: number
 ): Scores | null {
-	const salt = stakeholderIndex * 100;
+	const salt = reviewerIndex * 100;
 
 	switch (bias) {
 		case 'positive': {

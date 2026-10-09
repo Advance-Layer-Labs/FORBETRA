@@ -6,7 +6,7 @@ import {
 	generateWeeklySynthesis,
 	generateWeeklySynthesisStreaming
 } from '$lib/server/ai/generateInsight';
-import { computeWeekNumber } from '$lib/server/coachUtils';
+import { currentWeekNumber } from '$lib/server/domain/week';
 import { rateLimit } from '$lib/server/rateLimit';
 
 export const POST: RequestHandler = async (event) => {
@@ -16,29 +16,29 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
 	}
 
-	// Get active cycle
-	const objective = await prisma.objective.findFirst({
+	// Get active journey
+	const goal = await prisma.goal.findFirst({
 		where: { userId: dbUser.id, active: true },
 		orderBy: { createdAt: 'desc' },
 		include: {
-			cycles: {
+			journeys: {
 				orderBy: { startDate: 'desc' },
 				take: 1
 			}
 		}
 	});
 
-	if (!objective || objective.cycles.length === 0) {
-		return json({ error: 'No active cycle found' }, { status: 400 });
+	if (!goal || goal.journeys.length === 0) {
+		return json({ error: 'No active journey found' }, { status: 400 });
 	}
 
-	const cycle = objective.cycles[0];
-	const currentWeek = computeWeekNumber(cycle.startDate);
+	const journey = goal.journeys[0];
+	const currentWeek = currentWeekNumber(journey.startDate, new Date(), dbUser.timezone);
 
 	// Check if client wants streaming
 	const acceptHeader = event.request.headers.get('accept') ?? '';
 	if (acceptHeader.includes('text/event-stream')) {
-		const result = await generateWeeklySynthesisStreaming(dbUser.id, cycle.id, currentWeek);
+		const result = await generateWeeklySynthesisStreaming(dbUser.id, journey.id, currentWeek);
 
 		if (!result) {
 			return json({ error: 'Failed to generate insight' }, { status: 500 });
@@ -82,7 +82,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Non-streaming fallback
-	const insightId = await generateWeeklySynthesis(dbUser.id, cycle.id, currentWeek);
+	const insightId = await generateWeeklySynthesis(dbUser.id, journey.id, currentWeek);
 
 	if (!insightId) {
 		return json({ error: 'Failed to generate insight' }, { status: 500 });

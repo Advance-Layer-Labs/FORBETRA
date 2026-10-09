@@ -12,7 +12,7 @@ Core principles:
 - Be DIRECT but warm. Speak like a trusted advisor, not a cheerleader.
 - Focus on PATTERNS, not single data points. Look for trends across weeks.
 - Name the GAP between effort and performance when it exists. This is often the most valuable insight.
-- Reference stakeholder feedback alignment/misalignment when available.
+- Reference reviewer feedback alignment/misalignment when available.
 - Never use generic coaching platitudes like "keep going" or "believe in yourself."
 - Ground observations in performance psychology: identity, deliberate practice, feedback loops, energy management.
 
@@ -30,9 +30,9 @@ type WeekScore = {
 	performance: number | null;
 };
 
-type StakeholderWeekScore = {
+type ReviewerWeekScore = {
 	weekNumber: number;
-	stakeholderName: string;
+	reviewerName: string;
 	effort: number | null;
 	performance: number | null;
 	behavioralObservation?: string | null;
@@ -40,37 +40,37 @@ type StakeholderWeekScore = {
 };
 
 export type CheckInContext = {
-	objectiveTitle: string;
-	subgoals: string[];
+	goalTitle: string;
+	focusAreas: string[];
 	currentWeek: number;
 	thisWeekScores: { effort: number | null; performance: number | null };
 	last3Weeks: WeekScore[];
-	stakeholderFeedback: StakeholderWeekScore[];
+	reviewerFeedback: ReviewerWeekScore[];
 	weeklyPromptTopic: string;
 };
 
 export type WeeklySynthesisContext = {
-	objectiveTitle: string;
-	subgoals: string[];
+	goalTitle: string;
+	focusAreas: string[];
 	currentWeek: number;
 	identityAnchor: string | null;
-	thisWeekReflections: Array<{
-		type: string;
+	thisWeekCheckIns: Array<{
+		label: string;
 		effort: number | null;
 		performance: number | null;
 		notes: string | null;
 	}>;
 	last3Weeks: WeekScore[];
-	stakeholderFeedback: StakeholderWeekScore[];
+	reviewerFeedback: ReviewerWeekScore[];
 	coachNotes: string[];
 };
 
 export type CoachPrepContext = {
 	individualName: string;
-	objectiveTitle: string;
+	goalTitle: string;
 	last4Weeks: WeekScore[];
-	stakeholderFeedback: StakeholderWeekScore[];
-	stakeholderGapTrend: Array<{ weekNumber: number; effortGap: number; performanceGap: number }>;
+	reviewerFeedback: ReviewerWeekScore[];
+	reviewerGapTrend: Array<{ weekNumber: number; effortGap: number; performanceGap: number }>;
 	stabilityScore: number | null;
 	coachNotes: string[];
 	alerts: string[];
@@ -84,22 +84,22 @@ export function buildCheckInPrompt(context: CheckInContext): string {
 		)
 		.join('\n');
 
-	const stakeholderLines =
-		context.stakeholderFeedback.length > 0
-			? context.stakeholderFeedback
+	const reviewerLines =
+		context.reviewerFeedback.length > 0
+			? context.reviewerFeedback
 					.map((s) => {
-						let line = `  ${s.stakeholderName}: Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`;
+						let line = `  ${s.reviewerName}: Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`;
 						if (s.behavioralObservation) line += `\n    Observation: "${s.behavioralObservation}"`;
 						if (s.suggestion) line += `\n    Suggestion: "${s.suggestion}"`;
 						return line;
 					})
 					.join('\n')
-			: '  No stakeholder feedback for this week yet.';
+			: '  No reviewer feedback for this week yet.';
 
 	return `## Check-In Insight Request
 
-**Objective**: ${context.objectiveTitle}
-**Subgoals**: ${context.subgoals.join(', ')}
+**Goal**: ${context.goalTitle}
+**Focus areas (context only, not scored)**: ${context.focusAreas.join(', ') || 'None'}
 **Current Week**: ${context.currentWeek} (Topic: ${context.weeklyPromptTopic})
 
 **This Week's Self-Scores**:
@@ -109,8 +109,8 @@ export function buildCheckInPrompt(context: CheckInContext): string {
 **Last 3 Weeks Trend**:
 ${trendLines || '  No prior data.'}
 
-**Stakeholder Feedback (this week)**:
-${stakeholderLines}
+**Reviewer Feedback (this week)**:
+${reviewerLines}
 
 ---
 
@@ -118,10 +118,10 @@ Provide a 2-3 sentence developmental observation. Be specific about the pattern 
 }
 
 export function buildWeeklySynthesisPrompt(context: WeeklySynthesisContext): string {
-	const reflectionLines = context.thisWeekReflections
+	const checkInLines = context.thisWeekCheckIns
 		.map(
 			(r) =>
-				`  ${r.type}: Effort ${r.effort ?? '--'}, Performance ${r.performance ?? '--'}${r.notes ? ` | Notes: "${r.notes}"` : ''}`
+				`  ${r.label}: Effort ${r.effort ?? '--'}, Performance ${r.performance ?? '--'}${r.notes ? ` | Notes: "${r.notes}"` : ''}`
 		)
 		.join('\n');
 
@@ -132,17 +132,17 @@ export function buildWeeklySynthesisPrompt(context: WeeklySynthesisContext): str
 		)
 		.join('\n');
 
-	const stakeholderLines =
-		context.stakeholderFeedback.length > 0
-			? context.stakeholderFeedback
+	const reviewerLines =
+		context.reviewerFeedback.length > 0
+			? context.reviewerFeedback
 					.map((s) => {
-						let line = `  ${s.stakeholderName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`;
+						let line = `  ${s.reviewerName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`;
 						if (s.behavioralObservation) line += `\n    Observation: "${s.behavioralObservation}"`;
 						if (s.suggestion) line += `\n    Suggestion: "${s.suggestion}"`;
 						return line;
 					})
 					.join('\n')
-			: '  No stakeholder feedback this week.';
+			: '  No reviewer feedback this week.';
 
 	const coachNoteLines =
 		context.coachNotes.length > 0
@@ -155,19 +155,19 @@ export function buildWeeklySynthesisPrompt(context: WeeklySynthesisContext): str
 
 	return `## Weekly Synthesis Request
 
-**Objective**: ${context.objectiveTitle}
-**Subgoals**: ${context.subgoals.join(', ')}
+**Goal**: ${context.goalTitle}
+**Focus areas (context only, not scored)**: ${context.focusAreas.join(', ') || 'None'}
 **Week**: ${context.currentWeek}
 ${identityLine}
 
-**This Week's Reflections**:
-${reflectionLines || '  No reflections submitted.'}
+**This Week's Check-ins**:
+${checkInLines || '  No check-ins submitted.'}
 
 **Previous 3 Weeks Trend**:
 ${trendLines || '  No prior data.'}
 
-**Stakeholder Feedback**:
-${stakeholderLines}
+**Reviewer Feedback**:
+${reviewerLines}
 
 **Coach Notes**:
 ${coachNoteLines}
@@ -180,7 +180,7 @@ Provide a 3-5 sentence synthesis that includes:
 1. **Identity connection** — link this week's data to who they are becoming
 2. **Key observation** about this week's data
 3. **Effort-performance gap analysis** (if applicable)
-4. **Stakeholder alignment note** (do others see what the individual sees?)
+4. **Reviewer alignment note** (do others see what the individual sees?)
 5. **One specific behavioral experiment** for next week (concrete enough to visualize doing it)
 
 Be concrete. Use numbers. Name patterns.
@@ -190,16 +190,16 @@ ACTION: [A single concrete behavioral action for this week. Start with a verb. B
 }
 
 export type CycleReportContext = {
-	objectiveTitle: string;
-	subgoals: string[];
+	goalTitle: string;
+	focusAreas: string[];
 	cycleStartDate: string;
 	currentWeek: number;
 	totalWeeks: number;
 	identityAnchor: string | null;
 	weeklyScores: WeekScore[];
-	stakeholderFeedback: StakeholderWeekScore[];
+	reviewerFeedback: ReviewerWeekScore[];
 	perceptionGaps: Array<{
-		stakeholderName: string;
+		reviewerName: string;
 		latestEffortGap: number | null;
 		latestPerformanceGap: number | null;
 		effortGapTrend: 'widening' | 'closing' | 'stable' | null;
@@ -220,21 +220,21 @@ export function buildCycleReportPrompt(context: CycleReportContext): string {
 		)
 		.join('\n');
 
-	const stakeholderLines =
-		context.stakeholderFeedback.length > 0
-			? context.stakeholderFeedback
+	const reviewerLines =
+		context.reviewerFeedback.length > 0
+			? context.reviewerFeedback
 					.map(
 						(s) =>
-							`  ${s.stakeholderName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`
+							`  ${s.reviewerName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`
 					)
 					.join('\n')
-			: '  No stakeholder feedback available.';
+			: '  No reviewer feedback available.';
 
 	const gapLines =
 		context.perceptionGaps.length > 0
 			? context.perceptionGaps
 					.map((g) => {
-						const parts = [`  ${g.stakeholderName}:`];
+						const parts = [`  ${g.reviewerName}:`];
 						if (g.latestEffortGap !== null)
 							parts.push(
 								`Effort gap ${g.latestEffortGap > 0 ? '+' : ''}${g.latestEffortGap.toFixed(1)} (${g.effortGapTrend ?? 'unknown'})`
@@ -257,26 +257,26 @@ export function buildCycleReportPrompt(context: CycleReportContext): string {
 		? `**Identity Anchor**: "${context.identityAnchor}"`
 		: '**Identity Anchor**: Not set';
 
-	return `## Cycle Performance Report Request
+	return `## Journey Performance Report Request
 
-**Objective**: ${context.objectiveTitle}
-**Subgoals**: ${context.subgoals.join(', ')}
-**Cycle Start**: ${context.cycleStartDate}
+**Goal**: ${context.goalTitle}
+**Focus areas (context only, not scored)**: ${context.focusAreas.join(', ') || 'None'}
+**Journey Start**: ${context.cycleStartDate}
 **Current Week**: ${context.currentWeek} of ${context.totalWeeks}
 ${identityLine}
 **Key Metrics**:
   Stability: ${context.stabilityScore !== null ? `${context.stabilityScore}/100` : 'N/A'}
   Trajectory: ${context.trajectoryScore !== null ? `${context.trajectoryScore}` : 'N/A'}
   Completion Rate: ${context.completionRate !== null ? `${context.completionRate}%` : 'N/A'}
-  Stakeholder Alignment: ${context.alignmentRatio !== null ? `${context.alignmentRatio}%` : 'N/A'}
+  Reviewer Alignment: ${context.alignmentRatio !== null ? `${context.alignmentRatio}%` : 'N/A'}
 
-**Weekly Self-Scores (Full Cycle)**:
+**Weekly Self-Scores (Full Journey)**:
 ${weekLines || '  No data.'}
 
-**Stakeholder Feedback (Full Cycle)**:
-${stakeholderLines}
+**Reviewer Feedback (Full Journey)**:
+${reviewerLines}
 
-**Perception Gaps (Self - Stakeholder)**:
+**Perception Gaps (Self - Reviewer)**:
 ${gapLines}
 
 **Coach Notes**:
@@ -289,13 +289,13 @@ Write a comprehensive developmental performance report. Use ## markdown headers 
 If an identity anchor is provided, open the report with: "X weeks ago, you said you were becoming [identity anchor]. Here's what the data shows about that journey."
 
 ## Executive Summary
-2-3 sentences. State where this individual stands relative to their objective and overall trajectory. Reference specific metrics.
+2-3 sentences. State where this individual stands relative to their goal and overall trajectory. Reference specific metrics.
 
 ## Progress Trajectory
-Analyze the evolution of effort and performance scores across the full cycle. Identify inflection points, plateaus, or acceleration. Reference specific weeks.
+Analyze the evolution of effort and performance scores across the full journey. Identify inflection points, plateaus, or acceleration. Reference specific weeks.
 
 ## Perception Analysis
-Name each stakeholder. Describe the direction and trend of their perception gap (effort and performance). Note where alignment is strong and where it diverges.
+Name each reviewer. Describe the direction and trend of their perception gap (effort and performance). Note where alignment is strong and where it diverges.
 
 ## Key Strengths
 2-3 data-backed strengths. Each must reference specific patterns, scores, or trends from the data.
@@ -318,19 +318,19 @@ export function buildCoachPrepPrompt(context: CoachPrepContext): string {
 		)
 		.join('\n');
 
-	const stakeholderLines =
-		context.stakeholderFeedback.length > 0
-			? context.stakeholderFeedback
+	const reviewerLines =
+		context.reviewerFeedback.length > 0
+			? context.reviewerFeedback
 					.map(
 						(s) =>
-							`  ${s.stakeholderName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`
+							`  ${s.reviewerName} (Week ${s.weekNumber}): Effort ${s.effort ?? '--'}, Performance ${s.performance ?? '--'}`
 					)
 					.join('\n')
-			: '  No recent stakeholder feedback.';
+			: '  No recent reviewer feedback.';
 
 	const gapLines =
-		context.stakeholderGapTrend.length > 0
-			? context.stakeholderGapTrend
+		context.reviewerGapTrend.length > 0
+			? context.reviewerGapTrend
 					.map(
 						(g) =>
 							`  Week ${g.weekNumber}: Effort gap ${g.effortGap > 0 ? '+' : ''}${g.effortGap.toFixed(1)}, Performance gap ${g.performanceGap > 0 ? '+' : ''}${g.performanceGap.toFixed(1)}`
@@ -351,14 +351,14 @@ export function buildCoachPrepPrompt(context: CoachPrepContext): string {
 	return `## Coach Prep Briefing Request
 
 **Individual**: ${context.individualName}
-**Objective**: ${context.objectiveTitle}
+**Goal**: ${context.goalTitle}
 **Stability Score**: ${context.stabilityScore !== null ? `${context.stabilityScore}/100` : 'N/A'}
 
 **Last 4 Weeks Self-Scores**:
 ${weekLines || '  No data.'}
 
-**Stakeholder Feedback (last 4 weeks)**:
-${stakeholderLines}
+**Reviewer Feedback (last 4 weeks)**:
+${reviewerLines}
 
 **Self-Other Gap Trend**:
 ${gapLines}

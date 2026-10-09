@@ -1,33 +1,31 @@
-import {
-	toIsoDate,
-	weeksBetween,
-	computeWeekNumber,
-	weekNumberForDate,
-	stdDev
-} from './coachUtils';
+import { toIsoDate, weeksBetween, stdDev } from './coachUtils';
+import { currentWeekNumber, weekNumberForDate } from './domain/week';
 
+/**
+ * Check-ins must carry a derived `weekNumber` (see `withCheckInWeeks`).
+ * Feedback rows carry their own `weekNumber`; the legacy `reflection.weekNumber`
+ * is still read as a fallback. Legacy cadence / kind fields are accepted and ignored.
+ */
 type IndividualWithRelations = {
 	id: string;
 	email: string;
 	name: string | null;
-	objectives: Array<{
+	timezone?: string | null;
+	goals: Array<{
 		id: string;
 		title: string;
 		description: string | null;
-		subgoals: Array<{ id: string; label: string; description: string | null }>;
-		cycles: Array<{
+		focusAreas: Array<{ id: string; label: string; description: string | null }>;
+		journeys: Array<{
 			id: string;
 			label: string | null;
 			startDate: Date;
 			endDate: Date | null;
 			status: string;
-			checkInFrequency?: string;
-			stakeholderCadence?: string;
-			autoThrottle?: boolean;
-			reflections: Array<{
+			lengthWeeks?: number;
+			checkIns: Array<{
 				id: string;
 				weekNumber: number;
-				reflectionType: string;
 				submittedAt: Date | null;
 				effortScore: number | null;
 				performanceScore: number | null;
@@ -40,23 +38,24 @@ type IndividualWithRelations = {
 				createdAt: Date;
 			}>;
 		}>;
-		stakeholders: Array<{
+		reviewers: Array<{
 			id: string;
 			name: string;
 			email: string;
+			cadence?: 'WEEKLY' | 'BIWEEKLY';
 			feedbacks: Array<{
 				submittedAt: Date | null;
 				effortScore: number | null;
 				performanceScore: number | null;
-				reflection: {
-					weekNumber: number;
-					effortScore: number | null;
-					performanceScore: number | null;
-				} | null;
+				weekNumber?: number;
+				reflection?: { weekNumber: number } | null;
 			}>;
 		}>;
 	}>;
 };
+
+const feedbackWeek = (f: { weekNumber?: number; reflection?: { weekNumber: number } | null }) =>
+	f.weekNumber ?? f.reflection?.weekNumber ?? null;
 
 type CoachClient = {
 	id: string;
@@ -72,11 +71,11 @@ export type ClientSummary = {
 	archived: boolean;
 	joinedAt: string;
 	archivedAt: string | null;
-	objective: {
+	goal: {
 		id: string;
 		title: string;
 		description: string;
-		cycle: {
+		journey: {
 			id: string;
 			label: string;
 			startDate: string | null;
@@ -85,17 +84,16 @@ export type ClientSummary = {
 			completion: number;
 			weeksElapsed: number;
 			currentWeek: number | null;
-			stakeholderCadence: string;
-			autoThrottle: boolean;
+			lengthWeeks: number | null;
 			recentReflections: Array<{
 				weekNumber: number;
 				effortScore: number | null;
 				performanceScore: number | null;
 			}>;
 		} | null;
-		subgoalCount: number;
-		stakeholderCount: number;
-		respondedStakeholders: number;
+		focusAreaCount: number;
+		reviewerCount: number;
+		respondedReviewers: number;
 		insights: {
 			avgEffort: number | null;
 			avgProgress: number | null;
@@ -104,10 +102,11 @@ export type ClientSummary = {
 			alignmentRatio: number | null;
 		} | null;
 	} | null;
-	stakeholders: Array<{
+	reviewers: Array<{
 		id: string;
 		name: string;
 		email: string;
+		cadence: 'WEEKLY' | 'BIWEEKLY';
 		lastFeedback: {
 			submittedAt: string | null;
 			effortScore: number | null;
@@ -128,14 +127,14 @@ export type ClientSummary = {
 			effortScore: number | null;
 			performanceScore: number | null;
 		}>;
-		stakeholders: Array<{
+		reviewers: Array<{
 			weekNumber: number;
-			stakeholderId: string;
-			stakeholderName: string;
+			reviewerId: string;
+			reviewerName: string;
 			effortScore: number | null;
 			performanceScore: number | null;
 		}>;
-		stakeholderList: Array<{ id: string; name: string }>;
+		reviewerList: Array<{ id: string; name: string }>;
 	};
 };
 
@@ -147,20 +146,28 @@ export function buildClientSummary(
 		return null;
 	}
 
-	const objective = individual.objectives[0] ?? null;
-	const cycle = objective?.cycles[0] ?? null;
-	const cycleEnd = cycle?.endDate ?? null;
-	const totalWeeks = cycle && cycleEnd ? weeksBetween(cycle.startDate, cycleEnd) : 0;
+	const goal = individual.goals[0] ?? null;
+	const journey = goal?.journeys[0] ?? null;
+	const cycleEnd = journey?.endDate ?? null;
+	const totalWeeks = journey
+		? cycleEnd
+			? weeksBetween(journey.startDate, cycleEnd)
+			: (journey.lengthWeeks ?? 0)
+		: 0;
 	const currentTime = new Date();
-	const weeksElapsed = cycle
+	const weeksElapsed = journey
 		? Math.max(
 				0,
-				Math.floor((currentTime.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+				Math.floor(
+					(currentTime.getTime() - journey.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+				)
 			)
 		: 0;
 	const completion =
 		totalWeeks > 0 ? Math.min(100, Math.round((weeksElapsed / totalWeeks) * 100)) : 0;
-	const currentWeek = cycle ? computeWeekNumber(cycle.startDate) : null;
+	const currentWeek = journey
+		? currentWeekNumber(journey.startDate, new Date(), individual.timezone)
+		: null;
 
 	const reflectionTrendMap = new Map<
 		number,
@@ -171,7 +178,7 @@ export function buildClientSummary(
 		}
 	>();
 
-	cycle?.reflections.forEach((reflection) => {
+	journey?.checkIns.forEach((reflection) => {
 		const weekEntry = reflectionTrendMap.get(reflection.weekNumber) ?? {
 			weekNumber: reflection.weekNumber,
 			effortScores: [],
@@ -263,35 +270,38 @@ export function buildClientSummary(
 		}
 	}
 
-	let respondedStakeholders = 0;
-	const stakeholders =
-		objective?.stakeholders.map((stakeholder) => {
-			const lastFeedback = stakeholder.feedbacks[0] ?? null;
-			let feedbackWeek: number | null = null;
-			if (lastFeedback?.submittedAt && cycle) {
-				feedbackWeek = weekNumberForDate(cycle.startDate, lastFeedback.submittedAt);
-				if (currentWeek !== null && feedbackWeek === currentWeek) {
-					respondedStakeholders += 1;
+	let respondedReviewers = 0;
+	const reviewers =
+		goal?.reviewers.map((reviewer) => {
+			const lastFeedback = reviewer.feedbacks[0] ?? null;
+			let lastWeek: number | null = null;
+			if (lastFeedback && journey) {
+				lastWeek =
+					feedbackWeek(lastFeedback) ??
+					(lastFeedback.submittedAt
+						? weekNumberForDate(journey.startDate, lastFeedback.submittedAt, individual.timezone)
+						: null);
+				if (currentWeek !== null && lastWeek === currentWeek) {
+					respondedReviewers += 1;
 				}
 			}
 			return {
-				id: stakeholder.id,
-				name: stakeholder.name,
-				email: stakeholder.email,
+				id: reviewer.id,
+				name: reviewer.name,
+				email: reviewer.email,
+				cadence: reviewer.cadence ?? 'WEEKLY',
 				lastFeedback: lastFeedback
 					? {
 							submittedAt: lastFeedback.submittedAt?.toISOString() ?? null,
 							effortScore: lastFeedback.effortScore,
 							performanceScore: lastFeedback.performanceScore,
-							weekNumber: feedbackWeek
+							weekNumber: lastWeek
 						}
 					: null
 			};
 		}) ?? [];
 
-	const alignmentRatio = objective?.stakeholders.length
-		? respondedStakeholders / objective.stakeholders.length
-		: null;
+	const alignmentRatio = goal?.reviewers.length ? respondedReviewers / goal.reviewers.length : null;
 
 	const avgEffort =
 		effortSeries.length > 0
@@ -309,72 +319,64 @@ export function buildClientSummary(
 	// Calculate alerts
 	const alerts: Array<{ type: string; message: string; severity: 'low' | 'medium' | 'high' }> = [];
 
-	if (cycle && currentWeek) {
-		// Overdue reflections check — respect checkInFrequency
-		const checkInFrequency = cycle.checkInFrequency ?? '3x';
-		const submittedTypes = new Set(
-			cycle.reflections.filter((r) => r.weekNumber === currentWeek).map((r) => r.reflectionType)
-		);
-		const overdueTypes: string[] = [];
-		if (!submittedTypes.has('RATING_A')) overdueTypes.push('Wednesday check-in');
-		if (checkInFrequency === '3x') {
-			if (!submittedTypes.has('RATING_B')) overdueTypes.push('Friday check-in');
-		}
+	if (journey && currentWeek) {
+		const weeksWithCheckIn = new Set(journey.checkIns.map((r) => r.weekNumber));
 
-		if (overdueTypes.length > 0) {
+		if (!weeksWithCheckIn.has(currentWeek)) {
+			const missedLastWeek = currentWeek > 1 && !weeksWithCheckIn.has(currentWeek - 1);
 			alerts.push({
 				type: 'overdue',
-				message: `Missing: ${overdueTypes.join(', ')}`,
-				severity: overdueTypes.length >= 2 ? 'high' : 'medium'
+				message: missedLastWeek
+					? 'Missing: this week and last week check-ins'
+					: 'Missing: this week check-in',
+				severity: missedLastWeek ? 'high' : 'medium'
 			});
 		}
 
-		// Engagement check (reflection completion rate)
-		const reflectionsPerWeek = checkInFrequency === '1x' ? 1 : checkInFrequency === '2x' ? 2 : 3;
-		const expectedReflections = currentWeek * reflectionsPerWeek;
-		const actualReflections = cycle.reflections.length;
-		const completionRate = expectedReflections > 0 ? actualReflections / expectedReflections : 0;
+		// Engagement check (share of elapsed weeks with a check-in)
+		const completedWeeks = [...weeksWithCheckIn].filter((w) => w <= currentWeek).length;
+		const completionRate = currentWeek > 0 ? completedWeeks / currentWeek : 0;
 
 		if (completionRate < 0.7 && currentWeek >= 2) {
 			alerts.push({
 				type: 'low_engagement',
-				message: `Reflection completion: ${Math.round(completionRate * 100)}% (below 70%)`,
+				message: `Check-in completion: ${Math.round(completionRate * 100)}% (below 70%)`,
 				severity: completionRate < 0.5 ? 'high' : 'medium'
 			});
 		}
 
 		// Alignment check (self-other gap)
-		if (objective?.stakeholders.length && cycle.reflections.length > 0) {
-			const recentReflections = cycle.reflections
+		if (goal?.reviewers.length && journey.checkIns.length > 0) {
+			const recentReflections = journey.checkIns
 				.filter((r) => r.weekNumber >= currentWeek - 3 && r.weekNumber <= currentWeek)
 				.filter((r) => r.effortScore !== null || r.performanceScore !== null);
 
 			if (recentReflections.length > 0) {
 				const alignmentIssues: number[] = [];
 				for (const reflection of recentReflections) {
-					const reflectionFeedbacks = objective.stakeholders
+					const reflectionFeedbacks = goal.reviewers
 						.flatMap((s) => s.feedbacks)
-						.filter((f) => f.reflection?.weekNumber === reflection.weekNumber);
+						.filter((f) => feedbackWeek(f) === reflection.weekNumber);
 
 					if (reflectionFeedbacks.length > 0) {
-						const avgStakeholderEffort =
+						const avgReviewerEffort =
 							reflectionFeedbacks
 								.map((f) => f.effortScore)
 								.filter((s): s is number => s !== null)
 								.reduce((sum, s) => sum + s, 0) / reflectionFeedbacks.length;
 
-						const avgStakeholderProgress =
+						const avgReviewerProgress =
 							reflectionFeedbacks
 								.map((f) => f.performanceScore)
 								.filter((s): s is number => s !== null)
 								.reduce((sum, s) => sum + s, 0) / reflectionFeedbacks.length;
 
 						if (reflection.effortScore !== null) {
-							const effortGap = Math.abs(reflection.effortScore - avgStakeholderEffort);
+							const effortGap = Math.abs(reflection.effortScore - avgReviewerEffort);
 							if (effortGap > 1.5) alignmentIssues.push(reflection.weekNumber);
 						}
 						if (reflection.performanceScore !== null) {
-							const progressGap = Math.abs(reflection.performanceScore - avgStakeholderProgress);
+							const progressGap = Math.abs(reflection.performanceScore - avgReviewerProgress);
 							if (progressGap > 1.5) alignmentIssues.push(reflection.weekNumber);
 						}
 					}
@@ -393,7 +395,7 @@ export function buildClientSummary(
 	}
 
 	// Get coach notes for this client
-	const coachNotes = cycle?.coachNotes ?? [];
+	const coachNotes = journey?.coachNotes ?? [];
 
 	// Prepare visualization data (all weeks, not just last 4)
 	const allReflectionWeeks = Array.from(reflectionTrendMap.values()).sort(
@@ -426,22 +428,23 @@ export function buildClientSummary(
 		};
 	});
 
-	// Prepare stakeholder feedback data by week for visualization
-	const stakeholderWeeklyData: Array<{
+	// Prepare reviewer feedback data by week for visualization
+	const reviewerWeeklyData: Array<{
 		weekNumber: number;
-		stakeholderId: string;
-		stakeholderName: string;
+		reviewerId: string;
+		reviewerName: string;
 		effortScore: number | null;
 		performanceScore: number | null;
 	}> = [];
 
-	objective?.stakeholders.forEach((stakeholder) => {
-		stakeholder.feedbacks.forEach((feedback) => {
-			if (feedback.reflection) {
-				stakeholderWeeklyData.push({
-					weekNumber: feedback.reflection.weekNumber,
-					stakeholderId: stakeholder.id,
-					stakeholderName: stakeholder.name,
+	goal?.reviewers.forEach((reviewer) => {
+		reviewer.feedbacks.forEach((feedback) => {
+			const weekNumber = feedbackWeek(feedback);
+			if (weekNumber !== null) {
+				reviewerWeeklyData.push({
+					weekNumber,
+					reviewerId: reviewer.id,
+					reviewerName: reviewer.name,
 					effortScore: feedback.effortScore,
 					performanceScore: feedback.performanceScore
 				});
@@ -453,30 +456,29 @@ export function buildClientSummary(
 		id: individual.id,
 		name: individual.name ?? individual.email,
 		email: individual.email,
-		objective: objective
+		goal: goal
 			? {
-					id: objective.id,
-					title: objective.title,
-					description: objective.description ?? '',
-					cycle: cycle
+					id: goal.id,
+					title: goal.title,
+					description: goal.description ?? '',
+					journey: journey
 						? {
-								id: cycle.id,
-								label: cycle.label ?? 'Cycle',
-								startDate: toIsoDate(cycle.startDate),
-								endDate: toIsoDate(cycle.endDate ?? null),
-								status: cycle.status,
+								id: journey.id,
+								label: journey.label ?? 'Journey',
+								startDate: toIsoDate(journey.startDate),
+								endDate: toIsoDate(journey.endDate ?? null),
+								status: journey.status,
 								completion,
 								weeksElapsed,
 								currentWeek: currentWeek ?? null,
-								stakeholderCadence: cycle.stakeholderCadence ?? 'weekly',
-								autoThrottle: cycle.autoThrottle ?? true,
+								lengthWeeks: journey.lengthWeeks ?? null,
 								recentReflections: reflectionTrend
 							}
 						: null,
-					subgoalCount: objective.subgoals.length,
-					stakeholderCount: stakeholders.length,
-					respondedStakeholders,
-					insights: cycle
+					focusAreaCount: goal.focusAreas.length,
+					reviewerCount: reviewers.length,
+					respondedReviewers,
+					insights: journey
 						? {
 								avgEffort,
 								avgProgress,
@@ -487,7 +489,7 @@ export function buildClientSummary(
 						: null
 				}
 			: null,
-		stakeholders,
+		reviewers,
 		alerts,
 		coachNotes: coachNotes.map((note) => ({
 			id: note.id,
@@ -498,11 +500,11 @@ export function buildClientSummary(
 		archived: relationship.archivedAt !== null,
 		joinedAt: relationship.createdAt.toISOString(),
 		archivedAt: relationship.archivedAt?.toISOString() ?? null,
-		visualizationData: cycle
+		visualizationData: journey
 			? {
 					individual: individualWeeklyData,
-					stakeholders: stakeholderWeeklyData,
-					stakeholderList: stakeholders.map((s) => ({ id: s.id, name: s.name }))
+					reviewers: reviewerWeeklyData,
+					reviewerList: reviewers.map((s) => ({ id: s.id, name: s.name }))
 				}
 			: undefined
 	};

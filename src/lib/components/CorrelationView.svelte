@@ -7,20 +7,20 @@
 
 	interface Props {
 		individualData: Array<{ effort: number; progress: number; weekNumber: number }>;
-		stakeholderData: Array<{
+		reviewerData: Array<{
 			effort: number;
 			progress: number;
 			weekNumber: number;
-			stakeholderName: string;
+			reviewerName: string;
 		}>;
 	}
 
-	const { individualData, stakeholderData }: Props = $props();
+	const { individualData, reviewerData }: Props = $props();
 
 	let chartCanvas = $state<HTMLCanvasElement | null>(null);
 	let chartInstance = $state<Chart | null>(null);
-	let showStakeholders = $state(true);
-	let showIndividualStakeholders = $state(false);
+	let showReviewers = $state(true);
+	let showIndividualReviewers = $state(false);
 	let isMounted = $state(false);
 
 	// Calculate Pearson correlation coefficient
@@ -83,8 +83,8 @@
 					weekNumber: number;
 					individualEffort: number | null;
 					individualPerformance: number | null;
-					stakeholderEfforts: number[];
-					stakeholderPerformances: number[];
+					reviewerEfforts: number[];
+					reviewerPerformances: number[];
 				}
 			>();
 
@@ -95,8 +95,8 @@
 						weekNumber: d.weekNumber,
 						individualEffort: null,
 						individualPerformance: null,
-						stakeholderEfforts: [],
-						stakeholderPerformances: []
+						reviewerEfforts: [],
+						reviewerPerformances: []
 					});
 				}
 				const week = weeksMap.get(d.weekNumber)!;
@@ -104,20 +104,20 @@
 				week.individualPerformance = d.progress;
 			});
 
-			// Add stakeholder data
-			stakeholderData.forEach((d) => {
+			// Add reviewer data
+			reviewerData.forEach((d) => {
 				if (!weeksMap.has(d.weekNumber)) {
 					weeksMap.set(d.weekNumber, {
 						weekNumber: d.weekNumber,
 						individualEffort: null,
 						individualPerformance: null,
-						stakeholderEfforts: [],
-						stakeholderPerformances: []
+						reviewerEfforts: [],
+						reviewerPerformances: []
 					});
 				}
 				const week = weeksMap.get(d.weekNumber)!;
-				week.stakeholderEfforts.push(d.effort);
-				week.stakeholderPerformances.push(d.progress);
+				week.reviewerEfforts.push(d.effort);
+				week.reviewerPerformances.push(d.progress);
 			});
 
 			return Array.from(weeksMap.values()).sort((a, b) => a.weekNumber - b.weekNumber);
@@ -141,16 +141,16 @@
 		})()
 	);
 
-	const stakeholderCorrelation = $derived(
+	const reviewerCorrelation = $derived(
 		(() => {
-			if (!showStakeholders || stakeholderData.length === 0) return null;
+			if (!showReviewers || reviewerData.length === 0) return null;
 
 			const effortValues: number[] = [];
 			const performanceValues: number[] = [];
 
 			// Calculate average for each week
 			const weekAverages = new SvelteMap<number, { effort: number[]; performance: number[] }>();
-			stakeholderData.forEach((d) => {
+			reviewerData.forEach((d) => {
 				if (!weekAverages.has(d.weekNumber)) {
 					weekAverages.set(d.weekNumber, { effort: [], performance: [] });
 				}
@@ -191,16 +191,16 @@
 		})()
 	);
 
-	const stakeholderCorrelationLine = $derived(
+	const reviewerCorrelationLine = $derived(
 		(() => {
-			if (!showStakeholders || stakeholderData.length === 0) return null;
+			if (!showReviewers || reviewerData.length === 0) return null;
 
 			const effortValues: number[] = [];
 			const performanceValues: number[] = [];
 
 			// Calculate average for each week
 			const weekAverages = new SvelteMap<number, { effort: number[]; performance: number[] }>();
-			stakeholderData.forEach((d) => {
+			reviewerData.forEach((d) => {
 				if (!weekAverages.has(d.weekNumber)) {
 					weekAverages.set(d.weekNumber, { effort: [], performance: [] });
 				}
@@ -309,27 +309,27 @@
 				}
 			}
 
-			// Stakeholder average lines
-			if (showStakeholders && stakeholderData.length > 0) {
+			// Reviewer average lines
+			if (showReviewers && reviewerData.length > 0) {
 				// Calculate averages per week
-				const stakeholderAveragesByWeek = weeklyData.map((week) => {
+				const reviewerAveragesByWeek = weeklyData.map((week) => {
 					const avgEffort =
-						week.stakeholderEfforts.length > 0
-							? week.stakeholderEfforts.reduce((sum, val) => sum + val, 0) /
-								week.stakeholderEfforts.length
+						week.reviewerEfforts.length > 0
+							? week.reviewerEfforts.reduce((sum, val) => sum + val, 0) /
+								week.reviewerEfforts.length
 							: null;
 					const avgPerformance =
-						week.stakeholderPerformances.length > 0
-							? week.stakeholderPerformances.reduce((sum, val) => sum + val, 0) /
-								week.stakeholderPerformances.length
+						week.reviewerPerformances.length > 0
+							? week.reviewerPerformances.reduce((sum, val) => sum + val, 0) /
+								week.reviewerPerformances.length
 							: null;
 					return { weekNumber: week.weekNumber, avgEffort, avgPerformance };
 				});
 
 				datasets.push({
-					label: 'Stakeholders Effort (Avg)',
+					label: 'Reviewers Effort (Avg)',
 					data: allWeeks.map((week) => {
-						const weekData = stakeholderAveragesByWeek.find((w) => w.weekNumber === week);
+						const weekData = reviewerAveragesByWeek.find((w) => w.weekNumber === week);
 						return weekData?.avgEffort ?? null;
 					}),
 					borderColor: 'rgba(245, 158, 11, 0.5)',
@@ -344,9 +344,9 @@
 				});
 
 				datasets.push({
-					label: 'Stakeholders Performance (Avg)',
+					label: 'Reviewers Performance (Avg)',
 					data: allWeeks.map((week) => {
-						const weekData = stakeholderAveragesByWeek.find((w) => w.weekNumber === week);
+						const weekData = reviewerAveragesByWeek.find((w) => w.weekNumber === week);
 						return weekData?.avgPerformance ?? null;
 					}),
 					borderColor: 'rgba(99, 102, 241, 0.5)',
@@ -360,24 +360,23 @@
 					yAxisID: 'y'
 				});
 
-				// Stakeholder correlation line (solid and prominent)
+				// Reviewer correlation line (solid and prominent)
 				if (
-					stakeholderCorrelation !== null &&
-					stakeholderCorrelationLine &&
-					stakeholderCorrelationLine.length === 2
+					reviewerCorrelation !== null &&
+					reviewerCorrelationLine &&
+					reviewerCorrelationLine.length === 2
 				) {
-					const dx = stakeholderCorrelationLine[1].x - stakeholderCorrelationLine[0].x;
-					const dy = stakeholderCorrelationLine[1].y - stakeholderCorrelationLine[0].y;
+					const dx = reviewerCorrelationLine[1].x - reviewerCorrelationLine[0].x;
+					const dy = reviewerCorrelationLine[1].y - reviewerCorrelationLine[0].y;
 
 					if (Math.abs(dx) > 0.0001) {
 						const slope = dy / dx;
-						const intercept =
-							stakeholderCorrelationLine[0].y - slope * stakeholderCorrelationLine[0].x;
+						const intercept = reviewerCorrelationLine[0].y - slope * reviewerCorrelationLine[0].x;
 
 						datasets.push({
-							label: 'Stakeholders Correlation',
+							label: 'Reviewers Correlation',
 							data: allWeeks.map((week) => {
-								const weekData = stakeholderAveragesByWeek.find((w) => w.weekNumber === week);
+								const weekData = reviewerAveragesByWeek.find((w) => w.weekNumber === week);
 								if (weekData && weekData.avgEffort !== null && weekData.avgEffort !== undefined) {
 									// Predicted performance = slope * effort + intercept
 									return slope * weekData.avgEffort + intercept;
@@ -397,17 +396,17 @@
 					}
 				}
 
-				// Individual stakeholder lines (optional)
-				if (showIndividualStakeholders) {
-					const stakeholderGroups = new SvelteMap<
+				// Individual reviewer lines (optional)
+				if (showIndividualReviewers) {
+					const reviewerGroups = new SvelteMap<
 						string,
 						Array<{ weekNumber: number; effort: number; performance: number }>
 					>();
-					stakeholderData.forEach((d) => {
-						if (!stakeholderGroups.has(d.stakeholderName)) {
-							stakeholderGroups.set(d.stakeholderName, []);
+					reviewerData.forEach((d) => {
+						if (!reviewerGroups.has(d.reviewerName)) {
+							reviewerGroups.set(d.reviewerName, []);
 						}
-						stakeholderGroups.get(d.stakeholderName)!.push({
+						reviewerGroups.get(d.reviewerName)!.push({
 							weekNumber: d.weekNumber,
 							effort: d.effort,
 							performance: d.progress
@@ -422,12 +421,12 @@
 					];
 
 					let colorIndex = 0;
-					stakeholderGroups.forEach((points, stakeholderName) => {
+					reviewerGroups.forEach((points, reviewerName) => {
 						const color = colors[colorIndex % colors.length];
 
-						// Effort line for this stakeholder
+						// Effort line for this reviewer
 						datasets.push({
-							label: `${stakeholderName} (Effort)`,
+							label: `${reviewerName} (Effort)`,
 							data: allWeeks.map((week) => {
 								const point = points.find((p) => p.weekNumber === week);
 								return point?.effort ?? null;
@@ -442,9 +441,9 @@
 							yAxisID: 'y'
 						});
 
-						// Performance line for this stakeholder
+						// Performance line for this reviewer
 						datasets.push({
-							label: `${stakeholderName} (Performance)`,
+							label: `${reviewerName} (Performance)`,
 							data: allWeeks.map((week) => {
 								const point = points.find((p) => p.weekNumber === week);
 								return point?.performance ?? null;
@@ -583,11 +582,11 @@
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const _indData = individualData;
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const _stkData = stakeholderData;
+		const _stkData = reviewerData;
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const _showStk = showStakeholders;
+		const _showStk = showReviewers;
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const _showIndStk = showIndividualStakeholders;
+		const _showIndStk = showIndividualReviewers;
 
 		// Get current config
 		const config = chartConfig;
@@ -633,21 +632,21 @@
 				together, there's correlation.
 			</p>
 		</div>
-		{#if stakeholderData.length > 0}
+		{#if reviewerData.length > 0}
 			<div class="flex items-center gap-4">
 				<label class="flex items-center gap-2">
 					<input
 						type="checkbox"
-						bind:checked={showStakeholders}
+						bind:checked={showReviewers}
 						class="h-4 w-4 rounded border-border-strong text-accent focus:ring-accent"
 					/>
-					<span class="text-sm font-semibold text-text-secondary">Show Stakeholders</span>
+					<span class="text-sm font-semibold text-text-secondary">Show Reviewers</span>
 				</label>
-				{#if showStakeholders}
+				{#if showReviewers}
 					<label class="flex items-center gap-2">
 						<input
 							type="checkbox"
-							bind:checked={showIndividualStakeholders}
+							bind:checked={showIndividualReviewers}
 							class="h-4 w-4 rounded border-border-strong text-success focus:ring-success"
 						/>
 						<span class="text-xs font-semibold text-text-secondary">Show Individual Lines</span>
@@ -675,18 +674,18 @@
 						</span>
 					</div>
 				</div>
-				{#if stakeholderCorrelation !== null}
+				{#if reviewerCorrelation !== null}
 					<div class="flex-1 border-l border-border-strong pl-6">
 						<div class="text-xs font-semibold tracking-wide text-text-tertiary uppercase">
-							Stakeholders Correlation
+							Reviewers Correlation
 						</div>
 						<div class="mt-1 flex items-baseline gap-2">
 							<span class="text-2xl font-bold text-text-primary">
-								{stakeholderCorrelation.toFixed(2)}
+								{reviewerCorrelation.toFixed(2)}
 							</span>
 							<span class="text-sm font-medium text-text-secondary">
-								({getCorrelationInterpretation(stakeholderCorrelation)}
-								{getCorrelationDirection(stakeholderCorrelation)})
+								({getCorrelationInterpretation(reviewerCorrelation)}
+								{getCorrelationDirection(reviewerCorrelation)})
 							</span>
 						</div>
 					</div>
@@ -717,11 +716,11 @@
 						<span class="text-xs text-text-tertiary">(r={individualCorrelation.toFixed(2)})</span>
 					{/if}
 				</div>
-				{#if showStakeholders && stakeholderCorrelation !== null}
+				{#if showReviewers && reviewerCorrelation !== null}
 					<div class="flex items-center gap-2">
 						<div class="h-1 w-8 rounded-full bg-emerald-600"></div>
-						<span class="text-sm font-medium text-text-secondary">Stakeholders Correlation</span>
-						<span class="text-xs text-text-tertiary">(r={stakeholderCorrelation.toFixed(2)})</span>
+						<span class="text-sm font-medium text-text-secondary">Reviewers Correlation</span>
+						<span class="text-xs text-text-tertiary">(r={reviewerCorrelation.toFixed(2)})</span>
 					</div>
 				{/if}
 			</div>
@@ -739,14 +738,14 @@
 					<div class="h-0.5 w-8 border-t-2 border-dashed border-amber-500/50"></div>
 					<span class="text-sm text-text-secondary">My Performance</span>
 				</div>
-				{#if showStakeholders}
+				{#if showReviewers}
 					<div class="flex items-center gap-2">
 						<div class="h-0.5 w-8 border-t-2 border-dashed border-emerald-600/50"></div>
-						<span class="text-sm text-text-secondary">Stakeholders Effort (Avg)</span>
+						<span class="text-sm text-text-secondary">Reviewers Effort (Avg)</span>
 					</div>
 					<div class="flex items-center gap-2">
 						<div class="h-0.5 w-8 border-t-2 border-dashed border-red-600/50"></div>
-						<span class="text-sm text-text-secondary">Stakeholders Performance (Avg)</span>
+						<span class="text-sm text-text-secondary">Reviewers Performance (Avg)</span>
 					</div>
 				{/if}
 			</div>
@@ -754,15 +753,15 @@
 	</div>
 
 	<div class="h-[400px] w-full rounded-xl border border-border-default bg-surface-raised p-6">
-		{#if individualData.length >= 3 || stakeholderData.length >= 3}
+		{#if individualData.length >= 3 || reviewerData.length >= 3}
 			<canvas bind:this={chartCanvas}></canvas>
-		{:else if individualData.length > 0 || stakeholderData.length > 0}
+		{:else if individualData.length > 0 || reviewerData.length > 0}
 			<div class="flex h-full flex-col items-center justify-center gap-2 text-text-tertiary">
 				<p class="text-sm font-medium">Correlation patterns need at least 3 weeks of data.</p>
 				<p class="text-xs">
 					You're on week {Math.max(
 						...individualData.map((d) => d.weekNumber),
-						...stakeholderData.map((d) => d.weekNumber),
+						...reviewerData.map((d) => d.weekNumber),
 						1
 					)}. Keep going!
 				</p>

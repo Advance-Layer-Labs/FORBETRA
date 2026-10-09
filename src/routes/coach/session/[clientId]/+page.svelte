@@ -26,10 +26,10 @@
 	let prepError = $state<string | null>(null);
 	let freshPrep = $state<{ id: string; content: string | null; createdAt: string } | null>(null);
 	let noteContent = $state('');
-	let noteWeek = $state(data.client.objective?.cycle?.currentWeek?.toString() ?? '');
+	let noteWeek = $state(data.client.goal?.journey?.currentWeek?.toString() ?? '');
 	let submittingNote = $state(false);
 	let showChart = $state(true);
-	const earlyInCycle = $derived((data.client.objective?.cycle?.currentWeek ?? 99) <= 3);
+	const earlyInCycle = $derived((data.client.goal?.journey?.currentWeek ?? 99) <= 3);
 	let showCheckins = $state(false);
 	let showReviewerFeedback = $state(false);
 	let editingNoteId = $state<string | null>(null);
@@ -120,7 +120,7 @@
 		}
 	}
 
-	// Recent weeks: last 3-4 weeks of reflections
+	// Recent weeks: last 3-4 weeks of checkIns
 	const recentWeeks = $derived(
 		(() => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -217,23 +217,23 @@
 			<div>
 				<h1 class="text-2xl font-bold text-text-primary">{data.client.name}</h1>
 				<p class="text-sm text-text-muted">{data.client.email}</p>
-				{#if data.client.objective}
+				{#if data.client.goal}
 					<div class="mt-1.5 flex items-center gap-2">
 						<Target class="h-4 w-4 text-accent" />
-						<span class="text-sm text-text-secondary">{data.client.objective.title}</span>
+						<span class="text-sm text-text-secondary">{data.client.goal.title}</span>
 					</div>
 				{/if}
 			</div>
-			{#if data.client.objective?.cycle}
+			{#if data.client.goal?.journey}
 				<span class="rounded-full bg-accent-muted px-3 py-1 text-xs font-semibold text-accent">
-					Week {data.client.objective.cycle.currentWeek ?? '—'}
+					Week {data.client.goal.journey.currentWeek ?? '—'}
 				</span>
 			{/if}
 		</div>
 	</header>
 
-	<!-- Cycle Completed Banner -->
-	{#if data.client.objective?.cycle?.status === 'COMPLETED'}
+	<!-- Journey Completed Banner -->
+	{#if data.client.goal?.journey?.status === 'COMPLETED'}
 		<div
 			class="rounded-xl border border-success/30 bg-gradient-to-r from-success/10 to-success/5 p-5"
 		>
@@ -244,7 +244,8 @@
 				<div>
 					<p class="text-sm font-bold text-success">Journey complete — well coached</p>
 					<p class="text-xs text-text-secondary">
-						{data.client.name} has completed their cycle. Review their progress, insights, and notes below.
+						{data.client.name} has completed their journey. Review their progress, insights, and notes
+						below.
 					</p>
 				</div>
 			</div>
@@ -252,16 +253,8 @@
 	{/if}
 
 	<!-- Alerts -->
-	{#if data.alerts.length > 0 || data.client.alerts.length > 0}
+	{#if data.client.alerts.length > 0}
 		<div class="space-y-2">
-			{#each data.alerts as alert (alert.content)}
-				<div
-					class="flex items-start gap-2 rounded-xl border border-error/30 bg-error-muted px-4 py-3 text-sm text-error"
-				>
-					<AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
-					{alert.content}
-				</div>
-			{/each}
 			{#each data.client.alerts as alert (alert.message)}
 				<div
 					class="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-muted px-4 py-3 text-sm {alert.severity ===
@@ -277,8 +270,8 @@
 	{/if}
 
 	<!-- At-a-Glance Status -->
-	{#if data.client.objective?.insights}
-		{@const ins = data.client.objective.insights}
+	{#if data.client.goal?.insights}
+		{@const ins = data.client.goal.insights}
 		<div
 			class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border-default bg-surface-subtle px-4 py-3"
 		>
@@ -296,45 +289,41 @@
 					{/if}
 				</div>
 			{/if}
-			{#if data.stakeholderTrends.length > 0}
+			{#if data.reviewerTrends.length > 0}
 				<div class="flex items-center gap-1.5 text-xs">
 					<span class="text-text-muted">Reviewers</span>
-					<span class="font-bold text-accent tabular-nums">{data.stakeholderTrends.length}</span>
+					<span class="font-bold text-accent tabular-nums">{data.reviewerTrends.length}</span>
 				</div>
 			{/if}
-			{#if data.client.objective.cycle}
+			{#if data.client.goal.journey}
 				<div class="flex items-center gap-1.5 text-xs">
 					<span class="text-text-muted">Progress</span>
 					<span class="font-bold text-accent tabular-nums"
-						>{Math.round(data.client.objective.cycle.completion)}%</span
+						>{Math.round(data.client.goal.journey.completion)}%</span
 					>
 				</div>
 			{/if}
-			{#if data.alerts.length > 0 || data.client.alerts.length > 0}
+			{#if data.client.alerts.length > 0}
 				<span class="text-2xs rounded-full bg-warning/10 px-2 py-0.5 font-semibold text-warning"
-					>{data.alerts.length + data.client.alerts.length} alert{data.alerts.length +
-						data.client.alerts.length !==
-					1
-						? 's'
-						: ''}</span
+					>{data.client.alerts.length} alert{data.client.alerts.length !== 1 ? 's' : ''}</span
 				>
 			{/if}
 		</div>
 	{/if}
 
-	<!-- Focus Areas (Subgoals) -->
-	{#if data.subgoals.length > 0}
+	<!-- Focus Areas (FocusAreas) -->
+	{#if data.focusAreas.length > 0}
 		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
 			<h2 class="mb-2 text-xs font-bold tracking-wider text-text-tertiary uppercase">
 				Focus Areas
 			</h2>
 			<div class="flex flex-wrap gap-2">
-				{#each data.subgoals as subgoal (subgoal.label)}
+				{#each data.focusAreas as focusArea (focusArea.label)}
 					<span
 						class="rounded-lg bg-accent-muted px-3 py-1.5 text-xs font-medium text-accent"
-						title={subgoal.description || ''}
+						title={focusArea.description || ''}
 					>
-						{subgoal.label}
+						{focusArea.label}
 					</span>
 				{/each}
 			</div>
@@ -374,7 +363,7 @@
 				<span class="font-semibold text-accent">Wk {recentWeeks[0][0]}</span>
 			</a>
 		{/if}
-		{#if data.stakeholderTrends.length > 0}
+		{#if data.reviewerTrends.length > 0}
 			<a
 				href="#feedback"
 				class="text-2xs inline-flex items-center gap-1 rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
@@ -382,7 +371,7 @@
 				Feedback
 				<span
 					class="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-muted px-1 font-bold text-accent"
-					>{data.stakeholderTrends.length}</span
+					>{data.reviewerTrends.length}</span
 				>
 			</a>
 		{/if}
@@ -395,7 +384,7 @@
 		{/if}
 	</nav>
 
-	<!-- Early-in-cycle guidance -->
+	<!-- Early-in-journey guidance -->
 	{#if earlyInCycle}
 		<div class="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-4 py-2.5">
 			<Sparkles class="h-4 w-4 shrink-0 text-accent" />
@@ -485,8 +474,8 @@
 	</div>
 
 	<!-- 2. Recent Scores + Gap Highlights -->
-	{#if data.client.objective?.insights}
-		{@const ins = data.client.objective.insights}
+	{#if data.client.goal?.insights}
+		{@const ins = data.client.goal.insights}
 		<div
 			id="scores"
 			class="scroll-anchor grid grid-cols-2 gap-3 sm:grid-cols-4"
@@ -495,7 +484,10 @@
 		>
 			<div class="rounded-xl border border-border-default bg-surface-raised px-3 py-2">
 				<p class="text-2xs font-medium tracking-wider text-text-muted uppercase">
-					Effort <InfoTip text="Self-rated investment of energy and focus (last 4 weeks avg)" />
+					Effort
+					<InfoTip
+						text="How much attention they gave this goal, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
+					/>
 				</p>
 				<p class="text-lg font-bold text-data-effort tabular-nums">
 					{ins.avgEffort != null ? `${ins.avgEffort.toFixed(1)}/10` : '—'}
@@ -503,8 +495,9 @@
 			</div>
 			<div class="rounded-xl border border-border-default bg-surface-raised px-3 py-2">
 				<p class="text-2xs font-medium tracking-wider text-text-muted uppercase">
-					Performance <InfoTip
-						text="Self-rated satisfaction with progress toward goal (last 4 weeks avg)"
+					Performance
+					<InfoTip
+						text="How effective that work was, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
 					/>
 				</p>
 				<p class="text-lg font-bold text-data-performance tabular-nums">
@@ -537,26 +530,24 @@
 			<div class="rounded-xl border border-border-default bg-surface-raised px-3 py-2">
 				<p class="text-2xs font-medium tracking-wider text-text-muted uppercase">
 					Completion <InfoTip
-						text="Journey progress based on weeks elapsed vs total cycle length"
+						text="Journey progress based on weeks elapsed vs total journey length"
 					/>
 				</p>
 				<p class="text-lg font-bold text-accent tabular-nums">
-					{data.client.objective.cycle
-						? `${Math.round(data.client.objective.cycle.completion)}%`
-						: '—'}
+					{data.client.goal.journey ? `${Math.round(data.client.goal.journey.completion)}%` : '—'}
 				</p>
 			</div>
 		</div>
 	{/if}
 
 	<!-- Perception Gap -->
-	{#if data.client.objective?.insights && data.stakeholderTrends.length > 0}
-		{@const selfEffort = data.client.objective.insights.avgEffort}
-		{@const selfPerf = data.client.objective.insights.avgProgress}
-		{@const reviewerEfforts = data.stakeholderTrends
+	{#if data.client.goal?.insights && data.reviewerTrends.length > 0}
+		{@const selfEffort = data.client.goal.insights.avgEffort}
+		{@const selfPerf = data.client.goal.insights.avgProgress}
+		{@const reviewerEfforts = data.reviewerTrends
 			.filter((t) => t.latestEffort !== null)
 			.map((t) => t.latestEffort!)}
-		{@const reviewerPerfs = data.stakeholderTrends
+		{@const reviewerPerfs = data.reviewerTrends
 			.filter((t) => t.latestPerformance !== null)
 			.map((t) => t.latestPerformance!)}
 		{@const avgReviewerEffort =
@@ -633,8 +624,8 @@
 	{/if}
 
 	<!-- Coaching Prompts -->
-	{#if data.client.objective?.insights}
-		{@const ins = data.client.objective.insights}
+	{#if data.client.goal?.insights}
+		{@const ins = data.client.goal.insights}
 		{@const hasLowEffort = ins.avgEffort != null && ins.avgEffort < 5}
 		{@const hasHighEffortLowPerf =
 			ins.avgEffort != null && ins.avgProgress != null && ins.avgEffort >= 7 && ins.avgProgress < 5}
@@ -692,8 +683,8 @@
 				};
 			}}
 		>
-			{#if data.cycleId}
-				<input type="hidden" name="cycleId" value={data.cycleId} />
+			{#if data.journeyId}
+				<input type="hidden" name="journeyId" value={data.journeyId} />
 			{/if}
 			{#if form?.noteError}
 				<p class="mb-2 text-xs text-error">{form.noteError}</p>
@@ -864,20 +855,16 @@
 			</button>
 			{#if showCheckins}
 				<div class="space-y-3 px-5 pb-5">
-					{#each recentWeeks as [weekNumber, reflections] (weekNumber)}
+					{#each recentWeeks as [weekNumber, checkIns] (weekNumber)}
 						<div class="rounded-lg border border-border-default bg-surface-subtle p-3">
 							<p class="mb-1.5 text-xs font-bold text-text-secondary">Week {weekNumber}</p>
 							<div class="space-y-1.5">
-								{#each reflections as r (r.id)}
+								{#each checkIns as r (r.id)}
 									<div class="flex items-start gap-2 text-xs">
 										<span
 											class="text-2xs shrink-0 rounded bg-accent-muted px-1.5 py-0.5 font-semibold text-accent"
 										>
-											{r.reflectionType === 'RATING_A' || r.reflectionType === 'RATING_B'
-												? 'Self'
-												: r.reflectionType === 'STAKEHOLDER'
-													? '360'
-													: r.reflectionType}
+											Self
 										</span>
 										<div class="min-w-0 flex-1">
 											{#if r.effortScore !== null || r.performanceScore !== null}
@@ -912,7 +899,7 @@
 	{/if}
 
 	<!-- Reviewer feedback summary — collapsed by default -->
-	{#if data.stakeholderTrends.length > 0}
+	{#if data.reviewerTrends.length > 0}
 		<div
 			id="feedback"
 			class="scroll-anchor rounded-xl border border-border-default bg-surface-raised"
@@ -926,7 +913,7 @@
 				<h2 class="font-semibold text-text-primary">Reviewer Feedback</h2>
 				<div class="flex items-center gap-2">
 					<span class="text-2xs rounded-full bg-accent-muted px-2 py-0.5 font-semibold text-accent"
-						>{data.stakeholderTrends.length} reviewer{data.stakeholderTrends.length !== 1
+						>{data.reviewerTrends.length} reviewer{data.reviewerTrends.length !== 1
 							? 's'
 							: ''}</span
 					>
@@ -939,7 +926,7 @@
 			</button>
 			{#if showReviewerFeedback}
 				<div class="grid gap-2 px-5 pb-5 sm:grid-cols-2">
-					{#each data.stakeholderTrends as trend (trend.name)}
+					{#each data.reviewerTrends as trend (trend.name)}
 						{@const effortDiff =
 							trend.latestEffort != null && trend.previousEffort != null
 								? trend.latestEffort - trend.previousEffort
@@ -1007,8 +994,8 @@
 				<div class="border-t border-border-default p-5">
 					<PerformanceEffortChart
 						individualData={data.client.visualizationData.individual}
-						stakeholderData={data.client.visualizationData.stakeholders}
-						stakeholders={data.client.visualizationData.stakeholderList}
+						reviewerData={data.client.visualizationData.reviewers}
+						reviewers={data.client.visualizationData.reviewerList}
 						selfLabel="Self-rated"
 					/>
 				</div>

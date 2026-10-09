@@ -11,6 +11,7 @@
 		MessageSquare
 	} from 'lucide-svelte';
 	import Badge from '$lib/components/Badge.svelte';
+	import InfoTip from '$lib/components/InfoTip.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData | null } = $props();
 
@@ -20,10 +21,9 @@
 	let addEmail = $state('');
 	let addingReviewer = $state(false);
 	let requestingFeedbackId = $state<string | null>(null);
-	let copiedLink = $state<string | null>(null);
 
 	const formResult = form as Record<string, unknown> | null;
-	const isStakeholderAction = formResult?.action === 'stakeholder';
+	const isReviewerAction = formResult?.action === 'reviewer';
 	const isFeedbackAction = formResult?.action === 'feedback';
 
 	function gapColor(gap: number | null): string {
@@ -47,16 +47,6 @@
 		if (diffDays < 7) return `${diffDays}d ago`;
 		return `${Math.floor(diffDays / 7)}w ago`;
 	}
-
-	const copyLink = async (url: string) => {
-		try {
-			await navigator.clipboard.writeText(url);
-			copiedLink = url;
-			setTimeout(() => (copiedLink = null), 2000);
-		} catch {
-			/* noop */
-		}
-	};
 </script>
 
 <svelte:head>
@@ -73,7 +63,7 @@
 					<a
 						href="/individual"
 						class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-						>Hub</a
+						>Journeys</a
 					>
 				</li>
 				<li aria-hidden="true" class="text-text-muted">/</li>
@@ -87,27 +77,10 @@
 				? ` — Week ${data.currentWeek}`
 				: ''}.
 		</p>
-		<!-- Reveal status badge — clarifies the asymmetric-trust feature -->
-		<!-- eslint-disable svelte/no-navigation-without-resolve -->
-		<a
-			href="/individual/settings"
-			class="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors {data.revealScores
-				? 'border-success/30 bg-success-muted text-success hover:border-success/50'
-				: 'border-border-default bg-surface-raised text-text-secondary hover:border-border-strong'}"
-		>
-			<span class="h-1.5 w-1.5 rounded-full {data.revealScores ? 'bg-success' : 'bg-text-muted'}"
-			></span>
-			Reveal: {data.revealScores ? 'On' : 'Off'}
-			<span class="text-text-muted">·</span>
-			<span class="text-text-tertiary">
-				{data.revealScores ? 'Reviewers see your self-scores' : 'Reviewers score blind'}
-			</span>
-		</a>
-		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	</div>
 
 	<!-- Toast messages -->
-	{#if isStakeholderAction && formResult?.success}
+	{#if isReviewerAction && formResult?.success}
 		<div class="rounded-xl border border-success/30 bg-success-muted p-4 text-sm text-success">
 			Reviewer added. They'll receive a welcome email.
 		</div>
@@ -127,7 +100,12 @@
 	{#if data.myEffort !== null || data.myPerformance !== null}
 		<section class="grid grid-cols-2 gap-3">
 			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-				<p class="text-2xs font-semibold tracking-wider text-text-muted uppercase">Effort</p>
+				<p
+					class="text-2xs flex items-center gap-1.5 font-semibold tracking-wider text-text-muted uppercase"
+				>
+					Effort
+					<InfoTip text="How much attention you gave this goal. 0 is none, 10 is exceptional." />
+				</p>
 				<div class="mt-2 flex items-end justify-between">
 					<div>
 						<p class="text-xs text-text-tertiary">You</p>
@@ -144,11 +122,19 @@
 						class="mt-2 flex items-center justify-center gap-1 rounded-lg bg-surface-subtle px-2 py-1"
 					>
 						<span class="text-xs font-semibold {gapColor(gap)}">Gap: {formatGap(gap)}</span>
+						<InfoTip
+							text="Your score minus the reviewer’s. Closer to zero means you see it the same way. Closing means that difference is shrinking."
+						/>
 					</div>
 				{/if}
 			</div>
 			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-				<p class="text-2xs font-semibold tracking-wider text-text-muted uppercase">Performance</p>
+				<p
+					class="text-2xs flex items-center gap-1.5 font-semibold tracking-wider text-text-muted uppercase"
+				>
+					Performance
+					<InfoTip text="How effective that work was. 0 is none, 10 is exceptional." />
+				</p>
 				<div class="mt-2 flex items-end justify-between">
 					<div>
 						<p class="text-xs text-text-tertiary">You</p>
@@ -165,6 +151,9 @@
 						class="mt-2 flex items-center justify-center gap-1 rounded-lg bg-surface-subtle px-2 py-1"
 					>
 						<span class="text-xs font-semibold {gapColor(gap)}">Gap: {formatGap(gap)}</span>
+						<InfoTip
+							text="Your score minus the reviewer’s. Closer to zero means you see it the same way. Closing means that difference is shrinking."
+						/>
 					</div>
 				{/if}
 			</div>
@@ -202,8 +191,8 @@
 						Your reviewers haven't responded yet — that's normal in week 1.
 					</p>
 					<p class="mt-1.5 text-xs text-text-tertiary">
-						Reviewers receive a feedback prompt at the end of each week. Reminders fire Mon–Fri at
-						3pm. Feedback will appear below as it arrives.
+						Feedback is requested when you ask for it. If a request is still open, a reminder can go
+						out later. Responses show up here as they arrive.
 					</p>
 				</div>
 			{/if}
@@ -330,19 +319,17 @@
 
 							<!-- Actions -->
 							<div class="flex items-center gap-2 pt-1">
-								{#if reviewer.pendingFeedbackLink}
-									<button
-										type="button"
-										onclick={() => {
-											if (reviewer.pendingFeedbackLink) copyLink(reviewer.pendingFeedbackLink);
-										}}
-										class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors {copiedLink ===
-										reviewer.pendingFeedbackLink
-											? 'border-success text-success'
-											: 'border-border-default text-text-secondary hover:border-accent hover:text-accent'}"
-									>
-										{copiedLink === reviewer.pendingFeedbackLink ? 'Copied!' : 'Copy Link'}
-									</button>
+								{#if reviewer.hasPendingInvite}
+									<p class="text-xs text-text-muted">A feedback link was emailed.</p>
+									<form method="post" action="?/reissueFeedback" use:enhance>
+										<input type="hidden" name="reviewerId" value={reviewer.id} />
+										<button
+											type="submit"
+											class="rounded-lg border border-border-default px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent"
+										>
+											Send a new link
+										</button>
+									</form>
 								{/if}
 								<form
 									method="post"
@@ -355,7 +342,7 @@
 										};
 									}}
 								>
-									<input type="hidden" name="stakeholderId" value={reviewer.id} />
+									<input type="hidden" name="reviewerId" value={reviewer.id} />
 									<button
 										type="submit"
 										disabled={requestingFeedbackId === reviewer.id}
@@ -378,7 +365,7 @@
 			<h2 class="mb-3 text-sm font-semibold text-text-primary">Add a Reviewer</h2>
 			<form
 				method="post"
-				action="?/addStakeholder"
+				action="?/addReviewer"
 				use:enhance={() => {
 					addingReviewer = true;
 					return async ({ update }) => {

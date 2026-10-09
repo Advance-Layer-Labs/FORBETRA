@@ -1,8 +1,8 @@
 /**
- * Cycle Auto-Completion Job
+ * Journey Auto-Completion Job
  *
- * Finds all ACTIVE cycles whose endDate has passed and marks them COMPLETED.
- * Generates a CYCLE_REPORT insight and sends a completion email.
+ * Finds all ACTIVE journeys whose endDate has passed and marks them COMPLETED.
+ * Generates a JOURNEY_REPORT insight and sends a completion email.
  * Runs daily at 1 AM UTC.
  */
 
@@ -10,6 +10,7 @@ import prisma from '$lib/server/prisma';
 import { generateCycleReport } from '$lib/server/ai/generateInsight';
 import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
+import { wantsEmail, wantsSms } from '$lib/notifications/preferences';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { getAppUrl } from '$lib/server/appUrl';
@@ -19,11 +20,11 @@ export async function completeExpiredCycles(): Promise<{
 	failed: number;
 	skipped: number;
 }> {
-	console.log('[cycles:complete] Starting expired cycle completion...');
+	console.log('[journeys:complete] Starting expired journey completion...');
 
 	const now = new Date();
 
-	const expiredCycles = await prisma.cycle.findMany({
+	const expiredCycles = await prisma.journey.findMany({
 		where: {
 			status: 'ACTIVE',
 			endDate: {
@@ -35,7 +36,7 @@ export async function completeExpiredCycles(): Promise<{
 			user: {
 				select: { id: true, email: true, name: true, phone: true, deliveryMethod: true }
 			},
-			objective: {
+			goal: {
 				select: { title: true }
 			}
 		}
@@ -45,64 +46,65 @@ export async function completeExpiredCycles(): Promise<{
 	let failed = 0;
 	let skipped = 0;
 
-	for (const cycle of expiredCycles) {
-		// Check if a CYCLE_REPORT already exists (skip report generation if so, but still fix status)
+	for (const journey of expiredCycles) {
+		// Check if a JOURNEY_REPORT already exists (skip report generation if so, but still fix status)
 		const existingReport = await prisma.insight.findFirst({
 			where: {
-				userId: cycle.userId,
-				cycleId: cycle.id,
-				type: 'CYCLE_REPORT'
+				userId: journey.userId,
+				journeyId: journey.id,
+				type: 'JOURNEY_REPORT'
 			}
 		});
 
 		try {
-			// Update cycle status to COMPLETED
-			await prisma.cycle.update({
-				where: { id: cycle.id },
+			// Update journey status to COMPLETED
+			await prisma.journey.update({
+				where: { id: journey.id },
 				data: { status: 'COMPLETED' }
 			});
 
-			// Generate cycle report if one doesn't exist
+			// Generate journey report if one doesn't exist
 			if (!existingReport) {
 				try {
-					await generateCycleReport(cycle.userId, cycle.id);
+					await generateCycleReport(journey.userId, journey.id);
 				} catch (reportError) {
 					console.error(
-						`[cycles:complete] Failed to generate report for cycle ${cycle.id}`,
+						`[journeys:complete] Failed to generate report for journey ${journey.id}`,
 						reportError
 					);
-					// Don't fail the whole cycle completion if report generation fails
+					// Don't fail the whole journey completion if report generation fails
 				}
 			} else {
 				skipped++;
 			}
 
 			const baseUrl = getAppUrl();
-			const delivery = cycle.user.deliveryMethod ?? 'both';
 
-			if (delivery !== 'sms') {
+			if (wantsEmail(journey.user.deliveryMethod)) {
 				try {
 					const template = emailTemplates.cycleCompleted({
-						individualName: cycle.user.name || undefined,
-						objectiveTitle: cycle.objective.title,
-						cycleLabel: cycle.label || undefined,
+						individualName: journey.user.name || undefined,
+						goalTitle: journey.goal.title,
+						cycleLabel: journey.label || undefined,
 						appUrl: baseUrl
 					});
 					await sendEmail({
-						to: cycle.user.email,
+						to: journey.user.email,
 						...template
 					});
 				} catch (emailError) {
-					console.error(`[cycles:complete] Failed to send email for cycle ${cycle.id}`, emailError);
+					console.error(
+						`[journeys:complete] Failed to send email for journey ${journey.id}`,
+						emailError
+					);
 				}
 			}
 
-			// Send SMS notification
-			if (delivery !== 'email') {
+			if (wantsSms(journey.user.deliveryMethod)) {
 				await trySendSms(
-					cycle.user.phone,
+					journey.user.phone,
 					smsTemplates.cycleCompleted({
-						objectiveTitle: cycle.objective.title,
+						goalTitle: journey.goal.title,
 						appUrl: baseUrl
 					})
 				);
@@ -110,13 +112,13 @@ export async function completeExpiredCycles(): Promise<{
 
 			completed++;
 		} catch (error) {
-			console.error(`[cycles:complete] Failed to complete cycle ${cycle.id}`, error);
+			console.error(`[journeys:complete] Failed to complete journey ${journey.id}`, error);
 			failed++;
 		}
 	}
 
 	console.log(
-		`[cycles:complete] Done. Completed: ${completed}, Skipped reports: ${skipped}, Failed: ${failed}`
+		`[journeys:complete] Done. Completed: ${completed}, Skipped reports: ${skipped}, Failed: ${failed}`
 	);
 	return { completed, failed, skipped };
 }

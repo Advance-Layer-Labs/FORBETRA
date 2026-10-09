@@ -50,6 +50,14 @@
 				>
 					Try Again
 				</button>
+				<!-- eslint-disable svelte/no-navigation-without-resolve -->
+				<a
+					href="/stakeholder/invalid"
+					class="rounded-xl border border-border-default px-6 py-2.5 text-sm font-semibold text-text-primary transition-all hover:bg-surface-subtle"
+				>
+					Request a new link
+				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			</div>
 			<p class="text-xs text-text-tertiary">
 				If this keeps happening, ask the person who invited you to send a fresh link.
