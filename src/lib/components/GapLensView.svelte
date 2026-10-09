@@ -578,9 +578,9 @@
 			<div class="mt-3 border-t border-border-default pt-3">
 				<p class="text-xs text-text-secondary">
 					<strong>What this means:</strong> Gap shows the difference between your self-assessment and
-					reviewer observations. Positive values mean you rate yourself higher than reviewers see
-					you. Negative values mean reviewers see you higher than you see yourself. Values closer to
-					zero indicate better alignment. Large gaps reveal potential blind spots in self-awareness.
+					reviewer observations. Positive values mean you rate yourself higher than reviewers see you.
+					Negative values mean reviewers see you higher than you see yourself. Values closer to zero indicate
+					better alignment. Large gaps reveal potential blind spots in self-awareness.
 				</p>
 			</div>
 		</div>

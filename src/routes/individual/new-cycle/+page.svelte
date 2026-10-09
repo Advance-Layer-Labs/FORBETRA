@@ -450,8 +450,8 @@
 								<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
 									<p class="text-sm text-text-secondary">
 										Check in at least once a week, on any day. Each check-in is one effort score and
-										one performance score, plus an optional note (~2 min). Extra check-ins in the same
-										week are welcome.
+										one performance score, plus an optional note (~2 min). Extra check-ins in the
+										same week are welcome.
 									</p>
 								</div>
 							</div>
@@ -514,8 +514,9 @@
 									Each reviewer has their own cadence, weekly or every other week. You can change it
 									any time on the
 									<!-- eslint-disable svelte/no-navigation-without-resolve -->
-									<a href="/individual/stakeholders" class="font-semibold text-accent hover:underline"
-										>Reviewers</a
+									<a
+										href="/individual/stakeholders"
+										class="font-semibold text-accent hover:underline">Reviewers</a
 									>
 									<!-- eslint-enable svelte/no-navigation-without-resolve -->
 									page.

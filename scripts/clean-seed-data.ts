@@ -49,8 +49,8 @@ async function cleanSeedData() {
 
 	await prisma.$transaction(
 		async (tx) => {
-			let deletedFeedback = 0;
-			let deletedReflections = 0;
+			const deletedFeedback = 0;
+			const deletedReflections = 0;
 			let deletedCoachNotes = 0;
 			let deletedCycles = 0;
 			let deletedFocusAreas = 0;

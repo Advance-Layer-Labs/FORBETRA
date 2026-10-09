@@ -426,15 +426,15 @@ UI-driven seed data operations. **Also worth auditing prod presence.**
 
 User experience also includes what arrives in their inbox / on their phone. From `vercel.json`:
 
-| Cron                           | Schedule          | Audience     | Effect                                  |
-| ------------------------------ | ----------------- | ------------ | --------------------------------------- |
-| `/api/jobs/remind-base`        | Every hour        | Individuals  | Weekly check-in reminder at the saved local hour |
-| `/api/jobs/remind-prompts`     | Every hour        | Individuals  | Overdue check-in nudge at the saved local hour, except journey day 3 |
-| `/api/jobs/remind-feedback`    | Weekdays 3pm UTC  | Reviewers    | Reminder for an open or expired feedback link. Earlier links stay valid |
-| `/api/jobs/generate-insights`  | Sun 8pm UTC       | Individuals  | New insights stored in the app. Not emailed |
-| `/api/jobs/coach-prep`         | Mon 7am UTC       | Coaches      | Coach prep stored in the app. Not emailed |
-| `/api/jobs/complete-cycles`    | Daily 1am UTC     | Individuals  | Journey completion email and SMS         |
-| `/api/jobs/stakeholder-impact` | 1st of month 10am UTC | Reviewers | Monthly impact summary                |
+| Cron                           | Schedule              | Audience    | Effect                                                                  |
+| ------------------------------ | --------------------- | ----------- | ----------------------------------------------------------------------- |
+| `/api/jobs/remind-base`        | Every hour            | Individuals | Weekly check-in reminder at the saved local hour                        |
+| `/api/jobs/remind-prompts`     | Every hour            | Individuals | Overdue check-in nudge at the saved local hour, except journey day 3    |
+| `/api/jobs/remind-feedback`    | Weekdays 3pm UTC      | Reviewers   | Reminder for an open or expired feedback link. Earlier links stay valid |
+| `/api/jobs/generate-insights`  | Sun 8pm UTC           | Individuals | New insights stored in the app. Not emailed                             |
+| `/api/jobs/coach-prep`         | Mon 7am UTC           | Coaches     | Coach prep stored in the app. Not emailed                               |
+| `/api/jobs/complete-cycles`    | Daily 1am UTC         | Individuals | Journey completion email and SMS                                        |
+| `/api/jobs/stakeholder-impact` | 1st of month 10am UTC | Reviewers   | Monthly impact summary                                                  |
 
 **Email + SMS templates live in `src/lib/notifications/`.** Each one is a UX surface — the user sees these more often than the in-app screens.
 

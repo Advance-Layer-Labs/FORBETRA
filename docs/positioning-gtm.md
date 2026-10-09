@@ -70,7 +70,7 @@ those two views.
 That repetition, over a Journey, is how Forbetra shows whether development is
 actually happening.
 
-Everything below is about *packaging* this so it lands faster and harder. The
+Everything below is about _packaging_ this so it lands faster and harder. The
 philosophy ("streamlined by default, complexity hidden and triggered") applies to
 marketing too: **lead with a sharp, concrete promise; reveal the deeper concept
 only once they've leaned in.**
@@ -79,15 +79,17 @@ only once they've leaned in.**
 
 ## 1. The single-sentence dagger
 
-The origin copy is a great *story* but has no one-line hook. Recommendation: don't
+The origin copy is a great _story_ but has no one-line hook. Recommendation: don't
 lead with the abstract concept ("measure the unmeasurable") — lead with a promise
 tied to an audience. Keep the concept as the second beat.
 
 **Master dagger (concept-level, for when audience is mixed):**
+
 > **"Forbetra measures the goals you can't put a number on — and shows if you're
 > actually getting better."**
 
 **Audience-specific daggers (preferred for cold reach):**
+
 - **Coaches / L&D:** _"Prove your coaching works."_ (backup: _"Turn 'I think
   you're improving' into proof."_)
 - **Executives / ambitious individuals:** _"Know how you're really seen — before
@@ -103,8 +105,8 @@ open cold with the philosophy.
 ## 2. Vitamin → painkiller
 
 The individual pitch is a vitamin (nice-to-have, low urgency). Painkillers attach
-to a **painful, time-bound, high-stakes moment** where *not knowing your perception
-has a real cost.* Strategies:
+to a **painful, time-bound, high-stakes moment** where _not knowing your perception
+has a real cost._ Strategies:
 
 1. **Anchor to trigger moments,** not to "self-improvement in general":
    - Performance review / promotion cycle ("know before they decide").
@@ -114,7 +116,7 @@ has a real cost.* Strategies:
    - 360-review season (position as the lightweight, continuous alternative).
 2. **Sell the painkiller to the buyer who feels the pain most: the coach / org.**
    For an individual, blind spots are uncomfortable; for a coach or an L&D budget
-   owner, *unprovable ROI is an existential threat.* The ROI/accountability angle
+   owner, _unprovable ROI is an existential threat._ The ROI/accountability angle
    (canonical §1) is the painkiller — it converts "nice to know" into "I need this
    to justify the spend / keep the client / defend the budget."
 3. **Make the cost of the gap concrete.** Reframe from "track your growth" to
@@ -160,13 +162,13 @@ matters more, not less.
    you." The AI insight narrative should be constructive and curious, never
    verdict-like.
 2. **Give the individual agency and go first.** They choose their reviewers, they
-   set the goal, and they self-rate + set the baseline *before* anyone else weighs
+   set the goal, and they self-rate + set the baseline _before_ anyone else weighs
    in. Starting from their own view (agency) softens the arrival of others' views.
 3. **Lead with Effort (self-controllable) alongside Performance.** Effort is
    within the person's control, so it's less threatening; pairing it with
    performance keeps the experience from feeling like pure external judgment.
 4. **Normalize the gap.** "Almost everyone has a 1–3 point gap — that's the point,
-   not a failing." Set the expectation that a gap is *the normal, useful signal*,
+   not a failing." Set the expectation that a gap is _the normal, useful signal_,
    so seeing one feels like insight rather than criticism.
 5. **Celebrate convergence and improvement, not just deltas.** Make "the gap
    closed" and "you improved from baseline" the emotional payoff — progress framing
@@ -179,10 +181,11 @@ matters more, not less.
 
 ## 5. Reviewer experience & fatigue
 
-This is the make-or-break: the value depends on reviewers *sustaining* a behavior
+This is the make-or-break: the value depends on reviewers _sustaining_ a behavior
 we can't market away. Below is what the product already does well, then the gaps.
 
 **Already good (keep / protect):**
+
 - **No account, ~60 seconds, two questions + optional note** — token-link feedback,
   extremely low friction. This is the single most important thing; protect it
   fiercely.
@@ -192,6 +195,7 @@ we can't market away. Below is what the product already does well, then the gaps
 - **Welcome + reminder + impact-summary** touchpoints already exist.
 
 **Where we can make it genuinely enjoyable (recommendations):**
+
 1. **Show impact immediately, not just monthly.** The moment a reviewer submits,
    show them something ("your input moved the picture" / a glimpse of alignment) —
    with reveal-on we can show how their view compared. Immediate feedback loops are

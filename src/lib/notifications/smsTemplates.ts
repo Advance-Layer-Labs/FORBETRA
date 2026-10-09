@@ -18,11 +18,7 @@ export const smsTemplates = {
 		return `Forbetra: You have overdue check-ins. Catch up now: ${data.appUrl || baseUrl}/individual/checkin\n\nReply STOP to opt out`;
 	},
 
-	welcomeReviewer: (data: {
-		reviewerName?: string;
-		individualName?: string;
-		appUrl?: string;
-	}) => {
+	welcomeReviewer: (data: { reviewerName?: string; individualName?: string; appUrl?: string }) => {
 		const name = data.individualName || 'someone';
 		return `Forbetra: ${name} added you as a feedback provider. You'll occasionally be asked to rate their performance — takes <60 seconds.\n\nReply STOP to opt out`;
 	},

@@ -266,7 +266,8 @@ async function seedTestData() {
 				weekNumber: 2,
 				type: 'WEEKLY_SYNTHESIS',
 				status: 'COMPLETED',
-				content: 'Two check-ins in a week average into the self score. The coach review counts once.'
+				content:
+					'Two check-ins in a week average into the self score. The coach review counts once.'
 			}
 		});
 
@@ -320,10 +321,7 @@ async function seedTestData() {
 				individualEffort,
 				individualProgress
 			);
-			const neutralFeedback = generateNeutralReviewerFeedback(
-				individualEffort,
-				individualProgress
-			);
+			const neutralFeedback = generateNeutralReviewerFeedback(individualEffort, individualProgress);
 			const negativeFeedback = generateNegativeReviewerFeedback(
 				individualEffort,
 				individualProgress

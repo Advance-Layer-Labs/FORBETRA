@@ -37,6 +37,7 @@ on a repeating rhythm, and helps you close it.
 ### Positioning language — internal vs. marketing
 
 Keep these precise internally even if marketing softens them:
+
 - **Internal (honest) framing:** we measure _perceived_ Effort and Performance,
   and the gap between perspectives — not objective performance.
 - **Marketing framing:** "finally measure progress on the goals that matter most —
@@ -139,16 +140,16 @@ translation layer (UI word ≠ code word) is a standing source of confusion, and
 rebuild is the moment to erase it. The chosen word is the **UI word**, because
 that is the product's language.
 
-| Concept | Current DB/code | Current UI | Also leaks as | **Ratified name (all layers)** |
-| --- | --- | --- | --- | --- |
-| The thing you're improving | `Objective` | "Goal" | "Objective" (reviewer page, emails) | **Goal** |
-| Optional observable facet | `Subgoal` | "Focus Area" | "sub-objective" (errors/validation), "measure" (onboarding) | **Focus Area** (`FocusArea`) |
-| A time-boxed run | `Cycle` | "Journey" | "Cycle" / "Cycle 1" (fallback labels, admin) | **Journey** |
-| Individual's weekly rating | `Reflection` | "Check-in" | "reflection(s)" (SMS/email), "rating" | **Check-in** (`CheckIn`) |
-| Person who rates you | `Stakeholder` | "Reviewer" | "stakeholder" (terms page, copy) | **Reviewer** |
-| A reviewer's submission | `Feedback` | "Feedback" | — | **Feedback** (keep) |
-| The two score dimensions | `effortScore` / `performanceScore` | "Effort" / "Performance" | — | **Effort / Performance** (keep) |
-| Check-in type enum | `RATING_A` / `RATING_B` | (none) | "Wednesday/Friday check-in" (reminders) | **eliminate** (single check-in) |
+| Concept                    | Current DB/code                    | Current UI               | Also leaks as                                               | **Ratified name (all layers)**  |
+| -------------------------- | ---------------------------------- | ------------------------ | ----------------------------------------------------------- | ------------------------------- |
+| The thing you're improving | `Objective`                        | "Goal"                   | "Objective" (reviewer page, emails)                         | **Goal**                        |
+| Optional observable facet  | `Subgoal`                          | "Focus Area"             | "sub-objective" (errors/validation), "measure" (onboarding) | **Focus Area** (`FocusArea`)    |
+| A time-boxed run           | `Cycle`                            | "Journey"                | "Cycle" / "Cycle 1" (fallback labels, admin)                | **Journey**                     |
+| Individual's weekly rating | `Reflection`                       | "Check-in"               | "reflection(s)" (SMS/email), "rating"                       | **Check-in** (`CheckIn`)        |
+| Person who rates you       | `Stakeholder`                      | "Reviewer"               | "stakeholder" (terms page, copy)                            | **Reviewer**                    |
+| A reviewer's submission    | `Feedback`                         | "Feedback"               | —                                                           | **Feedback** (keep)             |
+| The two score dimensions   | `effortScore` / `performanceScore` | "Effort" / "Performance" | —                                                           | **Effort / Performance** (keep) |
+| Check-in type enum         | `RATING_A` / `RATING_B`            | (none)                   | "Wednesday/Friday check-in" (reminders)                     | **eliminate** (single check-in) |
 
 ### Why each word was chosen
 
@@ -192,6 +193,7 @@ have too many.
 judgment connotation) are the two most worth a second look before locking in.
 
 Notes:
+
 - **Focus Area is the priority fix.** It currently has three names (`Subgoal`,
   "Focus Area", "measure"), and that triple-naming is exactly what let the
   onboarding data-linking bug hide. Collapse to **Focus Area** everywhere.
@@ -206,6 +208,7 @@ Notes:
 
 Even before any schema work, these **user-facing strings** should be corrected to
 the ratified vocabulary:
+
 - "No sub-objectives found…" → "No focus areas…" (`individual/checkin`,
   `individual/+page.server.ts`)
 - "Objective, cycle, or sub-objectives not found." → "Goal, journey, or focus

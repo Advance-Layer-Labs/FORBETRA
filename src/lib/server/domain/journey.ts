@@ -3,7 +3,10 @@ import prisma from '$lib/server/prisma';
 
 const ALLOWED_LENGTHS = new Set([6, 12, 16]);
 
-export function journeyLengthWeeks(lengthWeeks: number | undefined, isFirstJourney: boolean): number {
+export function journeyLengthWeeks(
+	lengthWeeks: number | undefined,
+	isFirstJourney: boolean
+): number {
 	if (isFirstJourney) return 12;
 	if (lengthWeeks && ALLOWED_LENGTHS.has(lengthWeeks)) return lengthWeeks;
 	return 12;

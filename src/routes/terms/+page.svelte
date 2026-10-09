@@ -86,9 +86,9 @@
 		<div>
 			<h2 class="mb-2 text-lg font-semibold text-text-primary">6. Reviewer Invitations</h2>
 			<p>
-				When you invite reviewers, you represent that you have a legitimate relationship with
-				those individuals and that they would reasonably expect to receive communications from you
-				through the platform.
+				When you invite reviewers, you represent that you have a legitimate relationship with those
+				individuals and that they would reasonably expect to receive communications from you through
+				the platform.
 			</p>
 		</div>
 

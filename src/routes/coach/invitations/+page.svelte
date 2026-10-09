@@ -503,8 +503,7 @@
 										placeholder="Email"
 										onblur={(e) => validateReviewerEmail(e.currentTarget.value, i)}
 										oninput={(e) => {
-											if (reviewerEmailErrors[i])
-												validateReviewerEmail(e.currentTarget.value, i);
+											if (reviewerEmailErrors[i]) validateReviewerEmail(e.currentTarget.value, i);
 										}}
 									/>
 									{#if prefillReviewers.length > 1}
@@ -512,9 +511,7 @@
 											type="button"
 											onclick={() => {
 												prefillReviewers = prefillReviewers.filter((_, idx) => idx !== i);
-												reviewerEmailErrors = reviewerEmailErrors.filter(
-													(_, idx) => idx !== i
-												);
+												reviewerEmailErrors = reviewerEmailErrors.filter((_, idx) => idx !== i);
 											}}
 											class="shrink-0 rounded-lg border border-border-default p-2 text-text-muted transition-colors hover:border-error/30 hover:text-error"
 											aria-label="Remove reviewer"
@@ -533,8 +530,7 @@
 						{#if prefillReviewers.length < 5}
 							<button
 								type="button"
-								onclick={() =>
-									(prefillReviewers = [...prefillReviewers, { name: '', email: '' }])}
+								onclick={() => (prefillReviewers = [...prefillReviewers, { name: '', email: '' }])}
 								class="flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-accent-hover"
 							>
 								<Plus class="h-3.5 w-3.5" /> Add reviewer

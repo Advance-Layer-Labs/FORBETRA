@@ -93,7 +93,10 @@ export async function completeExpiredCycles(): Promise<{
 						...template
 					});
 				} catch (emailError) {
-					console.error(`[journeys:complete] Failed to send email for journey ${journey.id}`, emailError);
+					console.error(
+						`[journeys:complete] Failed to send email for journey ${journey.id}`,
+						emailError
+					);
 				}
 			}
 

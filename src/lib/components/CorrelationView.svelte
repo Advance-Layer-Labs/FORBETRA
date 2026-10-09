@@ -371,8 +371,7 @@
 
 					if (Math.abs(dx) > 0.0001) {
 						const slope = dy / dx;
-						const intercept =
-							reviewerCorrelationLine[0].y - slope * reviewerCorrelationLine[0].x;
+						const intercept = reviewerCorrelationLine[0].y - slope * reviewerCorrelationLine[0].x;
 
 						datasets.push({
 							label: 'Reviewers Correlation',

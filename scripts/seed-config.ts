@@ -158,8 +158,7 @@ export const PERSONAS: PersonaConfig[] = [
 		email: `casey.declining${SEED_DOMAIN}`,
 		pattern: 'declining',
 		goalTitle: 'Build Technical Mentorship Practice',
-		goalDescription:
-			'Develop skills as a technical mentor to grow junior engineers on the team.',
+		goalDescription: 'Develop skills as a technical mentor to grow junior engineers on the team.',
 		focusAreas: [
 			{
 				label: 'Conduct weekly 1:1 mentoring sessions',

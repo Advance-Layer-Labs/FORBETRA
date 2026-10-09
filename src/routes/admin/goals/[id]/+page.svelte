@@ -17,9 +17,7 @@
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 <section class="mx-auto flex max-w-5xl flex-col gap-6 p-6">
 	<header>
-		<a
-			href="/admin/goals"
-			class="text-sm font-medium text-text-tertiary hover:text-text-secondary"
+		<a href="/admin/goals" class="text-sm font-medium text-text-tertiary hover:text-text-secondary"
 			>&larr; Back to Goals</a
 		>
 		<h1 class="mt-1 text-2xl font-bold text-text-primary">{obj.title}</h1>

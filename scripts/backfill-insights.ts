@@ -51,7 +51,9 @@ async function backfillInsights() {
 		);
 
 		const weekNumbers = [
-			...new Set(journey.checkIns.map((checkIn) => weekNumberForDate(journey.startDate, checkIn.submittedAt)))
+			...new Set(
+				journey.checkIns.map((checkIn) => weekNumberForDate(journey.startDate, checkIn.submittedAt))
+			)
 		].sort((a, b) => a - b);
 
 		for (const week of weekNumbers) {
