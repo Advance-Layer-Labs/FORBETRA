@@ -17,7 +17,7 @@
 
 	const navItems = $derived([
 		{ href: '/admin', label: 'Dashboard', icon: 'grid' },
-		...(dev ? [{ href: '/admin/demo', label: 'Demo', icon: 'play' }] : []),
+		{ href: '/admin/demo', label: 'Demo', icon: 'play' },
 		{ href: '/admin/preview', label: 'Preview Flows', icon: 'eye' },
 		{ href: '/admin/users', label: 'Users', icon: 'users' },
 		{ href: '/admin/goals', label: 'Goals & Journeys', icon: 'target' },
