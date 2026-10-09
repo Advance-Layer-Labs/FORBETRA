@@ -300,5 +300,104 @@ export const onboardingContexts: OnboardingContext[] = [
 				}
 			}
 		]
+	},
+	{
+		id: 'sports',
+		title: 'Sports',
+		description: 'These examples are written for soccer.',
+		goals: [
+			{
+				id: 'sports-composure',
+				title: 'Play with more composure on the ball',
+				description:
+					'Keep a clean first touch and choose the next action when pressure arrives, instead of rushing the pass.',
+				contextSummary:
+					'Stay calm when a defender arrives so the first touch sets up a pass, not a panic.',
+				focusAreas: [
+					{
+						label: 'Take a clean first touch',
+						description: 'Receive on the half-turn so the ball is ready for the next action.'
+					},
+					{
+						label: 'Choose before you rush',
+						description:
+							'Pick the pass or the dribble once you feel pressure, instead of playing the first ball you see.'
+					},
+					{
+						label: 'Keep the ball when pressed',
+						description:
+							'Use a touch or a body shape that protects the ball until the next option is clear.'
+					}
+				],
+				reviewerGuidance: {
+					whyItMatters:
+						'People who watch you in matches and training can see whether you stay composed or rush the ball away.',
+					recommendedApproach: 'Invite a few people who see you on the ball in games and sessions.',
+					recommendedRoles: ['Coach', 'Teammate who plays beside you', 'Captain or staff member'],
+					exampleReviewers: ['Head coach', 'Teammate in your line', 'Captain', 'Assistant coach']
+				}
+			},
+			{
+				id: 'sports-scan',
+				title: 'See the game a moment sooner',
+				description:
+					'Scan before the ball arrives and play the pass that is already on, rather than the one that appears after you receive.',
+				contextSummary:
+					'Know the picture before the ball comes so the first decision is already made.',
+				focusAreas: [
+					{
+						label: 'Scan before you receive',
+						description: 'Check shoulders and the space ahead before the pass reaches you.'
+					},
+					{
+						label: 'Play the pass that is on',
+						description:
+							'Choose the option you saw before receiving, instead of waiting to look again.'
+					},
+					{
+						label: 'Notice the next runner',
+						description: 'See the teammate making the run, not only the nearest open player.'
+					}
+				],
+				reviewerGuidance: {
+					whyItMatters:
+						'A coach or teammate can tell whether you are looking early or discovering the picture after the ball arrives.',
+					recommendedApproach:
+						'Invite a few people who watch your scanning in matches and training.',
+					recommendedRoles: ['Coach', 'Teammate who plays beside you', 'Captain or staff member'],
+					exampleReviewers: ['Head coach', 'Teammate in your line', 'Captain', 'Assistant coach']
+				}
+			},
+			{
+				id: 'sports-organize',
+				title: 'Organize the team around you',
+				description:
+					'Use your voice to set the shape, the press, and the next run so teammates know what you see.',
+				contextSummary:
+					'Make the picture shared. Teammates should hear the shape, the press, and the next run from you.',
+				focusAreas: [
+					{
+						label: 'Set the shape',
+						description:
+							'Call the line and the distances so the group holds a shape without guessing.'
+					},
+					{
+						label: 'Start the press',
+						description: 'Name when to step and who is pressing so the group moves together.'
+					},
+					{
+						label: 'Point the next run',
+						description: 'Tell a teammate the run you see before the ball is played.'
+					}
+				],
+				reviewerGuidance: {
+					whyItMatters:
+						'Teammates and staff hear whether your voice makes the next action clear or leaves them guessing.',
+					recommendedApproach: 'Invite a few people who hear you in matches and training.',
+					recommendedRoles: ['Coach', 'Teammate who plays beside you', 'Captain or staff member'],
+					exampleReviewers: ['Head coach', 'Teammate in your line', 'Captain', 'Assistant coach']
+				}
+			}
+		]
 	}
 ];
