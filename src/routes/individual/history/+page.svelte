@@ -21,17 +21,6 @@
 		}
 	};
 
-	const reflectionLabel = (type: string) => {
-		switch (type) {
-			case 'RATING_A':
-				return 'Check-in';
-			case 'RATING_B':
-				return 'Check-in';
-			default:
-				return 'Check-in';
-		}
-	};
-
 	const formatDate = (value: string) =>
 		new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(value));
 
@@ -39,40 +28,18 @@
 		const q = searchQuery.trim().toLowerCase();
 		if (!q) return data.weeks;
 		return data.weeks
-			.map(
-				(week: {
-					weekNumber: number;
-					reflections: Array<{
-						id: string;
-						type: string;
-						effortScore: number | null;
-						performanceScore: number | null;
-						notes: string | null;
-						checkInDate: string;
-						feedbacks: Array<{
-							stakeholderName: string;
-							effortScore: number | null;
-							performanceScore: number | null;
-							comment: string | null;
-							behavioralObservation: string | null;
-							suggestion: string | null;
-						}>;
-					}>;
-				}) => {
-					const matchingReflections = week.reflections.filter((r) => {
-						if (r.notes?.toLowerCase().includes(q)) return true;
-						return r.feedbacks.some(
-							(f) =>
-								f.comment?.toLowerCase().includes(q) ||
-								f.behavioralObservation?.toLowerCase().includes(q) ||
-								f.suggestion?.toLowerCase().includes(q) ||
-								f.stakeholderName.toLowerCase().includes(q)
-						);
-					});
-					if (matchingReflections.length === 0) return null;
-					return { ...week, reflections: matchingReflections };
-				}
-			)
+			.map((week) => {
+				const matchingCheckIns = week.checkIns.filter((r) => r.notes?.toLowerCase().includes(q));
+				const matchingFeedbacks = week.feedbacks.filter(
+					(f) =>
+						f.comment?.toLowerCase().includes(q) ||
+						f.behavioralObservation?.toLowerCase().includes(q) ||
+						f.suggestion?.toLowerCase().includes(q) ||
+						f.reviewerName.toLowerCase().includes(q)
+				);
+				if (matchingCheckIns.length === 0 && matchingFeedbacks.length === 0) return null;
+				return { ...week, checkIns: matchingCheckIns, feedbacks: matchingFeedbacks };
+			})
 			.filter((w): w is NonNullable<typeof w> => w !== null);
 	});
 </script>
@@ -91,7 +58,7 @@
 					<a
 						href="/individual"
 						class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-						>Hub</a
+						>Journeys</a
 					>
 				</li>
 				<li aria-hidden="true" class="text-text-muted">/</li>
@@ -101,7 +68,7 @@
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		<h1 class="text-2xl font-bold text-text-primary">Check-in History</h1>
 		<p class="mt-1 text-sm text-text-tertiary">
-			{data.cycleLabel} &middot; {data.objectiveTitle}
+			{data.cycleLabel} &middot; {data.goalTitle}
 		</p>
 	</div>
 
@@ -114,7 +81,7 @@
 			</p>
 			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			<a
-				href="/individual"
+				href="/individual/today"
 				class="mt-4 inline-block rounded-lg bg-accent px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
 			>
 				Go to Today
@@ -171,7 +138,7 @@
 											Week {week.weekNumber}
 										</h2>
 										<span class="text-xs text-text-muted">
-											{week.reflections.length} check-in{week.reflections.length !== 1 ? 's' : ''}
+											{week.checkIns.length} check-in{week.checkIns.length !== 1 ? 's' : ''}
 										</span>
 									</div>
 									<ChevronDown
@@ -183,16 +150,16 @@
 
 								{#if isExpanded}
 									<div class="mt-3 space-y-4">
-										{#each week.reflections as reflection (reflection.id)}
+										{#each week.checkIns as reflection (reflection.id)}
 											<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
 												<div class="mb-2 flex items-center justify-between">
 													<span
 														class="rounded-full bg-accent-muted px-2.5 py-0.5 text-xs font-semibold text-accent"
 													>
-														{reflectionLabel(reflection.type)}
+														Check-in
 													</span>
 													<span class="text-xs text-text-muted"
-														>{formatDate(reflection.checkInDate)}</span
+														>{formatDate(reflection.submittedAt)}</span
 													>
 												</div>
 
@@ -232,64 +199,65 @@
 														{reflection.notes}
 													</p>
 												{/if}
-
-												{#if reflection.feedbacks.length > 0}
-													<div class="mt-3 border-t border-border-default pt-3">
-														<p
-															class="mb-2 text-xs font-semibold tracking-wider text-text-muted uppercase"
-														>
-															Reviewer Feedback
-														</p>
-														<div class="space-y-2">
-															{#each reflection.feedbacks as feedback (feedback.stakeholderName)}
-																<div
-																	class="rounded-lg border border-border-default bg-surface-raised px-3 py-2"
-																>
-																	<div class="flex items-center justify-between">
-																		<span class="text-xs font-semibold text-text-secondary"
-																			>{feedback.stakeholderName}</span
-																		>
-																		<div class="flex gap-3">
-																			{#if feedback.effortScore !== null}
-																				<span class="text-xs text-text-tertiary"
-																					>E: <span class="font-bold">{feedback.effortScore}</span
-																					></span
-																				>
-																			{/if}
-																			{#if feedback.performanceScore !== null}
-																				<span class="text-xs text-text-tertiary"
-																					>P: <span class="font-bold"
-																						>{feedback.performanceScore}</span
-																					></span
-																				>
-																			{/if}
-																		</div>
-																	</div>
-																	{#if feedback.comment}
-																		<p class="mt-1 text-xs text-text-secondary">
-																			{feedback.comment}
-																		</p>
-																	{/if}
-																	{#if feedback.behavioralObservation}
-																		<p class="mt-1 text-xs text-text-secondary">
-																			<span class="font-medium text-text-tertiary">Observed:</span>
-																			{feedback.behavioralObservation}
-																		</p>
-																	{/if}
-																	{#if feedback.suggestion}
-																		<p class="mt-1 text-xs text-text-secondary">
-																			<span class="font-medium text-text-tertiary">Suggestion:</span
-																			>
-																			{feedback.suggestion}
-																		</p>
-																	{/if}
-																</div>
-															{/each}
-														</div>
-													</div>
-												{/if}
 											</div>
 										{/each}
+
+										{#if week.feedbacks.length > 0}
+											<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
+												<div>
+													<p
+														class="mb-2 text-xs font-semibold tracking-wider text-text-muted uppercase"
+													>
+														Reviewer Feedback
+													</p>
+													<div class="space-y-2">
+														{#each week.feedbacks as feedback (feedback.id)}
+															<div
+																class="rounded-lg border border-border-default bg-surface-raised px-3 py-2"
+															>
+																<div class="flex items-center justify-between">
+																	<span class="text-xs font-semibold text-text-secondary"
+																		>{feedback.reviewerName}</span
+																	>
+																	<div class="flex gap-3">
+																		{#if feedback.effortScore !== null}
+																			<span class="text-xs text-text-tertiary"
+																				>E: <span class="font-bold">{feedback.effortScore}</span
+																				></span
+																			>
+																		{/if}
+																		{#if feedback.performanceScore !== null}
+																			<span class="text-xs text-text-tertiary"
+																				>P: <span class="font-bold"
+																					>{feedback.performanceScore}</span
+																				></span
+																			>
+																		{/if}
+																	</div>
+																</div>
+																{#if feedback.comment}
+																	<p class="mt-1 text-xs text-text-secondary">
+																		{feedback.comment}
+																	</p>
+																{/if}
+																{#if feedback.behavioralObservation}
+																	<p class="mt-1 text-xs text-text-secondary">
+																		<span class="font-medium text-text-tertiary">Observed:</span>
+																		{feedback.behavioralObservation}
+																	</p>
+																{/if}
+																{#if feedback.suggestion}
+																	<p class="mt-1 text-xs text-text-secondary">
+																		<span class="font-medium text-text-tertiary">Suggestion:</span>
+																		{feedback.suggestion}
+																	</p>
+																{/if}
+															</div>
+														{/each}
+													</div>
+												</div>
+											</div>
+										{/if}
 									</div>
 								{/if}
 							</div>

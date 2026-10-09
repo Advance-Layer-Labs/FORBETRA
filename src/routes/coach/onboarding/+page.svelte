@@ -2,7 +2,16 @@
 	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { Compass, Mail, Smartphone, Users, BarChart3, MessageSquare } from 'lucide-svelte';
+	import {
+		Compass,
+		Mail,
+		Smartphone,
+		Users,
+		BarChart3,
+		MessageSquare,
+		Copy,
+		Check
+	} from 'lucide-svelte';
 
 	const { data, form }: { data: PageData; form: ActionData | null } = $props();
 
@@ -23,22 +32,19 @@
 	}
 
 	// Pre-fill state
-	type PrefillStakeholder = { id: number; name: string; email: string };
+	type PrefillReviewer = { id: number; name: string; email: string };
 	let showPrefill = $state(false);
-	let prefillObjectiveTitle = $state('');
-	let nextStakeholderId = $state(1);
-	let prefillStakeholders = $state<PrefillStakeholder[]>([{ id: 0, name: '', email: '' }]);
+	let prefillGoalTitle = $state('');
+	let nextReviewerId = $state(1);
+	let prefillReviewers = $state<PrefillReviewer[]>([{ id: 0, name: '', email: '' }]);
 
-	function addPrefillStakeholder() {
-		if (prefillStakeholders.length < 3) {
-			prefillStakeholders = [
-				...prefillStakeholders,
-				{ id: nextStakeholderId++, name: '', email: '' }
-			];
+	function addPrefillReviewer() {
+		if (prefillReviewers.length < 3) {
+			prefillReviewers = [...prefillReviewers, { id: nextReviewerId++, name: '', email: '' }];
 		}
 	}
-	function removePrefillStakeholder(index: number) {
-		prefillStakeholders = prefillStakeholders.filter((_, i) => i !== index);
+	function removePrefillReviewer(index: number) {
+		prefillReviewers = prefillReviewers.filter((_, i) => i !== index);
 	}
 
 	// Form state for invite step
@@ -49,16 +55,22 @@
 		"I'd like to invite you to join Forbetra so I can support your development journey. You'll set your own goal, track weekly progress, and get feedback from the people around you — and I'll be here to guide you through it."
 	);
 	let isSubmitting = $state(false);
+	let copiedInviteUrl = $state(false);
+
+	async function copyInviteUrl(url: string) {
+		await navigator.clipboard.writeText(url);
+		copiedInviteUrl = true;
+	}
 
 	const stepLabels = ['Welcome', 'Invite Client'];
 
-	// Handle successful invite creation — redirect to coach hub
+	// Leave onboarding once the invite email went out. If it failed, stay so the link can be copied.
 	$effect(() => {
-		if (form?.success) {
+		if (form?.skipped) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			goto('/coach');
 		}
-		if (form?.skipped) {
+		if (form?.success && !form.emailFailed) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			goto('/coach');
 		}
@@ -216,7 +228,7 @@
 					reviewers, and you'll see their data on your dashboard within minutes.
 				</p>
 				<p class="mx-auto max-w-md text-xs text-text-tertiary">
-					You can optionally pre-fill their goal and stakeholders below.
+					You can optionally pre-fill their goal and reviewers below.
 				</p>
 			</div>
 
@@ -225,6 +237,39 @@
 					class="mx-auto max-w-md rounded-xl border border-error/50 bg-error-muted p-4 text-sm text-error"
 				>
 					<p class="font-medium">{form.error}</p>
+				</div>
+			{/if}
+
+			{#if form?.success && form.emailFailed}
+				<div
+					class="mx-auto max-w-md space-y-3 rounded-xl border border-warning/40 bg-warning-muted p-4 text-left text-sm text-warning"
+				>
+					<p class="font-semibold">Invitation created, but the email could not be sent.</p>
+					<p>Share this link with your client directly.</p>
+					{#if form.inviteUrl}
+						<div
+							class="flex items-center gap-2 rounded-lg border border-warning/30 bg-surface-raised px-3 py-2"
+						>
+							<p class="flex-1 font-mono text-xs break-all text-text-primary">{form.inviteUrl}</p>
+							<button
+								type="button"
+								onclick={() => copyInviteUrl(form?.inviteUrl ?? '')}
+								class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning transition-all hover:bg-warning/20"
+								aria-label="Copy invite link"
+							>
+								{#if copiedInviteUrl}
+									<Check class="h-4 w-4" />
+								{:else}
+									<Copy class="h-4 w-4" />
+								{/if}
+							</button>
+						</div>
+					{/if}
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a href="/coach" class="inline-block text-sm font-semibold text-text-primary underline">
+						Continue to your dashboard
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				</div>
 			{/if}
 
@@ -310,7 +355,7 @@
 						<div>
 							<p class="text-sm font-semibold text-text-primary">Pre-fill client's setup</p>
 							<p class="text-xs text-text-tertiary">
-								Save them time by pre-filling their goal and stakeholders
+								Save them time by pre-filling their goal and reviewers
 							</p>
 						</div>
 						<button
@@ -333,22 +378,22 @@
 					{#if showPrefill}
 						<div class="mt-4 space-y-4">
 							<div>
-								<label for="prefillObjectiveTitle" class="text-xs font-semibold text-text-secondary"
+								<label for="prefillGoalTitle" class="text-xs font-semibold text-text-secondary"
 									>Goal title</label
 								>
 								<input
-									id="prefillObjectiveTitle"
+									id="prefillGoalTitle"
 									type="text"
-									name="prefillObjectiveTitle"
-									bind:value={prefillObjectiveTitle}
+									name="prefillGoalTitle"
+									bind:value={prefillGoalTitle}
 									placeholder="e.g. Improve executive presence"
 									class="mt-1 w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-1 focus:ring-accent/30 focus:outline-none"
 								/>
 							</div>
 
 							<div>
-								<p class="text-xs font-semibold text-text-secondary">Stakeholders</p>
-								{#each prefillStakeholders as sh, i (sh.id)}
+								<p class="text-xs font-semibold text-text-secondary">Reviewers</p>
+								{#each prefillReviewers as sh, i (sh.id)}
 									<div class="mt-1.5 flex items-center gap-2">
 										<input
 											type="text"
@@ -362,10 +407,10 @@
 											placeholder="Email"
 											class="flex-1 rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
 										/>
-										{#if prefillStakeholders.length > 1}
+										{#if prefillReviewers.length > 1}
 											<button
 												type="button"
-												onclick={() => removePrefillStakeholder(i)}
+												onclick={() => removePrefillReviewer(i)}
 												class="text-xs text-text-muted hover:text-error"
 											>
 												&times;
@@ -373,10 +418,10 @@
 										{/if}
 									</div>
 								{/each}
-								{#if prefillStakeholders.length < 3}
+								{#if prefillReviewers.length < 3}
 									<button
 										type="button"
-										onclick={addPrefillStakeholder}
+										onclick={addPrefillReviewer}
 										class="mt-1.5 text-xs font-medium text-accent hover:underline"
 									>
 										+ Add reviewer
@@ -387,9 +432,9 @@
 							<!-- Hidden serialized fields -->
 							<input
 								type="hidden"
-								name="prefillStakeholders"
+								name="prefillReviewers"
 								value={JSON.stringify(
-									prefillStakeholders.filter((s) => s.name.trim() && s.email.trim())
+									prefillReviewers.filter((s) => s.name.trim() && s.email.trim())
 								)}
 							/>
 						</div>

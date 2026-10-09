@@ -86,35 +86,41 @@ export const actions: Actions = {
 		const message = String(formData.get('message') ?? '').trim();
 
 		// Build optional pre-fill payload
-		const objectiveTitle = String(formData.get('objectiveTitle') ?? '').trim();
-		const objectiveDescription = String(formData.get('objectiveDescription') ?? '').trim();
+		const goalTitle = String(formData.get('goalTitle') ?? '').trim();
+		const goalDescription = String(formData.get('goalDescription') ?? '').trim();
 
-		const subgoals: { label: string; description?: string }[] = [];
+		const focusAreas: { label: string; description?: string }[] = [];
 		for (let i = 1; i <= 5; i++) {
-			const label = String(formData.get(`subgoalLabel${i}`) ?? '').trim();
+			const label = String(formData.get(`focusAreaLabel${i}`) ?? '').trim();
 			if (label) {
-				const desc = String(formData.get(`subgoalDescription${i}`) ?? '').trim();
-				subgoals.push({ label, ...(desc ? { description: desc } : {}) });
+				const desc = String(formData.get(`focusAreaDescription${i}`) ?? '').trim();
+				focusAreas.push({ label, ...(desc ? { description: desc } : {}) });
 			}
 		}
 
-		const stakeholders: { name: string; email: string }[] = [];
+		const reviewers: { name: string; email: string }[] = [];
 		for (let i = 1; i <= 5; i++) {
-			const sName = String(formData.get(`stakeholderName${i}`) ?? '').trim();
-			const sEmail = String(formData.get(`stakeholderEmail${i}`) ?? '').trim();
+			const sName = String(formData.get(`reviewerName${i}`) ?? '').trim();
+			const sEmail = String(formData.get(`reviewerEmail${i}`) ?? '').trim();
 			if (sName && sEmail) {
-				stakeholders.push({ name: sName, email: sEmail });
+				reviewers.push({ name: sName, email: sEmail });
 			}
 		}
 
 		const payload =
-			objectiveTitle || subgoals.length > 0 || stakeholders.length > 0
+			goalTitle || focusAreas.length > 0 || reviewers.length > 0
 				? {
-						...(objectiveTitle ? { objectiveTitle } : {}),
-						...(objectiveDescription ? { objectiveDescription } : {}),
-						...(subgoals.length > 0 ? { subgoals } : {}),
-						...(stakeholders.length > 0
-							? { stakeholders: stakeholders.map((s) => ({ ...s, relationship: '' })) }
+						...(goalTitle
+							? {
+									goal: {
+										title: goalTitle,
+										...(goalDescription ? { description: goalDescription } : {})
+									}
+								}
+							: {}),
+						...(focusAreas.length > 0 ? { focusAreas } : {}),
+						...(reviewers.length > 0
+							? { reviewers: reviewers.map((s) => ({ ...s, relationship: '' })) }
 							: {})
 					}
 				: undefined;
@@ -248,18 +254,13 @@ export const actions: Actions = {
 				console.error('[email:error] Failed to send coach invitation email', error);
 			}
 
-			// Send invitation SMS
-			let smsSent = false;
-			if (invite.phone) {
-				await trySendSms(
-					invite.phone,
-					smsTemplates.coachInvitation({
-						coachName: dbUser.name || undefined,
-						inviteUrl
-					})
-				);
-				smsSent = true;
-			}
+			const smsSent = await trySendSms(
+				invite.phone,
+				smsTemplates.coachInvitation({
+					coachName: dbUser.name || undefined,
+					inviteUrl
+				})
+			);
 
 			return {
 				success: true,

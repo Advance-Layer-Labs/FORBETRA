@@ -1,36 +1,50 @@
 import { redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
-import { getActiveObjectiveWithCycle } from '$lib/server/individualContext';
+import { getActiveGoalWithJourney } from '$lib/server/individualContext';
+import { currentWeekNumber } from '$lib/server/domain';
+import { withCheckInWeeks } from '$lib/server/hubMetrics';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
-	const result = await getActiveObjectiveWithCycle(dbUser.id);
+	const result = await getActiveGoalWithJourney(dbUser.id);
 
-	if (!result) {
+	if (!result || !result.journey) {
 		throw redirect(303, '/onboarding');
 	}
 
-	const { objective, cycle, currentWeek } = result;
+	const { goal, journey } = result;
+	const timeZone = dbUser.timezone;
+	const currentWeek =
+		result.currentWeek ?? currentWeekNumber(journey.startDate, new Date(), timeZone);
 
-	// If objective exists with cycles and subgoals but no initial rating (week 0), redirect to initial-ratings
-	// Skip this check if there are no subgoals — initial ratings require at least one subgoal
-	if (cycle && objective.subgoals.length > 0) {
-		const hasInitialRating = await prisma.reflection.findFirst({
-			where: { userId: dbUser.id, cycleId: cycle.id, weekNumber: 0 }
-		});
-		if (!hasInitialRating) {
-			throw redirect(303, '/onboarding/initial-ratings');
-		}
-	}
+	const [rawCheckIns, feedback] = await Promise.all([
+		prisma.checkIn.findMany({
+			where: { journeyId: journey.id },
+			orderBy: { submittedAt: 'asc' }
+		}),
+		prisma.feedback.findMany({
+			where: { journeyId: journey.id },
+			orderBy: { submittedAt: 'asc' },
+			include: {
+				reviewer: {
+					select: { id: true, name: true, relationship: true, attribution: true, cadence: true }
+				}
+			}
+		})
+	]);
+
+	const checkIns = withCheckInWeeks(journey.startDate, rawCheckIns, timeZone);
 
 	return {
 		dbUserId: dbUser.id,
 		dbUserName: dbUser.name,
-		objective,
-		cycle,
-		currentWeek
+		goal,
+		journey,
+		currentWeek,
+		checkIns,
+		feedback
 	};
 };

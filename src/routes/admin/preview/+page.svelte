@@ -4,17 +4,15 @@
 
 	const { data }: { data: PageData } = $props();
 
-	type Lens = 'individual' | 'stakeholder' | 'coach';
+	type Lens = 'individual' | 'reviewer' | 'coach';
 	let activeLens = $state<Lens>('individual');
 
 	let selectedIndividualId = $state(data.individuals[0]?.id ?? '');
 	let selectedCoachId = $state(data.coaches[0]?.id ?? '');
-	let selectedStakeholderId = $state(data.stakeholders[0]?.id ?? '');
+	let selectedReviewerId = $state(data.reviewers[0]?.id ?? '');
 
 	const selectedIndividual = $derived(data.individuals.find((u) => u.id === selectedIndividualId));
-	const selectedStakeholder = $derived(
-		data.stakeholders.find((s) => s.id === selectedStakeholderId)
-	);
+	const selectedReviewer = $derived(data.reviewers.find((s) => s.id === selectedReviewerId));
 
 	const impersonateAndOpen = async (userId: string, path: string) => {
 		const res = await fetch('/api/admin/impersonate', {
@@ -33,11 +31,11 @@
 		{
 			id: 'individual',
 			label: 'Individual',
-			description: 'The person working on their development objective'
+			description: 'The person working on their development goal'
 		},
 		{
-			id: 'stakeholder',
-			label: 'Stakeholder',
+			id: 'reviewer',
+			label: 'Reviewer',
 			description: "Someone rating an individual's effort and performance"
 		},
 		{
@@ -58,26 +56,13 @@
 	const individualFlows = $derived<FlowCard[]>([
 		{
 			label: 'Onboarding',
-			description: 'Objective setup, focus areas, journey config, reviewer invites',
+			description: 'Name a goal and start a 12-week journey',
 			action: () => impersonateAndOpen(selectedIndividualId, '/onboarding?preview=true')
 		},
 		{
-			label: 'Initial Ratings',
-			description: 'Baseline effort and performance scores',
-			action: () =>
-				impersonateAndOpen(selectedIndividualId, '/onboarding/initial-ratings?preview=true')
-		},
-		{
-			label: 'Check-in (Effort)',
-			description: 'Mid-week effort rating',
-			action: () =>
-				impersonateAndOpen(selectedIndividualId, '/individual/checkin?type=RATING_A&preview=true')
-		},
-		{
-			label: 'Check-in (Performance)',
-			description: 'End-of-week performance rating',
-			action: () =>
-				impersonateAndOpen(selectedIndividualId, '/individual/checkin?type=RATING_B&preview=true')
+			label: 'Check-in',
+			description: 'One effort score and one performance score for the goal',
+			action: () => impersonateAndOpen(selectedIndividualId, '/individual/checkin?preview=true')
 		},
 		{
 			label: 'Individual Hub',
@@ -91,22 +76,11 @@
 		}
 	]);
 
-	const stakeholderFlows = $derived<FlowCard[]>([
+	const reviewerFlows = $derived<FlowCard[]>([
 		{
-			label: 'Feedback Form (impersonate)',
+			label: 'Feedback Form',
 			description:
-				'Impersonate this stakeholder and preview the feedback form. Tokens are hashed at rest so direct-URL preview is not available.',
-			action: () => {
-				if (selectedStakeholder?.id) {
-					impersonateAndOpen(selectedStakeholder.id, '/stakeholder/feedback');
-				}
-			},
-			disabled: !selectedStakeholder?.hasActiveToken,
-			disabledReason: "No active feedback token — generate one from the individual's journey first"
-		},
-		{
-			label: 'Feedback Form (Demo)',
-			description: 'Preview the feedback form with sample data',
+				'Open the live reviewer form with sample data. Reviewers use a private link, not an account, so this preview is not impersonation.',
 			action: () => window.open('/stakeholder/feedback/preview?preview=true', '_blank')
 		}
 	]);
@@ -156,7 +130,7 @@
 				class="rounded-xl border p-4 text-left transition-all {activeLens === lens.id
 					? lens.id === 'individual'
 						? 'border-accent bg-accent-muted'
-						: lens.id === 'stakeholder'
+						: lens.id === 'reviewer'
 							? 'border-success bg-success-muted'
 							: 'border-accent bg-accent-muted'
 					: 'border-border-default bg-surface-raised hover:border-border-strong'}"
@@ -165,7 +139,7 @@
 					class="text-sm font-bold {activeLens === lens.id
 						? lens.id === 'individual'
 							? 'text-accent'
-							: lens.id === 'stakeholder'
+							: lens.id === 'reviewer'
 								? 'text-success'
 								: 'text-accent'
 						: 'text-text-primary'}"
@@ -196,9 +170,9 @@
 				</label>
 				{#if selectedIndividual}
 					<div class="text-xs text-text-tertiary">
-						{#if selectedIndividual.objectiveTitle}
+						{#if selectedIndividual.goalTitle}
 							<span class="rounded bg-accent-muted px-2 py-0.5 font-medium text-accent">
-								{selectedIndividual.objectiveTitle}
+								{selectedIndividual.goalTitle}
 							</span>
 							{#if selectedIndividual.cycleStatus}
 								<span class="ml-1 rounded bg-surface-subtle px-2 py-0.5 font-medium uppercase">
@@ -206,7 +180,7 @@
 								</span>
 							{/if}
 						{:else}
-							<span class="text-text-tertiary italic">No objective yet</span>
+							<span class="text-text-tertiary italic">No goal yet</span>
 						{/if}
 					</div>
 				{/if}
@@ -229,27 +203,27 @@
 		</div>
 	{/if}
 
-	<!-- Stakeholder Lens -->
-	{#if activeLens === 'stakeholder'}
+	<!-- Reviewer Lens -->
+	{#if activeLens === 'reviewer'}
 		<div class="rounded-xl border border-border-default bg-surface-raised p-5">
 			<div class="mb-4 flex flex-wrap items-end gap-3">
 				<label class="flex flex-col gap-1 text-sm">
-					<span class="font-semibold text-success">Preview as Stakeholder</span>
+					<span class="font-semibold text-success">Preview as Reviewer</span>
 					<select
-						bind:value={selectedStakeholderId}
+						bind:value={selectedReviewerId}
 						class="rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 					>
-						{#each data.stakeholders as stakeholder (stakeholder.id)}
-							<option value={stakeholder.id}>
-								{stakeholder.name} — rates {stakeholder.individualName}
-								{stakeholder.relationship ? `(${stakeholder.relationship})` : ''}
+						{#each data.reviewers as reviewer (reviewer.id)}
+							<option value={reviewer.id}>
+								{reviewer.name} — rates {reviewer.individualName}
+								{reviewer.relationship ? `(${reviewer.relationship})` : ''}
 							</option>
 						{/each}
 					</select>
 				</label>
-				{#if selectedStakeholder}
+				{#if selectedReviewer}
 					<div class="text-xs">
-						{#if selectedStakeholder.hasActiveToken}
+						{#if selectedReviewer.hasActiveToken}
 							<span class="rounded bg-success-muted px-2 py-0.5 font-medium text-success">
 								Active token
 							</span>
@@ -262,15 +236,15 @@
 				{/if}
 			</div>
 
-			{#if data.stakeholders.length === 0}
+			{#if data.reviewers.length === 0}
 				<div
 					class="rounded-lg border border-dashed border-border-strong bg-surface-raised p-6 text-center text-sm text-text-tertiary"
 				>
-					No stakeholders in the system yet. Create one through an individual's onboarding flow.
+					No reviewers in the system yet. Create one through an individual's onboarding flow.
 				</div>
 			{:else}
 				<div class="grid gap-2 sm:grid-cols-2">
-					{#each stakeholderFlows as flow (flow.label)}
+					{#each reviewerFlows as flow (flow.label)}
 						<button
 							onclick={flow.action}
 							disabled={flow.disabled}
@@ -339,7 +313,7 @@
 		class="rounded-lg border border-border-default bg-surface-raised px-4 py-3 text-xs text-text-tertiary"
 	>
 		All previews open in a new browser window. Impersonation is automatically set for individual and
-		coach lenses. Stakeholder previews use token-based access (no impersonation needed). Your admin
+		coach lenses. Reviewer previews use token-based access (no impersonation needed). Your admin
 		session stays active here.
 	</div>
 </section>

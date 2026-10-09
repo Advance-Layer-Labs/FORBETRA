@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,7 +10,6 @@ datasource db {
 enum UserRole {
   INDIVIDUAL
   COACH
-  STAKEHOLDER
   ADMIN
   ORG_ADMIN
 }
@@ -26,22 +19,21 @@ enum OrgRole {
   ORG_ADMIN
 }
 
-enum CycleStatus {
+enum JourneyStatus {
   PLANNED
   ACTIVE
   PAUSED
   COMPLETED
 }
 
-enum ReflectionType {
-  RATING_A
-  RATING_B
+enum ReviewerCadence {
+  WEEKLY
+  BIWEEKLY
 }
 
-enum SubgoalMetric {
-  EFFORT
-  PROGRESS
-  BOTH
+enum ReviewerAttribution {
+  REVIEWER
+  COACH
 }
 
 enum TokenType {
@@ -51,249 +43,12 @@ enum TokenType {
   COACH_INVITE
 }
 
-model User {
-  id        String   @id @default(cuid())
-  clerkUserId String? @unique
-  email     String   @unique
-  name      String?
-  role      UserRole @default(INDIVIDUAL)
-  phone     String?
-  timezone  String?
-  reminderDays     String? // 'wednesday_friday' or 'tuesday_thursday'
-  notificationTime String? // e.g. '09:00', '17:00'
-  deliveryMethod   String? // 'email', 'sms', or 'both'
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  coachOnboardingCompletedAt DateTime?
-
-  objectives           Objective[]
-  cycles               Cycle[]
-  reflections          Reflection[]
-  stakeholders         Stakeholder[]        @relation("IndividualStakeholders")
-  stakeholdersInvited  Stakeholder[]        @relation("StakeholderInviter")
-  coachNotesAuthored   CoachNote[]          @relation("CoachNotesAuthored")
-  coachNotesReceived   CoachNote[]          @relation("CoachNotesReceived")
-  tokens               Token[]              @relation("UserTokens")
-  coachClientsManaged  CoachClient[]        @relation("CoachClientsCoach")
-  coachClientsOwned    CoachClient[]        @relation("CoachClientsIndividual")
-  coachInvitationsSent CoachInvite[]        @relation("CoachInvites")
-  coachInvitationsLinked CoachInvite[]      @relation("CoachInviteIndividual")
-  insights             Insight[]
-  organizationMemberships OrganizationMember[]
-  objectiveChanges     ObjectiveChange[]
-}
-
-model Objective {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  startDate   DateTime @default(now())
-  endDate     DateTime?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  subgoals    Subgoal[]
-  cycles      Cycle[]
-  stakeholders Stakeholder[]
-
-  @@index([userId])
-  changes ObjectiveChange[]
-}
-
-model ObjectiveChange {
-  id             String    @id @default(cuid())
-  objectiveId    String
-  userId         String
-  previousTitle  String
-  newTitle       String
-  previousDesc   String?
-  newDesc        String?
-  reason         String?
-  createdAt      DateTime  @default(now())
-
-  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([objectiveId])
-  @@index([userId])
-}
-
-model Cycle {
-  id                  String      @id @default(cuid())
-  userId              String
-  objectiveId         String
-  label               String?
-  startDate           DateTime
-  endDate             DateTime?
-  status              CycleStatus @default(PLANNED)
-  summary             String?
-  checkInFrequency    String      @default("3x")    // "3x" | "2x" | "1x"
-  stakeholderCadence       String      @default("weekly")
-  stakeholderFeedbackTime  String?     // e.g. '09:00', '17:00'
-  autoThrottle             Boolean     @default(true)
-  revealScores        Boolean     @default(false)
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  reflections Reflection[]
-  coachNotes  CoachNote[]
-  insights    Insight[]
-
-  @@index([userId])
-  @@index([objectiveId])
-  @@index([status])
-}
-
-model Subgoal {
-  id          String        @id @default(cuid())
-  objectiveId String
-  label       String
-  description String?
-  metricType  SubgoalMetric @default(BOTH)
-  order       Int?
-  active      Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  objective  Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  reflections Reflection[]
-
-  @@index([objectiveId])
-}
-
-model Reflection {
-  id             String         @id @default(cuid())
-  cycleId        String
-  userId         String
-  subgoalId      String
-  reflectionType ReflectionType
-  weekNumber     Int
-  checkInDate    DateTime       @default(now())
-  effortScore    Int?
-  performanceScore  Int?
-  notes          String?
-  submittedAt    DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  cycle     Cycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subgoal   Subgoal  @relation(fields: [subgoalId], references: [id], onDelete: Cascade)
-  feedbacks Feedback[]
-  tokens    Token[]
-
-  @@index([cycleId])
-  @@index([userId])
-  @@index([subgoalId])
-  @@unique([cycleId, weekNumber, reflectionType, subgoalId])
-}
-
-model Feedback {
-  id                    String    @id @default(cuid())
-  reflectionId          String
-  stakeholderId         String
-  effortScore           Int?
-  performanceScore      Int?
-  comment               String?
-  behavioralObservation String?   // Specific behavior observed (e.g., "showed active listening in team meetings")
-  suggestion            String?   // Actionable suggestion for improvement
-  submittedAt           DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  reflection Reflection  @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
-  stakeholder Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
-
-  @@unique([stakeholderId, reflectionId])
-  @@index([reflectionId])
-}
-
-model Stakeholder {
-  id            String    @id @default(cuid())
-  individualId  String
-  objectiveId   String?
-  invitedById   String?
-  name          String
-  email         String
-  phone         String?
-  relationship  String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  individual User      @relation("IndividualStakeholders", fields: [individualId], references: [id], onDelete: Cascade)
-  objective  Objective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
-  invitedBy  User?     @relation("StakeholderInviter", fields: [invitedById], references: [id], onDelete: SetNull)
-  feedbacks  Feedback[]
-  tokens     Token[]
-
-  @@unique([individualId, email])
-  @@index([objectiveId])
-}
-
-model CoachNote {
-  id            String   @id @default(cuid())
-  coachId       String
-  individualId  String
-  cycleId       String?
-  weekNumber    Int?
-  content       String
-  createdAt     DateTime @default(now())
-
-  coach      User   @relation("CoachNotesAuthored", fields: [coachId], references: [id], onDelete: Cascade)
-  individual User   @relation("CoachNotesReceived", fields: [individualId], references: [id], onDelete: Cascade)
-  cycle      Cycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
-
-  @@index([coachId])
-  @@index([individualId])
-  @@index([cycleId])
-}
-
-model Token {
-  id            String     @id @default(cuid())
-  type          TokenType
-  tokenHash     String     @unique
-  userId        String?
-  stakeholderId String?
-  reflectionId  String?
-  expiresAt     DateTime
-  usedAt        DateTime?
-  metadata      Json?
-  createdAt     DateTime   @default(now())
-
-  user        User?        @relation("UserTokens", fields: [userId], references: [id], onDelete: Cascade)
-  stakeholder Stakeholder? @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
-  reflection  Reflection?  @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
-
-  @@index([expiresAt])
-  @@index([userId])
-  @@index([stakeholderId])
-  @@index([reflectionId])
-}
-
-model CoachClient {
-  id            String   @id @default(cuid())
-  coachId       String
-  individualId  String
-  createdAt     DateTime @default(now())
-  archivedAt    DateTime?
-
-  coach      User @relation("CoachClientsCoach", fields: [coachId], references: [id], onDelete: Cascade)
-  individual User @relation("CoachClientsIndividual", fields: [individualId], references: [id], onDelete: Cascade)
-
-  @@unique([coachId, individualId])
-  @@index([coachId])
-  @@index([individualId])
-}
-
 enum InsightType {
   CHECK_IN
   WEEKLY_SYNTHESIS
   COACH_PREP
   COACH_ALERT
-  CYCLE_REPORT
+  JOURNEY_REPORT
 }
 
 enum InsightStatus {
@@ -303,45 +58,281 @@ enum InsightStatus {
   FAILED
 }
 
-model Insight {
+model User {
+  id                         String    @id @default(cuid())
+  clerkUserId                String?   @unique
+  email                      String    @unique
+  name                       String?
+  role                       UserRole  @default(INDIVIDUAL)
+  phone                      String?
+  timezone                   String?
+  notificationTime           String?
+  deliveryMethod             String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  coachOnboardingCompletedAt DateTime?
+  lastSeenAt                 DateTime?
+  focusAreaPromptAt          DateTime?
+
+  goals                    Goal[]
+  journeys                 Journey[]
+  checkIns                 CheckIn[]
+  reviewers                Reviewer[]           @relation("IndividualReviewers")
+  reviewerAccount          Reviewer[]           @relation("ReviewerAccount")
+  reviewersInvited         Reviewer[]           @relation("ReviewerInviter")
+  coachNotesAuthored       CoachNote[]          @relation("CoachNotesAuthored")
+  coachNotesReceived       CoachNote[]          @relation("CoachNotesReceived")
+  tokens                   Token[]              @relation("UserTokens")
+  coachClientsManaged      CoachClient[]        @relation("CoachClientsCoach")
+  coachClientsOwned        CoachClient[]        @relation("CoachClientsIndividual")
+  coachInvitationsSent     CoachInvite[]        @relation("CoachInvites")
+  coachInvitationsLinked   CoachInvite[]        @relation("CoachInviteIndividual")
+  insights                 Insight[]
+  organizationMemberships  OrganizationMember[]
+  goalChanges              GoalChange[]
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  focusAreas FocusArea[]
+  journeys   Journey[]
+  reviewers  Reviewer[]
+  changes    GoalChange[]
+
+  @@index([userId])
+}
+
+model GoalChange {
+  id            String   @id @default(cuid())
+  goalId        String
+  userId        String
+  previousTitle String
+  newTitle      String
+  previousDesc  String?
+  newDesc       String?
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([userId])
+}
+
+model FocusArea {
+  id          String   @id @default(cuid())
+  goalId      String
+  label       String
+  description String?
+  order       Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+}
+
+model Journey {
   id          String        @id @default(cuid())
   userId      String
-  cycleId     String?
-  weekNumber  Int?
-  type        InsightType
-  status      InsightStatus @default(PENDING)
-  content     String?
-  promptHash  String?
-  modelId     String?
-  thumbs      Int?
-  metadata    Json?
+  goalId      String
+  label       String?
+  startDate   DateTime
+  endDate     DateTime?
+  lengthWeeks Int           @default(12)
+  status      JourneyStatus @default(PLANNED)
+  summary     String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cycle Cycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal       Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  checkIns   CheckIn[]
+  feedback   Feedback[]
+  coachNotes CoachNote[]
+  insights   Insight[]
+  tokens     Token[]
 
-  @@unique([userId, cycleId, weekNumber, type])
   @@index([userId])
-  @@index([cycleId])
+  @@index([goalId])
+  @@index([status])
+}
+
+model CheckIn {
+  id               String   @id @default(cuid())
+  journeyId        String
+  userId           String
+  effortScore      Int
+  performanceScore Int
+  notes            String?
+  submittedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  journey Journey @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([journeyId])
+  @@index([userId])
+  @@index([submittedAt])
+}
+
+model Reviewer {
+  id            String               @id @default(cuid())
+  individualId  String
+  goalId        String?
+  userId        String?
+  invitedById   String?
+  name          String
+  email         String
+  phone         String?
+  relationship  String?
+  cadence       ReviewerCadence      @default(WEEKLY)
+  attribution   ReviewerAttribution  @default(REVIEWER)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  individual User      @relation("IndividualReviewers", fields: [individualId], references: [id], onDelete: Cascade)
+  goal       Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  account    User?     @relation("ReviewerAccount", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy  User?     @relation("ReviewerInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  feedback   Feedback[]
+  tokens     Token[]
+
+  @@unique([individualId, email])
+  @@index([goalId])
+  @@index([userId])
+}
+
+model Feedback {
+  id                    String   @id @default(cuid())
+  journeyId             String
+  reviewerId            String
+  weekNumber            Int
+  effortScore           Int?
+  performanceScore      Int?
+  comment               String?
+  behavioralObservation String?
+  suggestion            String?
+  submittedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  journey  Journey  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  reviewer Reviewer @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, journeyId, weekNumber])
+  @@index([journeyId])
+  @@index([reviewerId])
+}
+
+model CoachNote {
+  id           String   @id @default(cuid())
+  coachId      String
+  individualId String
+  journeyId    String?
+  weekNumber   Int?
+  content      String
+  createdAt    DateTime @default(now())
+
+  coach      User     @relation("CoachNotesAuthored", fields: [coachId], references: [id], onDelete: Cascade)
+  individual User     @relation("CoachNotesReceived", fields: [individualId], references: [id], onDelete: Cascade)
+  journey    Journey? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+
+  @@index([coachId])
+  @@index([individualId])
+  @@index([journeyId])
+}
+
+model Token {
+  id         String    @id @default(cuid())
+  type       TokenType
+  tokenHash  String    @unique
+  userId     String?
+  reviewerId String?
+  journeyId  String?
+  weekNumber Int?
+  expiresAt  DateTime
+  usedAt     DateTime?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  user     User?     @relation("UserTokens", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer Reviewer? @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  journey  Journey?  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([journeyId])
+}
+
+model CoachClient {
+  id           String    @id @default(cuid())
+  coachId      String
+  individualId String
+  createdAt    DateTime  @default(now())
+  archivedAt   DateTime?
+
+  coach      User @relation("CoachClientsCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  individual User @relation("CoachClientsIndividual", fields: [individualId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, individualId])
+  @@index([coachId])
+  @@index([individualId])
+}
+
+model Insight {
+  id         String        @id @default(cuid())
+  userId     String
+  journeyId  String?
+  weekNumber Int?
+  type       InsightType
+  status     InsightStatus @default(PENDING)
+  content    String?
+  promptHash String?
+  modelId    String?
+  thumbs     Int?
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journey Journey? @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, journeyId, weekNumber, type])
+  @@index([userId])
+  @@index([journeyId])
   @@index([type, status])
 }
 
 model CoachInvite {
-  id            String   @id @default(cuid())
-  coachId       String
-  email         String
-  name          String?
-  phone         String?
-  message       String?
-  payload       Json?
-  tokenHash     String   @unique
-  expiresAt     DateTime
-  acceptedAt    DateTime?
-  cancelledAt   DateTime?
-  individualId  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  coachId      String
+  email        String
+  name         String?
+  phone        String?
+  message      String?
+  payload      Json?
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  cancelledAt  DateTime?
+  individualId String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   coach      User  @relation("CoachInvites", fields: [coachId], references: [id], onDelete: Cascade)
   individual User? @relation("CoachInviteIndividual", fields: [individualId], references: [id], onDelete: SetNull)
@@ -349,6 +340,14 @@ model CoachInvite {
   @@unique([coachId, email], map: "CoachInvite_coachId_email_key")
   @@index([coachId])
   @@index([email])
+}
+
+model NotificationCap {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
 }
 
 model Organization {

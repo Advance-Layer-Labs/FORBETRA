@@ -11,19 +11,25 @@
 		return pathname.startsWith(href);
 	};
 
-	const navItems = [
+	const hideOrgAdminSettings = $derived(
+		($page.data as { dbUser?: { role?: string } | null }).dbUser?.role === 'ORG_ADMIN'
+	);
+
+	const navItems = $derived([
 		{ href: '/admin', label: 'Dashboard', icon: 'grid' },
 		...(dev ? [{ href: '/admin/demo', label: 'Demo', icon: 'play' }] : []),
 		{ href: '/admin/preview', label: 'Preview Flows', icon: 'eye' },
 		{ href: '/admin/users', label: 'Users', icon: 'users' },
-		{ href: '/admin/objectives', label: 'Objectives & Cycles', icon: 'target' },
-		{ href: '/admin/stakeholders', label: 'Stakeholders', icon: 'people' },
+		{ href: '/admin/goals', label: 'Goals & Journeys', icon: 'target' },
+		{ href: '/admin/reviewers', label: 'Reviewers', icon: 'people' },
 		{ href: '/admin/coaches', label: 'Coach Assignments', icon: 'link' },
 		{ href: '/admin/insights', label: 'Insights', icon: 'sparkle' },
 		{ href: '/admin/organizations', label: 'Organizations', icon: 'building' },
 		...(dev ? [{ href: '/admin/seed', label: 'Seed Data', icon: 'database' }] : []),
-		{ href: '/admin/settings', label: 'Settings', icon: 'settings' }
-	];
+		...(hideOrgAdminSettings
+			? []
+			: [{ href: '/admin/settings', label: 'Settings', icon: 'settings' }])
+	]);
 </script>
 
 <div class="flex min-h-screen bg-surface-base">

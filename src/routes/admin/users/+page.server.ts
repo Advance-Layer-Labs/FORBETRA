@@ -5,7 +5,7 @@ import { clerkClient } from 'svelte-clerk/server';
 import type { Actions, PageServerLoad } from './$types';
 import type { UserRole } from '@prisma/client';
 
-const ALLOWED_ROLES: UserRole[] = ['INDIVIDUAL', 'COACH', 'STAKEHOLDER', 'ADMIN', 'ORG_ADMIN'];
+const ALLOWED_ROLES: UserRole[] = ['INDIVIDUAL', 'COACH', 'ADMIN', 'ORG_ADMIN'];
 
 export const load: PageServerLoad = async (event) => {
 	requireRole(event, 'ADMIN');
@@ -50,7 +50,7 @@ export const actions: Actions = {
 				const existingUser = await prisma.user.findUnique({
 					where: { id: userId },
 					include: {
-						objectives: true,
+						goals: true,
 						coachNotesAuthored: true,
 						coachNotesReceived: true
 					}
@@ -62,37 +62,18 @@ export const actions: Actions = {
 
 				// Delete related records first to avoid foreign key constraints
 				await prisma.$transaction(async (tx) => {
-					// Get all cycles for this user's objectives
-					const objectiveIds = existingUser.objectives.map((o) => o.id);
-					const cycles = await tx.cycle.findMany({
-						where: { objectiveId: { in: objectiveIds } }
-					});
-					const cycleIds = cycles.map((c) => c.id);
+					const goalIds = existingUser.goals.map((g) => g.id);
 
-					// Get all reflections linked to cycles
-					const reflections = await tx.reflection.findMany({
-						where: { cycleId: { in: cycleIds } }
-					});
-					const reflectionIds = reflections.map((r) => r.id);
-
-					// Delete feedback linked to reflections
-					await tx.feedback.deleteMany({
-						where: { reflectionId: { in: reflectionIds } }
+					// Journeys cascade to their check-ins, feedback, and tokens
+					await tx.journey.deleteMany({
+						where: { OR: [{ userId }, { goalId: { in: goalIds } }] }
 					});
 
-					// Delete reflections
-					await tx.reflection.deleteMany({
-						where: { cycleId: { in: cycleIds } }
-					});
+					// Delete focusAreas linked to goals
+					await tx.focusArea.deleteMany({ where: { goalId: { in: goalIds } } });
 
-					// Delete cycles
-					await tx.cycle.deleteMany({ where: { objectiveId: { in: objectiveIds } } });
-
-					// Delete subgoals linked to objectives
-					await tx.subgoal.deleteMany({ where: { objectiveId: { in: objectiveIds } } });
-
-					// Delete objectives
-					await tx.objective.deleteMany({ where: { userId: userId } });
+					// Delete goals
+					await tx.goal.deleteMany({ where: { userId: userId } });
 
 					// Delete coach notes
 					await tx.coachNote.deleteMany({
@@ -108,7 +89,7 @@ export const actions: Actions = {
 					await tx.coachInvite.deleteMany({
 						where: { OR: [{ coachId: userId }, { individualId: userId }] }
 					});
-					await tx.stakeholder.deleteMany({
+					await tx.reviewer.deleteMany({
 						where: { OR: [{ individualId: userId }, { invitedById: userId }] }
 					});
 					await tx.insight.deleteMany({ where: { userId: userId } });

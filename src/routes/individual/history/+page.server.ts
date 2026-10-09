@@ -1,99 +1,69 @@
-import { redirect } from '@sveltejs/kit';
-import prisma from '$lib/server/prisma';
 import type { PageServerLoad } from './$types';
 
+type HistoryCheckIn = {
+	id: string;
+	effortScore: number;
+	performanceScore: number;
+	notes: string | null;
+	submittedAt: string;
+};
+
+type HistoryFeedback = {
+	id: string;
+	reviewerName: string;
+	effortScore: number | null;
+	performanceScore: number | null;
+	comment: string | null;
+	behavioralObservation: string | null;
+	suggestion: string | null;
+};
+
 export const load: PageServerLoad = async ({ parent }) => {
-	const { objective, cycle } = await parent();
+	const { goal, journey, checkIns, feedback } = await parent();
 
-	if (!cycle) {
-		throw redirect(302, '/individual');
-	}
-
-	// History needs feedbacks per reflection — fetch separately
-	const reflections = await prisma.reflection.findMany({
-		where: { cycleId: cycle.id, userId: objective.userId },
-		orderBy: [{ weekNumber: 'desc' }, { checkInDate: 'desc' }],
-		select: {
-			id: true,
-			reflectionType: true,
-			weekNumber: true,
-			effortScore: true,
-			performanceScore: true,
-			notes: true,
-			checkInDate: true,
-			feedbacks: {
-				select: {
-					id: true,
-					effortScore: true,
-					performanceScore: true,
-					comment: true,
-					behavioralObservation: true,
-					suggestion: true,
-					submittedAt: true,
-					stakeholder: {
-						select: { name: true }
-					}
-				}
-			}
+	const weekMap = new Map<number, { checkIns: HistoryCheckIn[]; feedbacks: HistoryFeedback[] }>();
+	const bucketFor = (weekNumber: number) => {
+		let bucket = weekMap.get(weekNumber);
+		if (!bucket) {
+			bucket = { checkIns: [], feedbacks: [] };
+			weekMap.set(weekNumber, bucket);
 		}
-	});
+		return bucket;
+	};
 
-	// Group reflections by week number
-	const weekMap = new Map<
-		number,
-		{
-			reflections: Array<{
-				id: string;
-				type: string;
-				effortScore: number | null;
-				performanceScore: number | null;
-				notes: string | null;
-				checkInDate: string;
-				feedbacks: Array<{
-					stakeholderName: string;
-					effortScore: number | null;
-					performanceScore: number | null;
-					comment: string | null;
-					behavioralObservation: string | null;
-					suggestion: string | null;
-				}>;
-			}>;
-		}
-	>();
-
-	for (const r of reflections) {
-		if (!weekMap.has(r.weekNumber)) {
-			weekMap.set(r.weekNumber, { reflections: [] });
-		}
-		weekMap.get(r.weekNumber)!.reflections.push({
-			id: r.id,
-			type: r.reflectionType,
-			effortScore: r.effortScore,
-			performanceScore: r.performanceScore,
-			notes: r.notes,
-			checkInDate: r.checkInDate.toISOString(),
-			feedbacks: r.feedbacks.map((f) => ({
-				stakeholderName: f.stakeholder.name,
-				effortScore: f.effortScore,
-				performanceScore: f.performanceScore,
-				comment: f.comment,
-				behavioralObservation: f.behavioralObservation,
-				suggestion: f.suggestion
-			}))
+	for (const row of checkIns) {
+		bucketFor(row.weekNumber).checkIns.push({
+			id: row.id,
+			effortScore: row.effortScore,
+			performanceScore: row.performanceScore,
+			notes: row.notes,
+			submittedAt: row.submittedAt.toISOString()
 		});
 	}
 
-	// Convert to sorted array (newest first)
+	for (const row of feedback) {
+		bucketFor(row.weekNumber).feedbacks.push({
+			id: row.id,
+			reviewerName: row.reviewer.name,
+			effortScore: row.effortScore,
+			performanceScore: row.performanceScore,
+			comment: row.comment,
+			behavioralObservation: row.behavioralObservation,
+			suggestion: row.suggestion
+		});
+	}
+
 	const weeks = Array.from(weekMap.entries())
 		.map(([weekNumber, data]) => ({
 			weekNumber,
-			reflections: data.reflections
+			checkIns: [...data.checkIns].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+			feedbacks: data.feedbacks
 		}))
 		.sort((a, b) => b.weekNumber - a.weekNumber);
 
 	return {
-		objectiveTitle: objective.title,
-		cycleLabel: cycle.label ?? 'Current Cycle',
+		goalTitle: goal.title,
+		cycleLabel: journey.label ?? 'Current Journey',
 		weeks
 	};
 };

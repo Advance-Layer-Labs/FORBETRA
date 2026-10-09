@@ -1,21 +1,11 @@
-import { redirect } from '@sveltejs/kit';
-import prisma from '$lib/server/prisma';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
-	const { objective, cycle, currentWeek } = await event.parent();
+	const { goal, currentWeek, journey, checkIns, feedback } = await event.parent();
 
-	if (!cycle || !currentWeek) {
-		throw redirect(303, '/individual');
-	}
-
-	const cycleEnd = cycle.endDate ?? null;
-	const totalWeeks = cycleEnd
-		? Math.max(
-				1,
-				Math.ceil((cycleEnd.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
-			)
-		: currentWeek;
+	const totalWeeks = Math.max(journey.lengthWeeks, currentWeek);
+	const reviewerIds = new Set(goal.reviewers.map((reviewer) => reviewer.id));
+	const allFeedbacks = feedback.filter((row) => reviewerIds.has(row.reviewerId));
 
 	// Week navigation via query param
 	const weekParam = event.url.searchParams.get('week');
@@ -23,29 +13,14 @@ export const load: PageServerLoad = async (event) => {
 		? Math.max(1, Math.min(totalWeeks, parseInt(weekParam, 10) || currentWeek))
 		: currentWeek;
 
-	// Build stakeholder name map
-	const stakeholderNameMap = new Map<string, string>();
-	for (const sh of objective.stakeholders) {
-		stakeholderNameMap.set(sh.id, sh.name);
+	// Build reviewer name map
+	const reviewerNameMap = new Map<string, string>();
+	for (const sh of goal.reviewers) {
+		reviewerNameMap.set(sh.id, sh.name);
 	}
 
-	// Load all feedbacks for this cycle
-	const allFeedbacks = await prisma.feedback.findMany({
-		where: {
-			stakeholder: { objectiveId: objective.id },
-			reflection: { cycleId: cycle.id }
-		},
-		select: {
-			stakeholderId: true,
-			effortScore: true,
-			performanceScore: true,
-			comment: true,
-			reflection: { select: { weekNumber: true } }
-		}
-	});
-
 	// Self scores: average effort/performance for viewWeek
-	const selfReflections = cycle.reflections.filter((r) => r.weekNumber === viewWeek);
+	const selfReflections = checkIns.filter((r) => r.weekNumber === viewWeek);
 	const selfEfforts = selfReflections
 		.map((r) => r.effortScore)
 		.filter((v): v is number => v !== null);
@@ -64,12 +39,12 @@ export const load: PageServerLoad = async (event) => {
 		.map((r) => r.notes!)
 		.slice(0, 3);
 
-	// Build per-stakeholder scorecard for viewWeek
+	// Build per-reviewer scorecard for viewWeek
 	type ScorecardRow = {
-		stakeholderId: string;
-		stakeholderName: string;
-		stakeholderEffort: number | null;
-		stakeholderPerformance: number | null;
+		reviewerId: string;
+		reviewerName: string;
+		reviewerEffort: number | null;
+		reviewerPerformance: number | null;
 		comment: string | null;
 		effortGap: number | null;
 		performanceGap: number | null;
@@ -80,15 +55,14 @@ export const load: PageServerLoad = async (event) => {
 
 	const scorecard: ScorecardRow[] = [];
 
-	// Group feedbacks by stakeholder and week
+	// Group feedbacks by reviewer and week
 	const shWeekMap = new Map<
 		string,
 		Map<number, { efforts: number[]; performances: number[]; comments: string[] }>
 	>();
 	for (const fb of allFeedbacks) {
-		if (!fb.reflection) continue;
-		const wk = fb.reflection.weekNumber;
-		const shId = fb.stakeholderId;
+		const wk = fb.weekNumber;
+		const shId = fb.reviewerId;
 
 		if (!shWeekMap.has(shId)) shWeekMap.set(shId, new Map());
 		const shWeeks = shWeekMap.get(shId)!;
@@ -102,7 +76,7 @@ export const load: PageServerLoad = async (event) => {
 	// Self scores per week (for trend computation)
 	const selfWeekMap = new Map<number, { effort: number | null; performance: number | null }>();
 	for (let wk = 1; wk <= totalWeeks; wk++) {
-		const refs = cycle.reflections.filter((r) => r.weekNumber === wk);
+		const refs = checkIns.filter((r) => r.weekNumber === wk);
 		const effs = refs.map((r) => r.effortScore).filter((v): v is number => v !== null);
 		const prfs = refs.map((r) => r.performanceScore).filter((v): v is number => v !== null);
 		selfWeekMap.set(wk, { effort: avg(effs), performance: avg(prfs) });
@@ -130,7 +104,7 @@ export const load: PageServerLoad = async (event) => {
 		return 'stable';
 	}
 
-	for (const sh of objective.stakeholders) {
+	for (const sh of goal.reviewers) {
 		const shWeeks = shWeekMap.get(sh.id);
 		const viewData = shWeeks?.get(viewWeek);
 
@@ -161,10 +135,10 @@ export const load: PageServerLoad = async (event) => {
 			: null;
 
 		scorecard.push({
-			stakeholderId: sh.id,
-			stakeholderName: stakeholderNameMap.get(sh.id) ?? sh.name,
-			stakeholderEffort: stkEffort,
-			stakeholderPerformance: stkPerf,
+			reviewerId: sh.id,
+			reviewerName: reviewerNameMap.get(sh.id) ?? sh.name,
+			reviewerEffort: stkEffort,
+			reviewerPerformance: stkPerf,
 			comment,
 			effortGap,
 			performanceGap: perfGap,
@@ -182,6 +156,6 @@ export const load: PageServerLoad = async (event) => {
 		myPerformance,
 		selfNotes,
 		scorecard,
-		objectiveTitle: objective.title
+		goalTitle: goal.title
 	};
 };

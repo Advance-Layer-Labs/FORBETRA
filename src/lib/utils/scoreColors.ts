@@ -132,7 +132,7 @@ export const CHART_COLORS = {
 			border: 'rgb(6, 182, 212)', // cyan-500
 			bg: 'rgba(6, 182, 212, 0.1)'
 		},
-		stakeholder: {
+		reviewer: {
 			border: 'rgb(34, 211, 238)', // cyan-400
 			bg: 'rgba(34, 211, 238, 0.1)'
 		}
@@ -142,7 +142,7 @@ export const CHART_COLORS = {
 			border: 'rgb(245, 158, 11)', // amber-500
 			bg: 'rgba(245, 158, 11, 0.1)'
 		},
-		stakeholder: {
+		reviewer: {
 			border: 'rgb(251, 191, 36)', // amber-400
 			bg: 'rgba(251, 191, 36, 0.1)'
 		}

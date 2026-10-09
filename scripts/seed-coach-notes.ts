@@ -26,12 +26,12 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: midWeek,
 					content:
-						'Great momentum. Effort scores are climbing steadily and stakeholder feedback is starting to reflect the change. Alex reports feeling more natural in meetings. Next focus: handling disagreements without retreating to passive mode.'
+						'Great momentum. Effort scores are climbing steadily and reviewer feedback is starting to reflect the change. Alex reports feeling more natural in meetings. Next focus: handling disagreements without retreating to passive mode.'
 				},
 				{
 					weekNumber: totalWeeks,
 					content:
-						'Strong finish to the cycle. The upward trend in both effort and performance is clear. Priya noted a "completely different energy" in standups. Alex is ready for a stretch goal in the next cycle around strategic influence.'
+						'Strong finish to the journey. The upward trend in both effort and performance is clear. Priya noted a "completely different energy" in standups. Alex is ready for a stretch goal in the next journey around strategic influence.'
 				}
 			];
 
@@ -50,7 +50,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: totalWeeks,
 					content:
-						'Discussed the plateau pattern openly. Jordan acknowledged comfort has become a barrier. We agreed that the next cycle needs a stretch mechanism. Planning to add a "discomfort quota" where Jordan takes on one unfamiliar collaboration each week.'
+						'Discussed the plateau pattern openly. Jordan acknowledged comfort has become a barrier. We agreed that the next journey needs a stretch mechanism. Planning to add a "discomfort quota" where Jordan takes on one unfamiliar collaboration each week.'
 				}
 			];
 
@@ -69,7 +69,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: 10,
 					content:
-						'Had a frank conversation about the declining pattern. Casey admitted to skipping mentoring sessions and feeling guilty about it. We reframed: sustainability is part of the skill. Adjusted expectations for remaining weeks and planned a recovery approach for next cycle.'
+						'Had a frank conversation about the declining pattern. Casey admitted to skipping mentoring sessions and feeling guilty about it. We reframed: sustainability is part of the skill. Adjusted expectations for remaining weeks and planned a recovery approach for next journey.'
 				}
 			];
 
@@ -78,7 +78,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: 1,
 					content:
-						'Taylor is already operating at a high level. The opportunity here is about expanding scope of impact, not fixing deficits. We framed the cycle around "leadership multiplication" rather than personal improvement.'
+						'Taylor is already operating at a high level. The opportunity here is about expanding scope of impact, not fixing deficits. We framed the journey around "leadership multiplication" rather than personal improvement.'
 				},
 				{
 					weekNumber: midWeek,
@@ -88,7 +88,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: totalWeeks,
 					content:
-						'Taylor has been the model client for this cycle. Both stakeholders and self-ratings remain high. The next growth edge is navigating organizational politics at the VP level. Planning to introduce more challenging scenarios in the next cycle.'
+						'Taylor has been the model client for this journey. Both reviewers and self-ratings remain high. The next growth edge is navigating organizational politics at the VP level. Planning to introduce more challenging scenarios in the next journey.'
 				}
 			];
 
@@ -107,7 +107,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: 10,
 					content:
-						'Some improvement in the variance but still significant swings. Derek (stakeholder) flagged that the unpredictability is eroding team trust. This is now the #1 priority. We agreed on a "minimum viable week" framework: define the floor, then anything above is bonus.'
+						'Some improvement in the variance but still significant swings. Derek (reviewer) flagged that the unpredictability is eroding team trust. This is now the #1 priority. We agreed on a "minimum viable week" framework: define the floor, then anything above is bonus.'
 				}
 			];
 
@@ -126,7 +126,7 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: totalWeeks,
 					content:
-						'The effort-performance gap remains the core challenge. Progress is slow but there are signs of improvement in prioritization. Sam started sending weekly "completed work" summaries and Ryan (Director) noted increased visibility. Next cycle: deeper work on strategic thinking.'
+						'The effort-performance gap remains the core challenge. Progress is slow but there are signs of improvement in prioritization. Sam started sending weekly "completed work" summaries and Ryan (Director) noted increased visibility. Next journey: deeper work on strategic thinking.'
 				}
 			];
 
@@ -154,12 +154,12 @@ function getNotesForPattern(pattern: PersonaPattern, totalWeeks: number): NoteTe
 				{
 					weekNumber: 1,
 					content:
-						'Jamie is just starting their development journey. We focused the kickoff on understanding the stakeholder landscape and why it matters. Jamie has good instincts but lacks structured approach. The 12-week cycle is appropriate.'
+						'Jamie is just starting their development journey. We focused the kickoff on understanding the reviewer landscape and why it matters. Jamie has good instincts but lacks structured approach. The 12-week journey is appropriate.'
 				},
 				{
 					weekNumber: 3,
 					content:
-						'Three weeks in and Jamie is engaged. Early scores show a slight upward trend. The stakeholder mapping exercise was a hit. Next: moving from understanding stakeholders to actively managing their expectations. This is where the real work begins.'
+						'Three weeks in and Jamie is engaged. Early scores show a slight upward trend. The reviewer mapping exercise was a hit. Next: moving from understanding reviewers to actively managing their expectations. This is where the real work begins.'
 				}
 			];
 	}

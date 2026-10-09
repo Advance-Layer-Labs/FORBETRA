@@ -47,7 +47,7 @@
 	let notes = $state(data.previousEntry?.notes ?? '');
 	let isSubmitting = $state(false);
 	// Auto-expand on first check-in, collapse thereafter
-	const isFirstCheckin = !data.previousEntry && data.currentWeek <= 1;
+	const isFirstCheckin = data.isBaseline;
 	let showBehavioralIndicators = $state(isFirstCheckin);
 	// Notes collapsed by default (except first check-in or midpoint)
 	let showNotes = $state(isFirstCheckin || (data.isMidpoint && !!data.identityAnchor));
@@ -78,7 +78,7 @@
 		}
 		// Midpoint identity reflection override
 		if (data.isMidpoint && data.identityAnchor) {
-			return `In Week 1, you said you were becoming: "${data.identityAnchor}". Halfway through your journey \u2014 does that still feel true? Has it evolved? Write what feels right now.`;
+			return `In week 1 you wrote: "${data.identityAnchor}". Halfway through your journey — does that still fit? Write what feels right now.`;
 		}
 		const prev = data.previousRatings;
 		if (prev?.effortScore != null && prev?.performanceScore != null) {
@@ -118,7 +118,7 @@
 	<div class="flex items-center justify-between">
 		<!-- eslint-disable svelte/no-navigation-without-resolve -->
 		<a
-			href="/individual"
+			href="/individual/today"
 			class="group flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
 		>
 			<svg
@@ -152,10 +152,10 @@
 		</div>
 		<h1 class="text-3xl font-bold text-text-primary">{data.checkInLabel}</h1>
 		<p class="text-base text-text-secondary">
-			{#if data.currentWeek === 1}Your first check-in sets the baseline. Be honest — this is a
-				starting point, not a judgment.{:else if data.currentWeek <= 3}Each week builds your data.
-				Patterns start emerging around week 3–4.{:else}Rate your effort and performance. Your coach
-				and AI insights use this data.{/if}
+			{#if data.isBaseline}This first check-in is your baseline. Be honest — this is a starting
+				point, not a judgment.{:else if data.currentWeek <= 3}Each week builds your data. Patterns
+				start emerging around week 3–4.{:else}Rate your effort and performance. Your coach and AI
+				insights use this data.{/if}
 		</p>
 		{#if !data.isPreview && !data.isAvailable}
 			<div
@@ -244,7 +244,7 @@
 				{/if}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
-					href="/individual"
+					href="/individual/today"
 					class="mt-4 inline-flex items-center gap-2 rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-success/90"
 				>
 					Return to Today
@@ -288,7 +288,7 @@
 				</p>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
-					href="/individual"
+					href="/individual/today"
 					class="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-accent-hover"
 				>
 					Back to Home
@@ -298,7 +298,7 @@
 		{:else}
 			{#if data.identityAnchor}
 				<div class="rounded-xl border border-accent/20 bg-accent-muted/50 px-5 py-3 text-center">
-					<p class="text-xs font-medium tracking-wide text-accent uppercase">Becoming</p>
+					<p class="text-xs font-medium tracking-wide text-accent uppercase">Week 1 note</p>
 					<p class="mt-1 text-sm text-text-primary italic">"{data.identityAnchor}"</p>
 				</div>
 			{/if}
@@ -308,71 +308,72 @@
 				<input type="hidden" name="effortScore" value={effortScore ?? ''} />
 				<input type="hidden" name="performanceScore" value={performanceScore ?? ''} />
 
-				<!-- Simple Objective Display -->
+				<!-- Simple Goal Display -->
 				<div class="rounded-xl border border-border-default bg-surface-subtle px-5 py-4">
 					<div class="flex items-center gap-3 text-base text-text-secondary">
 						<Target class="h-5 w-5 text-accent" />
 						<span class="font-medium">Goal:</span>
-						<span class="text-lg font-semibold text-text-primary">{data.objective.title}</span>
+						<span class="text-lg font-semibold text-text-primary">{data.goal.title}</span>
 					</div>
 				</div>
 
-				<!-- Collapsible Behavioral Indicators -->
-				<div class="rounded-xl border border-border-default bg-surface-raised">
-					<button
-						type="button"
-						onclick={() => (showBehavioralIndicators = !showBehavioralIndicators)}
-						class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-subtle"
-					>
-						<div class="flex items-center gap-2">
-							<ClipboardList class="h-5 w-5 text-text-secondary" />
-							<span class="text-sm font-medium text-text-secondary">View behavioral indicators</span
-							>
-						</div>
-						<svg
-							class="h-5 w-5 text-text-tertiary transition-transform {showBehavioralIndicators
-								? 'rotate-180'
-								: ''}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
+				<!-- Focus Areas are unscored hints for the goal rating -->
+				{#if data.focusAreas.length > 0}
+					<div class="rounded-xl border border-border-default bg-surface-raised">
+						<button
+							type="button"
+							onclick={() => (showBehavioralIndicators = !showBehavioralIndicators)}
+							class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-subtle"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							/>
-						</svg>
-					</button>
-					{#if showBehavioralIndicators}
-						<div class="border-t border-border-default px-4 py-4">
-							<p class="mb-3 text-xs leading-relaxed text-text-secondary">
-								Use these as reference points when rating your overall effort and progress. They
-								help define what success looks like for your goal.
-							</p>
-							<div class="space-y-2">
-								{#each data.subgoals as subgoal, index (subgoal.id)}
-									<div
-										class="flex items-start gap-3 rounded-lg border border-border-default bg-surface-subtle p-3"
-									>
-										<span
-											class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-muted text-xs font-bold text-accent"
-										>
-											{index + 1}
-										</span>
-										<div class="flex-1">
-											<p class="font-semibold text-text-primary">{subgoal.label}</p>
-											{#if subgoal.description}
-												<p class="mt-1 text-xs text-text-secondary">{subgoal.description}</p>
-											{/if}
-										</div>
-									</div>
-								{/each}
+							<div class="flex items-center gap-2">
+								<ClipboardList class="h-5 w-5 text-text-secondary" />
+								<span class="text-sm font-medium text-text-secondary">Focus Areas</span>
 							</div>
-						</div>
-					{/if}
-				</div>
+							<svg
+								class="h-5 w-5 text-text-tertiary transition-transform {showBehavioralIndicators
+									? 'rotate-180'
+									: ''}"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 9l-7 7-7-7"
+								/>
+							</svg>
+						</button>
+						{#if showBehavioralIndicators}
+							<div class="border-t border-border-default px-4 py-4">
+								<p class="mb-3 text-xs leading-relaxed text-text-secondary">
+									Unscored hints for this goal. Use them when you rate effort and performance. They
+									are not scored on their own.
+								</p>
+								<div class="space-y-2">
+									{#each data.focusAreas as focusArea, index (focusArea.id)}
+										<div
+											class="flex items-start gap-3 rounded-lg border border-border-default bg-surface-subtle p-3"
+										>
+											<span
+												class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-muted text-xs font-bold text-accent"
+											>
+												{index + 1}
+											</span>
+											<div class="flex-1">
+												<p class="font-semibold text-text-primary">{focusArea.label}</p>
+												{#if focusArea.description}
+													<p class="mt-1 text-xs text-text-secondary">{focusArea.description}</p>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				{#if data.currentWeek > 1 && data.previousRatings}
 					{@const historicRatings = data.historicRatings ?? []}
@@ -583,7 +584,7 @@
 							<PenLine class="h-5 w-5 text-accent" />
 							<label for="notes" class="text-base font-semibold text-text-primary">
 								{data.isMidpoint && data.identityAnchor
-									? 'Midpoint Reflection'
+									? 'Midpoint CheckIn'
 									: 'Reflect on your week'}
 							</label>
 						</div>
@@ -634,7 +635,7 @@
 					<div class="flex items-center gap-3">
 						<!-- eslint-disable svelte/no-navigation-without-resolve -->
 						<a
-							href="/individual"
+							href="/individual/today"
 							class="rounded-xl border border-border-default bg-surface-raised px-6 py-3.5 text-sm font-semibold text-text-secondary transition-all hover:border-border-strong hover:bg-surface-subtle"
 						>
 							Cancel

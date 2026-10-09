@@ -1,6 +1,10 @@
 import prisma from '$lib/server/prisma';
 import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
+import { wantsEmail, wantsSms } from '$lib/notifications/preferences';
+import { trySendSms } from '$lib/notifications/sms';
+import { smsTemplates } from '$lib/notifications/smsTemplates';
+import { getAppUrl } from '$lib/server/appUrl';
 
 const SHIFT_THRESHOLD = 1.5;
 
@@ -13,7 +17,7 @@ const SHIFT_THRESHOLD = 1.5;
  * (about 15% of the 0-10 scale — empirically the point where the shift is
  * obvious to a coach, not noise.)
  *
- * Only fires when both this week and last week have paired data. First-cycle
+ * Only fires when both this week and last week have paired data. First-journey
  * users with no prior week of reviewer feedback will never see this — that's
  * fine, the existing scorecardReady ambient nudge covers their first surfacing.
  */
@@ -25,34 +29,38 @@ export const notifyScorecardShifts = async () => {
 	const individuals = await prisma.user.findMany({
 		where: {
 			role: 'INDIVIDUAL',
-			objectives: { some: { active: true, cycles: { some: { status: 'ACTIVE' } } } }
+			goals: { some: { active: true, journeys: { some: { status: 'ACTIVE' } } } }
 		},
 		select: {
 			id: true,
 			name: true,
 			email: true,
-			objectives: {
+			phone: true,
+			deliveryMethod: true,
+			goals: {
 				where: { active: true },
 				select: {
 					title: true,
-					cycles: {
+					journeys: {
+						where: { status: 'ACTIVE' },
 						orderBy: { startDate: 'desc' },
 						take: 1,
 						select: {
 							id: true,
-							reflections: {
+							checkIns: {
 								where: { submittedAt: { gte: fourteenDaysAgo } },
 								select: {
 									effortScore: true,
 									performanceScore: true,
-									submittedAt: true,
-									feedbacks: {
-										select: {
-											effortScore: true,
-											performanceScore: true,
-											submittedAt: true
-										}
-									}
+									submittedAt: true
+								}
+							},
+							feedback: {
+								where: { submittedAt: { gte: fourteenDaysAgo } },
+								select: {
+									effortScore: true,
+									performanceScore: true,
+									submittedAt: true
 								}
 							}
 						}
@@ -69,20 +77,18 @@ export const notifyScorecardShifts = async () => {
 
 	let sent = 0;
 	for (const user of individuals) {
-		const cycle = user.objectives[0]?.cycles[0];
-		const objective = user.objectives[0];
-		if (!cycle || !objective) continue;
+		const journey = user.goals[0]?.journeys[0];
+		const goal = user.goals[0];
+		if (!journey || !goal) continue;
 
 		// Partition by week window
-		const reflectionsThis = cycle.reflections.filter((r) => r.submittedAt >= sevenDaysAgo);
-		const reflectionsLast = cycle.reflections.filter(
+		const reflectionsThis = journey.checkIns.filter((r) => r.submittedAt >= sevenDaysAgo);
+		const reflectionsLast = journey.checkIns.filter(
 			(r) => r.submittedAt < sevenDaysAgo && r.submittedAt >= fourteenDaysAgo
 		);
-		const feedbacksThis = cycle.reflections.flatMap((r) =>
-			r.feedbacks.filter((f) => f.submittedAt >= sevenDaysAgo)
-		);
-		const feedbacksLast = cycle.reflections.flatMap((r) =>
-			r.feedbacks.filter((f) => f.submittedAt < sevenDaysAgo && f.submittedAt >= fourteenDaysAgo)
+		const feedbacksThis = journey.feedback.filter((f) => f.submittedAt >= sevenDaysAgo);
+		const feedbacksLast = journey.feedback.filter(
+			(f) => f.submittedAt < sevenDaysAgo && f.submittedAt >= fourteenDaysAgo
 		);
 
 		// Both weeks need paired data to compute deltas
@@ -123,20 +129,33 @@ export const notifyScorecardShifts = async () => {
 		const direction: 'widening' | 'closing' =
 			Math.abs(gapNow) > Math.abs(gapBefore) ? 'widening' : 'closing';
 
-		try {
-			const template = emailTemplates.scorecardShiftAlert({
-				individualName: user.name || undefined,
-				objectiveTitle: objective.title,
-				dimension,
-				direction,
-				gapNow: +gapNow.toFixed(1),
-				gapBefore: +gapBefore.toFixed(1),
-				deltaAbs: +maxDelta.toFixed(1)
-			});
-			await sendEmail({ to: user.email, ...template });
-			sent++;
-		} catch (err) {
-			console.error(`[job:notify-scorecard-shifts] Failed to send to ${user.email}`, err);
+		if (wantsEmail(user.deliveryMethod)) {
+			try {
+				const template = emailTemplates.scorecardShiftAlert({
+					individualName: user.name || undefined,
+					goalTitle: goal.title,
+					dimension,
+					direction,
+					gapNow: +gapNow.toFixed(1),
+					gapBefore: +gapBefore.toFixed(1),
+					deltaAbs: +maxDelta.toFixed(1)
+				});
+				await sendEmail({ to: user.email, ...template });
+				sent++;
+			} catch (err) {
+				console.error(`[job:notify-scorecard-shifts] Failed to send to ${user.email}`, err);
+			}
+		}
+
+		if (wantsSms(user.deliveryMethod)) {
+			await trySendSms(
+				user.phone,
+				smsTemplates.scorecardShiftAlert({
+					dimension,
+					direction,
+					appUrl: getAppUrl()
+				})
+			);
 		}
 	}
 

@@ -2,7 +2,7 @@
  * Seed Configuration - Test Persona Definitions
  *
  * Defines 8 individual personas with distinct behavioral patterns,
- * 3 coaches, and stakeholder configurations for comprehensive test data.
+ * 3 coaches, and reviewer configurations for comprehensive test data.
  */
 
 export type PersonaPattern =
@@ -15,22 +15,22 @@ export type PersonaPattern =
 	| 'late_bloomer'
 	| 'early_stage';
 
-export type StakeholderBias = 'positive' | 'neutral' | 'negative' | 'sporadic';
+export type ReviewerBias = 'positive' | 'neutral' | 'negative' | 'sporadic';
 
 export type PersonaConfig = {
 	name: string;
 	email: string;
 	pattern: PersonaPattern;
-	objectiveTitle: string;
-	objectiveDescription: string;
-	subgoals: Array<{ label: string; description: string }>;
+	goalTitle: string;
+	goalDescription: string;
+	focusAreas: Array<{ label: string; description: string }>;
 	cycleWeeks: number;
 	cycleStatus: 'ACTIVE' | 'COMPLETED';
-	stakeholders: Array<{
+	reviewers: Array<{
 		name: string;
 		email: string;
 		relationship: string;
-		bias: StakeholderBias;
+		bias: ReviewerBias;
 	}>;
 };
 
@@ -66,10 +66,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Alex Rivera',
 		email: `alex.improving${SEED_DOMAIN}`,
 		pattern: 'improving',
-		objectiveTitle: 'Strengthen Executive Presence',
-		objectiveDescription:
+		goalTitle: 'Strengthen Executive Presence',
+		goalDescription:
 			'Develop the ability to command attention and project confidence in high-stakes meetings and presentations.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Lead weekly team standups with authority',
 				description: 'Open and close standups with clear framing and decisive next steps'
@@ -85,7 +85,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Priya Sharma',
 				email: `priya.pos${SEED_DOMAIN}`,
@@ -112,10 +112,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Jordan Kim',
 		email: `jordan.plateau${SEED_DOMAIN}`,
 		pattern: 'plateaued',
-		objectiveTitle: 'Improve Cross-Functional Collaboration',
-		objectiveDescription:
+		goalTitle: 'Improve Cross-Functional Collaboration',
+		goalDescription:
 			'Build stronger working relationships with product, design, and data teams to reduce friction and ship faster.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Run joint planning sessions',
 				description: 'Facilitate monthly cross-team alignment meetings'
@@ -131,7 +131,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Maya Johnson',
 				email: `maya.pos${SEED_DOMAIN}`,
@@ -157,10 +157,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Casey Morgan',
 		email: `casey.declining${SEED_DOMAIN}`,
 		pattern: 'declining',
-		objectiveTitle: 'Build Technical Mentorship Practice',
-		objectiveDescription:
+		goalTitle: 'Build Technical Mentorship Practice',
+		goalDescription:
 			'Develop skills as a technical mentor to grow junior engineers on the team.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Conduct weekly 1:1 mentoring sessions',
 				description: 'Dedicate 30 min/week to each mentee with structured agenda'
@@ -176,7 +176,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'David Lee',
 				email: `david.pos${SEED_DOMAIN}`,
@@ -208,10 +208,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Taylor Brooks',
 		email: `taylor.highperf${SEED_DOMAIN}`,
 		pattern: 'high_performer',
-		objectiveTitle: 'Scale Leadership Impact Beyond Direct Team',
-		objectiveDescription:
+		goalTitle: 'Scale Leadership Impact Beyond Direct Team',
+		goalDescription:
 			'Extend influence and operational excellence to adjacent teams and organizational initiatives.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Champion org-wide process improvements',
 				description: 'Identify and implement at least 2 cross-team efficiency gains'
@@ -227,7 +227,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Nina Ross',
 				email: `nina.pos${SEED_DOMAIN}`,
@@ -253,13 +253,13 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Morgan Lee',
 		email: `morgan.inconsistent${SEED_DOMAIN}`,
 		pattern: 'inconsistent',
-		objectiveTitle: 'Develop Consistent Communication Habits',
-		objectiveDescription:
+		goalTitle: 'Develop Consistent Communication Habits',
+		goalDescription:
 			'Build reliable, predictable communication patterns that teammates can depend on.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Send weekly status updates on time',
-				description: 'Every Friday by 4pm, share progress with all stakeholders'
+				description: 'Every Friday by 4pm, share progress with all reviewers'
 			},
 			{
 				label: 'Respond to messages within 4 hours',
@@ -272,7 +272,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Hannah White',
 				email: `hannah.neu${SEED_DOMAIN}`,
@@ -294,7 +294,7 @@ export const PERSONAS: PersonaConfig[] = [
 			{
 				name: 'Greg Tanaka',
 				email: `greg.spo${SEED_DOMAIN}`,
-				relationship: 'Stakeholder',
+				relationship: 'Reviewer',
 				bias: 'sporadic'
 			}
 		]
@@ -304,10 +304,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Sam Patel',
 		email: `sam.effortgap${SEED_DOMAIN}`,
 		pattern: 'effort_gap',
-		objectiveTitle: 'Convert Effort Into Visible Results',
-		objectiveDescription:
+		goalTitle: 'Convert Effort Into Visible Results',
+		goalDescription:
 			'Bridge the gap between hard work and measurable outcomes. Focus on strategic prioritization over raw output.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Align weekly work to top-3 priorities',
 				description: 'Start each week by confirming the highest-impact tasks'
@@ -323,7 +323,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Alex Torres',
 				email: `alext.pos${SEED_DOMAIN}`,
@@ -349,10 +349,10 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Riley Chen',
 		email: `riley.latebloomer${SEED_DOMAIN}`,
 		pattern: 'late_bloomer',
-		objectiveTitle: 'Develop Data-Driven Decision Making',
-		objectiveDescription:
+		goalTitle: 'Develop Data-Driven Decision Making',
+		goalDescription:
 			'Move from intuition-based to evidence-based decision making in product development.',
-		subgoals: [
+		focusAreas: [
 			{
 				label: 'Base every proposal on data',
 				description: 'Include quantitative evidence in all product recommendations'
@@ -368,7 +368,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'COMPLETED',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Chris Walker',
 				email: `chris.neu${SEED_DOMAIN}`,
@@ -394,17 +394,17 @@ export const PERSONAS: PersonaConfig[] = [
 		name: 'Jamie Torres',
 		email: `jamie.earlystage${SEED_DOMAIN}`,
 		pattern: 'early_stage',
-		objectiveTitle: 'Build Stakeholder Management Skills',
-		objectiveDescription:
-			'Learn to identify, engage, and manage expectations of key stakeholders across the organization.',
-		subgoals: [
+		goalTitle: 'Build Reviewer Management Skills',
+		goalDescription:
+			'Learn to identify, engage, and manage expectations of key reviewers across the organization.',
+		focusAreas: [
 			{
-				label: 'Map stakeholder landscape',
-				description: 'Create a stakeholder map with influence and interest levels'
+				label: 'Map reviewer landscape',
+				description: 'Create a reviewer map with influence and interest levels'
 			},
 			{
 				label: 'Schedule regular touchpoints',
-				description: 'Establish recurring 1:1s with top-3 stakeholders'
+				description: 'Establish recurring 1:1s with top-3 reviewers'
 			},
 			{
 				label: 'Practice expectation setting',
@@ -413,7 +413,7 @@ export const PERSONAS: PersonaConfig[] = [
 		],
 		cycleWeeks: 12,
 		cycleStatus: 'ACTIVE',
-		stakeholders: [
+		reviewers: [
 			{
 				name: 'Pat Henderson',
 				email: `pat.pos${SEED_DOMAIN}`,

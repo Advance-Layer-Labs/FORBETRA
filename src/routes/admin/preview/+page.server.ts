@@ -5,7 +5,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
 	requireRole(event, 'ADMIN');
 
-	const [individuals, coaches, stakeholders] = await Promise.all([
+	const [individuals, coaches, reviewers] = await Promise.all([
 		prisma.user.findMany({
 			where: { role: 'INDIVIDUAL' },
 			orderBy: { name: 'asc' },
@@ -13,13 +13,13 @@ export const load: PageServerLoad = async (event) => {
 				id: true,
 				name: true,
 				email: true,
-				objectives: {
+				goals: {
 					where: { active: true },
 					orderBy: { createdAt: 'desc' },
 					take: 1,
 					select: {
 						title: true,
-						cycles: {
+						journeys: {
 							orderBy: { startDate: 'desc' },
 							take: 1,
 							select: { status: true, label: true }
@@ -38,7 +38,7 @@ export const load: PageServerLoad = async (event) => {
 				_count: { select: { coachClientsManaged: true } }
 			}
 		}),
-		prisma.stakeholder.findMany({
+		prisma.reviewer.findMany({
 			orderBy: { name: 'asc' },
 			select: {
 				id: true,
@@ -61,9 +61,9 @@ export const load: PageServerLoad = async (event) => {
 			id: u.id,
 			name: u.name,
 			email: u.email,
-			objectiveTitle: u.objectives[0]?.title ?? null,
-			cycleStatus: u.objectives[0]?.cycles[0]?.status ?? null,
-			cycleLabel: u.objectives[0]?.cycles[0]?.label ?? null
+			goalTitle: u.goals[0]?.title ?? null,
+			cycleStatus: u.goals[0]?.journeys[0]?.status ?? null,
+			cycleLabel: u.goals[0]?.journeys[0]?.label ?? null
 		})),
 		coaches: coaches.map((u) => ({
 			id: u.id,
@@ -71,9 +71,9 @@ export const load: PageServerLoad = async (event) => {
 			email: u.email,
 			clientCount: u._count.coachClientsManaged
 		})),
-		stakeholders: stakeholders.map((s) => {
+		reviewers: reviewers.map((s) => {
 			// Tokens are hashed now (see src/lib/server/tokenHash.ts); the hash is
-			// not a usable URL. Admin should impersonate the stakeholder to test
+			// not a usable URL. Admin should impersonate the reviewer to test
 			// the feedback flow rather than reconstructing a URL.
 			const hasActiveToken = s.tokens.length > 0;
 			return {

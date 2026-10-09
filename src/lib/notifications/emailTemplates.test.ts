@@ -24,10 +24,30 @@ describe('emailTemplates', () => {
 		expect(result.html).toContain('https://example.com/feedback');
 	});
 
-	it('stakeholderFeedbackReceived produces valid output', () => {
-		const result = emailTemplates.stakeholderFeedbackReceived({
+	it('feedbackInvite greets the reviewer and shows the goal', () => {
+		const result = emailTemplates.feedbackInvite({
+			individualName: 'Bob',
+			reviewerName: 'Sam',
+			goalTitle: 'Lead better meetings',
+			feedbackLink: 'https://example.com/feedback'
+		});
+		expect(result.html).toContain('Sam');
+		expect(result.html).toContain('Lead better meetings');
+		expect(result.text).toContain('Goal: Lead better meetings');
+	});
+
+	it('reminderBase links to the check-in page without a type param', () => {
+		const result = emailTemplates.reminderBase({ weekNumber: 4, appUrl: 'https://app.test' });
+		expect(result.html).toContain('https://app.test/individual/checkin"');
+		expect(result.text).toContain('https://app.test/individual/checkin');
+		expect(result.html).not.toContain('?type=');
+		expect(result.subject).not.toMatch(/Wednesday|Friday/);
+	});
+
+	it('reviewerFeedbackReceived produces valid output', () => {
+		const result = emailTemplates.reviewerFeedbackReceived({
 			individualName: 'Carol',
-			stakeholderName: 'Dave'
+			reviewerName: 'Dave'
 		});
 		expect(result.subject).toContain('Dave');
 		expect(result.html).toContain('Carol');
@@ -37,14 +57,14 @@ describe('emailTemplates', () => {
 	it('all templates return non-empty subject and html', () => {
 		const templates = [
 			emailTemplates.welcomeIndividual({}),
-			emailTemplates.welcomeStakeholder({}),
+			emailTemplates.welcomeReviewer({}),
 			emailTemplates.feedbackInvite({ feedbackLink: 'https://test.com' }),
-			emailTemplates.stakeholderFeedbackReceived({}),
+			emailTemplates.reviewerFeedbackReceived({}),
 			emailTemplates.reminderBase({}),
 			emailTemplates.reminderOverdue({}),
 			emailTemplates.cycleCompleted({}),
-			emailTemplates.reminderStakeholderFeedback({ feedbackLink: 'https://test.com' }),
-			emailTemplates.stakeholderThankYou({ weekNumber: 3 }),
+			emailTemplates.reminderReviewerFeedback({ feedbackLink: 'https://test.com' }),
+			emailTemplates.reviewerThankYou({ weekNumber: 3 }),
 			emailTemplates.coachInvitation({
 				coachName: 'Coach',
 				inviteUrl: 'https://test.com'
@@ -54,7 +74,7 @@ describe('emailTemplates', () => {
 				clientName: 'Client',
 				clientEmail: 'c@test.com'
 			}),
-			emailTemplates.coachStakeholderFeedbackReceived({
+			emailTemplates.coachReviewerFeedbackReceived({
 				coachName: 'Coach',
 				individualName: 'Client'
 			})
@@ -64,6 +84,18 @@ describe('emailTemplates', () => {
 			expect(template.subject.length).toBeGreaterThan(0);
 			expect(template.html.length).toBeGreaterThan(0);
 			expect(template.text.length).toBeGreaterThan(0);
+			for (const banned of [
+				['Object', 'ive'].join(''),
+				['Sub', 'goal'].join(''),
+				['Stake', 'holder'].join(''),
+				['STAKE', 'HOLDER'].join(''),
+				['RATING', '_A'].join(''),
+				['RATING', '_B'].join(''),
+				['Reflection', 'Type'].join('')
+			]) {
+				expect(template.html).not.toContain(banned);
+				expect(template.text).not.toContain(banned);
+			}
 		}
 	});
 

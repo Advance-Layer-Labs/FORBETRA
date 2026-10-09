@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
+import { weekNumberForDate } from '$lib/server/domain';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -12,11 +13,11 @@ export const load: PageServerLoad = async (event) => {
 
 	const [
 		userCounts,
-		objectiveCount,
+		goalCount,
 		activeCycleCount,
 		reflectionCount,
 		feedbackCount,
-		stakeholderCount,
+		reviewerCount,
 		recentUsers,
 		recentReflections,
 		recentFeedback
@@ -25,25 +26,24 @@ export const load: PageServerLoad = async (event) => {
 			by: ['role'],
 			_count: { id: true }
 		}),
-		prisma.objective.count(),
-		prisma.cycle.count({ where: { status: 'ACTIVE' } }),
-		prisma.reflection.count(),
+		prisma.goal.count(),
+		prisma.journey.count({ where: { status: 'ACTIVE' } }),
+		prisma.checkIn.count(),
 		prisma.feedback.count(),
-		prisma.stakeholder.count(),
+		prisma.reviewer.count(),
 		prisma.user.findMany({
 			orderBy: { createdAt: 'desc' },
 			take: 5,
 			select: { id: true, name: true, email: true, role: true, createdAt: true }
 		}),
-		prisma.reflection.findMany({
+		prisma.checkIn.findMany({
 			orderBy: { submittedAt: 'desc' },
 			take: 5,
 			select: {
 				id: true,
-				reflectionType: true,
-				weekNumber: true,
 				submittedAt: true,
-				user: { select: { name: true, email: true } }
+				user: { select: { name: true, email: true, timezone: true } },
+				journey: { select: { startDate: true } }
 			}
 		}),
 		prisma.feedback.findMany({
@@ -52,8 +52,8 @@ export const load: PageServerLoad = async (event) => {
 			select: {
 				id: true,
 				submittedAt: true,
-				stakeholder: { select: { name: true } },
-				reflection: { select: { user: { select: { name: true } } } }
+				weekNumber: true,
+				reviewer: { select: { name: true, individual: { select: { name: true } } } }
 			}
 		})
 	]);
@@ -69,15 +69,18 @@ export const load: PageServerLoad = async (event) => {
 		stats: {
 			totalUsers,
 			roleCounts,
-			objectiveCount,
+			goalCount,
 			activeCycleCount,
 			reflectionCount,
 			feedbackCount,
-			stakeholderCount
+			reviewerCount
 		},
 		recentActivity: {
 			users: recentUsers,
-			reflections: recentReflections,
+			checkIns: recentReflections.map(({ journey, ...checkIn }) => ({
+				...checkIn,
+				weekNumber: weekNumberForDate(journey.startDate, checkIn.submittedAt, checkIn.user.timezone)
+			})),
 			feedback: recentFeedback
 		}
 	};

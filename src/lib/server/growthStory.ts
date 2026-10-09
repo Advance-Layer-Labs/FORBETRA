@@ -1,7 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
+import { weekNumberForDate } from '$lib/server/domain/week';
 
 export type GrowthStoryData = {
-	objectiveTitle: string;
+	goalTitle: string;
 	durationWeeks: number;
 	checkInCount: number;
 	raterCount: number;
@@ -29,11 +30,11 @@ export type GrowthStoryData = {
 };
 
 /**
- * Calculates score trend data from reflections.
+ * Calculates score trend data from checkIns.
  * Groups by week number, averages effort and performance per week.
  */
 export function buildScoreTrend(
-	reflections: Array<{
+	checkIns: Array<{
 		weekNumber: number;
 		effortScore: number | null;
 		performanceScore: number | null;
@@ -41,7 +42,7 @@ export function buildScoreTrend(
 ): Array<{ weekNumber: number; effort: number | null; performance: number | null }> {
 	const weekMap = new Map<number, { efforts: number[]; performances: number[] }>();
 
-	for (const r of reflections) {
+	for (const r of checkIns) {
 		if (!weekMap.has(r.weekNumber)) {
 			weekMap.set(r.weekNumber, { efforts: [], performances: [] });
 		}
@@ -73,7 +74,7 @@ export function buildScoreTrend(
 export function selectTopComments(
 	feedbacks: Array<{
 		comment: string | null;
-		stakeholderName: string;
+		reviewerName: string;
 		weekNumber: number;
 	}>,
 	limit = 2
@@ -85,7 +86,7 @@ export function selectTopComments(
 		.sort((a, b) => b.comment.length - a.comment.length)
 		.slice(0, limit)
 		.map((f) => ({
-			raterName: f.stakeholderName,
+			raterName: f.reviewerName,
 			weekNumber: f.weekNumber,
 			comment: f.comment.trim()
 		}));
@@ -142,41 +143,50 @@ export function findKeyMoments(
 }
 
 /**
- * Loads all growth story data for a completed cycle.
+ * Loads all growth story data for a completed journey.
  */
 export async function loadGrowthStory(
 	prisma: PrismaClient,
-	cycleId: string,
+	journeyId: string,
 	userId: string
 ): Promise<GrowthStoryData | null> {
-	const cycle = await prisma.cycle.findFirst({
-		where: { id: cycleId, userId, status: 'COMPLETED' },
+	const journey = await prisma.journey.findFirst({
+		where: { id: journeyId, userId, status: 'COMPLETED' },
 		include: {
-			objective: {
-				select: { title: true, stakeholders: { select: { id: true } } }
+			goal: {
+				select: { title: true, reviewers: { select: { id: true } } }
 			},
-			reflections: {
+			user: { select: { timezone: true } },
+			checkIns: {
 				where: { userId },
 				select: {
-					weekNumber: true,
+					submittedAt: true,
 					effortScore: true,
-					performanceScore: true
+					performanceScore: true,
+					notes: true
 				},
-				orderBy: { weekNumber: 'asc' }
+				orderBy: { submittedAt: 'asc' }
 			}
 		}
 	});
 
-	if (!cycle) return null;
+	if (!journey) return null;
 
-	const durationWeeks = cycle.endDate
+	const durationWeeks = journey.endDate
 		? Math.max(
 				1,
-				Math.ceil((cycle.endDate.getTime() - cycle.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+				Math.ceil(
+					(journey.endDate.getTime() - journey.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+				)
 			)
-		: 12;
+		: journey.lengthWeeks;
 
-	const scores = buildScoreTrend(cycle.reflections);
+	const checkIns = journey.checkIns.map((c) => ({
+		...c,
+		weekNumber: weekNumberForDate(journey.startDate, c.submittedAt, journey.user.timezone)
+	}));
+
+	const scores = buildScoreTrend(checkIns);
 	const filledScores = scores.filter((s) => s.effort !== null || s.performance !== null);
 	const first = filledScores[0] ?? null;
 	const last = filledScores.length > 1 ? filledScores[filledScores.length - 1] : null;
@@ -184,13 +194,13 @@ export async function loadGrowthStory(
 	// Fetch rater comments
 	const feedbacks = await prisma.feedback.findMany({
 		where: {
-			reflection: { cycleId },
+			journeyId,
 			comment: { not: null }
 		},
 		select: {
 			comment: true,
-			stakeholder: { select: { name: true } },
-			reflection: { select: { weekNumber: true } }
+			weekNumber: true,
+			reviewer: { select: { name: true } }
 		},
 		orderBy: { submittedAt: 'desc' }
 	});
@@ -198,15 +208,15 @@ export async function loadGrowthStory(
 	const topComments = selectTopComments(
 		feedbacks.map((f) => ({
 			comment: f.comment,
-			stakeholderName: f.stakeholder.name,
-			weekNumber: f.reflection.weekNumber
+			reviewerName: f.reviewer.name,
+			weekNumber: f.weekNumber
 		}))
 	);
 
-	// Find identity anchor from cycle insights
+	// Find identity anchor from journey insights
 	const anchorInsight = await prisma.insight.findFirst({
 		where: {
-			cycleId,
+			journeyId,
 			userId,
 			status: 'COMPLETED',
 			type: { in: ['WEEKLY_SYNTHESIS', 'CHECK_IN'] },
@@ -216,29 +226,25 @@ export async function loadGrowthStory(
 		orderBy: { createdAt: 'asc' }
 	});
 
-	// Also check week 1 reflection notes as fallback
-	const week1Reflection = await prisma.reflection.findFirst({
-		where: { cycleId, userId, weekNumber: 1, notes: { not: null } },
-		select: { notes: true },
-		orderBy: { submittedAt: 'asc' }
-	});
+	// Also check week 1 check-in notes as fallback
+	const week1CheckIn = checkIns.find((c) => c.weekNumber === 1 && c.notes);
 
 	let identityAnchor: string | null = null;
 	if (anchorInsight?.content) {
 		const match = anchorInsight.content.match(/identity[^:]*:\s*"?([^"\n]+)"?/i);
 		if (match) identityAnchor = match[1].trim();
 	}
-	if (!identityAnchor && week1Reflection?.notes) {
-		identityAnchor = week1Reflection.notes.trim();
+	if (!identityAnchor && week1CheckIn?.notes) {
+		identityAnchor = week1CheckIn.notes.trim();
 	}
 
 	const keyMoments = findKeyMoments(scores);
 
 	return {
-		objectiveTitle: cycle.objective.title,
+		goalTitle: journey.goal.title,
 		durationWeeks,
-		checkInCount: cycle.reflections.length,
-		raterCount: cycle.objective.stakeholders.length,
+		checkInCount: checkIns.length,
+		raterCount: journey.goal.reviewers.length,
 		scores,
 		effortStart: first?.effort ?? null,
 		effortEnd: last?.effort ?? first?.effort ?? null,

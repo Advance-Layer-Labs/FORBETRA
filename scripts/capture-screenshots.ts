@@ -9,7 +9,7 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:5173';
-const INDIVIDUAL_ID = 'cmn4zskut00szoxrewao1bsbn'; // Jamie Torres (active cycle)
+const INDIVIDUAL_ID = 'cmn4zskut00szoxrewao1bsbn'; // Jamie Torres (active journey)
 const COACH_ID = 'cmn4zrjwb0001oxre7wtoupgz'; // Marcus Thompson
 
 const VIEWPORT = { width: 1280, height: 800 };
@@ -46,8 +46,8 @@ const shots: Shot[] = [
 	{ name: '12-coach-analytics', path: '/coach/analytics', impersonateAs: COACH_ID },
 	{ name: '13-coach-invitations', path: '/coach/invitations', impersonateAs: COACH_ID },
 
-	// Stakeholder
-	{ name: '20-stakeholder-feedback', path: '/stakeholder/feedback/preview?preview=true' },
+	// Reviewer
+	{ name: '20-reviewer-feedback', path: '/stakeholder/feedback/preview?preview=true' },
 
 	// Admin
 	{ name: '30-admin-dashboard', path: '/admin' },

@@ -15,6 +15,7 @@
 
 	const { children, data }: { children: Snippet; data: LayoutData } = $props();
 
+	const isStakeholder = $derived($page.url.pathname.startsWith('/stakeholder'));
 	const isImpersonating = $derived(data.realUser != null);
 	const isRoleSelection = $derived(
 		($page.data as Record<string, unknown>).showRoleSelection === true
@@ -54,59 +55,61 @@
 		</div>
 	{/if}
 	<SignedIn>
-		{#if isImpersonating}
-			<div
-				class="sticky top-0 z-50 flex items-center justify-center gap-3 bg-warning px-4 py-2 text-sm font-medium text-surface-base shadow-md"
-			>
-				<span>Viewing as {data.dbUser?.name ?? data.dbUser?.email} ({data.dbUser?.role})</span>
-				<button
-					onclick={stopImpersonating}
-					class="rounded bg-surface-base px-3 py-0.5 text-xs font-bold text-warning hover:bg-surface-raised"
+		{#if !isStakeholder}
+			{#if isImpersonating}
+				<div
+					class="sticky top-0 z-50 flex items-center justify-center gap-3 bg-warning px-4 py-2 text-sm font-medium text-surface-base shadow-md"
 				>
-					Stop
-				</button>
-			</div>
+					<span>Viewing as {data.dbUser?.name ?? data.dbUser?.email} ({data.dbUser?.role})</span>
+					<button
+						onclick={stopImpersonating}
+						class="rounded bg-surface-base px-3 py-0.5 text-xs font-bold text-warning hover:bg-surface-raised"
+					>
+						Stop
+					</button>
+				</div>
+			{/if}
+			<a
+				href="#main-content"
+				class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-md focus:bg-surface-raised focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-text-primary focus:shadow-lg"
+				>Skip to main content</a
+			>
+			<header
+				class="flex items-center justify-between border-b border-border-default bg-surface-base px-4 py-3"
+				aria-label="Site header"
+			>
+				<h1 class="text-sm font-bold tracking-[0.18em] text-text-tertiary uppercase">Forbetra</h1>
+				<nav class="flex items-center gap-2" aria-label="Main navigation">
+					{#if data.dbUser}
+						{#if data.dbUser.role === 'ADMIN'}
+							<a
+								href={resolve('/admin/users')}
+								class="{navClass(isActive('/admin'))} px-2 py-1 text-xs"
+								aria-current={isActive('/admin') ? 'page' : undefined}
+							>
+								Admin
+							</a>
+						{/if}
+						{#if !isRoleSelection && data.dbUser?.role !== 'ORG_ADMIN'}
+							<a
+								href={resolve('/settings')}
+								class="{navClass(isActive('/settings'))} px-2 py-1 text-xs"
+								aria-current={isActive('/settings') ? 'page' : undefined}
+							>
+								Settings
+							</a>
+						{/if}
+					{/if}
+					<UserButton />
+				</nav>
+			</header>
 		{/if}
-		<a
-			href="#main-content"
-			class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-md focus:bg-surface-raised focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-text-primary focus:shadow-lg"
-			>Skip to main content</a
-		>
-		<header
-			class="flex items-center justify-between border-b border-border-default bg-surface-base px-4 py-3"
-			aria-label="Site header"
-		>
-			<h1 class="text-sm font-bold tracking-[0.18em] text-text-tertiary uppercase">Forbetra</h1>
-			<nav class="flex items-center gap-2" aria-label="Main navigation">
-				{#if data.dbUser}
-					{#if data.dbUser.role === 'ADMIN'}
-						<a
-							href={resolve('/admin/users')}
-							class="{navClass(isActive('/admin'))} px-2 py-1 text-xs"
-							aria-current={isActive('/admin') ? 'page' : undefined}
-						>
-							Admin
-						</a>
-					{/if}
-					{#if !isRoleSelection}
-						<a
-							href={resolve('/settings')}
-							class="{navClass(isActive('/settings'))} px-2 py-1 text-xs"
-							aria-current={isActive('/settings') ? 'page' : undefined}
-						>
-							Settings
-						</a>
-					{/if}
-				{/if}
-				<UserButton />
-			</nav>
-		</header>
 	</SignedIn>
 
 	<main
 		id="main-content"
 		tabindex="-1"
-		class={`min-h-screen bg-surface-base ${data.dbUser && !$page.url.pathname.startsWith('/individual') && !$page.url.pathname.startsWith('/coach') ? 'p-4' : ''}`}
+		class={`min-h-screen bg-surface-base ${data.dbUser && !isStakeholder && !$page.url.pathname.startsWith('/individual') && !$page.url.pathname.startsWith('/coach') ? 'p-4' : ''}`}
 	>
 		{#key $page.url.pathname}
 			<div class="animate-fade-in">
@@ -114,17 +117,7 @@
 			</div>
 		{/key}
 	</main>
-	{#if data.dbUser && !$page.url.pathname.startsWith('/stakeholder')}
-		<footer
-			class="border-t border-border-default bg-surface-base px-4 py-3 text-center text-xs text-text-muted"
-		>
-			<a href={resolve('/privacy')} class="hover:text-text-secondary hover:underline">Privacy</a>
-			<span class="mx-2">·</span>
-			<a href={resolve('/terms')} class="hover:text-text-secondary hover:underline">Terms</a>
-			<span class="mx-2">·</span>
-			<span>TLS encrypted · Enterprise-grade security.</span>
-		</footer>
-	{:else if $page.url.pathname.startsWith('/stakeholder')}
+	{#if isStakeholder}
 		<footer
 			class="border-t border-border-default bg-surface-base px-4 py-3 text-center text-xs text-text-muted"
 		>
@@ -133,6 +126,16 @@
 			<a href={resolve('/terms')} class="hover:text-text-secondary hover:underline">Terms</a>
 			<span class="mx-2">·</span>
 			<span>Enterprise-grade security.</span>
+		</footer>
+	{:else if data.dbUser}
+		<footer
+			class="border-t border-border-default bg-surface-base px-4 py-3 text-center text-xs text-text-muted"
+		>
+			<a href={resolve('/privacy')} class="hover:text-text-secondary hover:underline">Privacy</a>
+			<span class="mx-2">·</span>
+			<a href={resolve('/terms')} class="hover:text-text-secondary hover:underline">Terms</a>
+			<span class="mx-2">·</span>
+			<span>TLS encrypted · Enterprise-grade security.</span>
 		</footer>
 	{/if}
 	<ToastContainer />

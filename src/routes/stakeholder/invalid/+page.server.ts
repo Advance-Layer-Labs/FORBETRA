@@ -2,11 +2,14 @@ import { fail } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { rateLimit } from '$lib/server/rateLimit';
 import { sendEmail } from '$lib/notifications/email';
+import { wantsEmail, wantsSms } from '$lib/notifications/preferences';
+import { trySendSms } from '$lib/notifications/sms';
+import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
 import { getAppUrl } from '$lib/server/appUrl';
 import type { Actions } from './$types';
 
-// Generic response to avoid leaking which emails correspond to real stakeholders.
+// Generic response to avoid leaking which emails correspond to real reviewers.
 const GENERIC_OK = 'If your email is on file, the person who invited you has been notified.';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,30 +37,41 @@ export const actions: Actions = {
 			return { success: true, message: GENERIC_OK };
 		}
 
-		// Look up stakeholder by email. Multiple individuals can have the same
-		// stakeholder email, so handle the multi-match case by notifying all of
+		// Look up reviewer by email. Multiple individuals can have the same
+		// reviewer email, so handle the multi-match case by notifying all of
 		// them. (Real-world: rare, but Marc/Alice/Bob might all list the same
 		// reviewer.)
-		const stakeholders = await prisma.stakeholder.findMany({
+		const reviewers = await prisma.reviewer.findMany({
 			where: { email },
 			include: {
-				individual: { select: { name: true, email: true } }
+				individual: { select: { name: true, email: true, phone: true, deliveryMethod: true } }
 			},
 			take: 10
 		});
 
 		const appUrl = getAppUrl();
 
-		for (const sh of stakeholders) {
-			try {
-				const template = emailTemplates.stakeholderRequestedNewLink({
-					individualName: sh.individual.name || undefined,
-					stakeholderName: name || sh.name || undefined,
-					appUrl
-				});
-				await sendEmail({ to: sh.individual.email, ...template });
-			} catch (err) {
-				console.error('[email:error] Failed to notify individual of recovery request', err);
+		for (const sh of reviewers) {
+			if (wantsEmail(sh.individual.deliveryMethod)) {
+				try {
+					const template = emailTemplates.reviewerRequestedNewLink({
+						individualName: sh.individual.name || undefined,
+						reviewerName: name || sh.name || undefined,
+						appUrl
+					});
+					await sendEmail({ to: sh.individual.email, ...template });
+				} catch (err) {
+					console.error('[email:error] Failed to notify individual of recovery request', err);
+				}
+			}
+			if (wantsSms(sh.individual.deliveryMethod)) {
+				await trySendSms(
+					sh.individual.phone,
+					smsTemplates.reviewerRequestedNewLink({
+						reviewerName: name || sh.name || undefined,
+						appUrl
+					})
+				);
 			}
 		}
 

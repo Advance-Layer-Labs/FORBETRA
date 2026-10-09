@@ -2,6 +2,7 @@ import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
 import type { PageServerLoad } from './$types';
 import { buildClientSummary } from '$lib/server/buildClientSummary';
+import { clientSelect, toSummaryInput } from '../clientData';
 
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
@@ -21,79 +22,8 @@ export const load: PageServerLoad = async (event) => {
 
 	const individuals = individualIds.length
 		? await prisma.user.findMany({
-				where: {
-					id: { in: individualIds }
-				},
-				select: {
-					id: true,
-					email: true,
-					name: true,
-					objectives: {
-						where: { active: true },
-						orderBy: { createdAt: 'desc' },
-						include: {
-							subgoals: {
-								where: { active: true },
-								orderBy: { createdAt: 'asc' },
-								select: {
-									id: true,
-									label: true,
-									description: true
-								}
-							},
-							cycles: {
-								orderBy: { startDate: 'desc' },
-								take: 1,
-								include: {
-									reflections: {
-										orderBy: { submittedAt: 'desc' },
-										select: {
-											id: true,
-											weekNumber: true,
-											reflectionType: true,
-											submittedAt: true,
-											effortScore: true,
-											performanceScore: true,
-											notes: true
-										}
-									},
-									coachNotes: {
-										where: { coachId: dbUser.id },
-										orderBy: { createdAt: 'desc' },
-										take: 3,
-										select: {
-											id: true,
-											content: true,
-											weekNumber: true,
-											createdAt: true
-										}
-									}
-								}
-							},
-							stakeholders: {
-								orderBy: { createdAt: 'asc' },
-								include: {
-									feedbacks: {
-										orderBy: { submittedAt: 'desc' },
-										take: 10,
-										select: {
-											submittedAt: true,
-											effortScore: true,
-											performanceScore: true,
-											reflection: {
-												select: {
-													weekNumber: true,
-													effortScore: true,
-													performanceScore: true
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+				where: { id: { in: individualIds } },
+				select: clientSelect(dbUser.id, { noteTake: 3 })
 			})
 		: [];
 
@@ -103,7 +33,7 @@ export const load: PageServerLoad = async (event) => {
 		.map((relationship) => {
 			const individual = individualLookup.get(relationship.individualId);
 			if (!individual) return null;
-			return buildClientSummary(relationship, individual);
+			return buildClientSummary(relationship, toSummaryInput(individual, { feedbackTake: 10 }));
 		})
 		.filter((value): value is NonNullable<typeof value> => value !== null);
 
@@ -123,7 +53,7 @@ export const load: PageServerLoad = async (event) => {
 	);
 
 	const stabilityScores = clientSummaries
-		.map((c) => c.objective?.insights?.stabilityScore)
+		.map((c) => c.goal?.insights?.stabilityScore)
 		.filter((s): s is number => s !== null);
 	const avgStability =
 		stabilityScores.length > 0
@@ -131,7 +61,7 @@ export const load: PageServerLoad = async (event) => {
 			: null;
 
 	const alignmentRatios = clientSummaries
-		.map((c) => c.objective?.insights?.alignmentRatio)
+		.map((c) => c.goal?.insights?.alignmentRatio)
 		.filter((r): r is number => r !== null);
 	const avgAlignment =
 		alignmentRatios.length > 0
@@ -139,7 +69,7 @@ export const load: PageServerLoad = async (event) => {
 			: null;
 
 	const avgEffortScores = clientSummaries
-		.map((c) => c.objective?.insights?.avgEffort)
+		.map((c) => c.goal?.insights?.avgEffort)
 		.filter((e): e is number => e !== null);
 	const overallAvgEffort =
 		avgEffortScores.length > 0
@@ -147,7 +77,7 @@ export const load: PageServerLoad = async (event) => {
 			: null;
 
 	const avgProgressScores = clientSummaries
-		.map((c) => c.objective?.insights?.avgProgress)
+		.map((c) => c.goal?.insights?.avgProgress)
 		.filter((p): p is number => p !== null);
 	const overallAvgProgress =
 		avgProgressScores.length > 0
@@ -158,19 +88,19 @@ export const load: PageServerLoad = async (event) => {
 
 	// --- Client Comparison Table ---
 	const clientComparison = clientSummaries
-		.filter((c) => c.objective && !c.archived)
+		.filter((c) => c.goal && !c.archived)
 		.map((c) => ({
 			clientId: c.id,
 			name: c.name,
-			objective: c.objective?.title ?? '',
-			avgEffort: c.objective?.insights?.avgEffort ?? null,
-			avgProgress: c.objective?.insights?.avgProgress ?? null,
-			stability: c.objective?.insights?.stabilityScore ?? null,
-			trajectory: c.objective?.insights?.trajectoryScore ?? null,
-			alignment: c.objective?.insights?.alignmentRatio ?? null,
-			completionRate: c.objective?.cycle?.completion ?? null,
+			goal: c.goal?.title ?? '',
+			avgEffort: c.goal?.insights?.avgEffort ?? null,
+			avgProgress: c.goal?.insights?.avgProgress ?? null,
+			stability: c.goal?.insights?.stabilityScore ?? null,
+			trajectory: c.goal?.insights?.trajectoryScore ?? null,
+			alignment: c.goal?.insights?.alignmentRatio ?? null,
+			completionRate: c.goal?.journey?.completion ?? null,
 			alertCount: c.alerts.length,
-			currentWeek: c.objective?.cycle?.currentWeek ?? null
+			currentWeek: c.goal?.journey?.currentWeek ?? null
 		}));
 
 	// --- Portfolio Time Series: weekly averages across all active clients ---
@@ -179,7 +109,7 @@ export const load: PageServerLoad = async (event) => {
 		{ efforts: number[]; performances: number[]; clientIds: Set<string> }
 	>();
 	for (const client of clientSummaries) {
-		if (client.archived || !client.objective || !client.visualizationData) continue;
+		if (client.archived || !client.goal || !client.visualizationData) continue;
 		const weeklyData = client.visualizationData.individual ?? [];
 		for (const week of weeklyData) {
 			if (!weeklyBuckets.has(week.weekNumber)) {

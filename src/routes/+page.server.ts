@@ -9,13 +9,13 @@ export const load: PageServerLoad = async (event) => {
 	const { session, dbUser } = getOptionalAuth(event);
 
 	if (dbUser) {
-		// Check if user is brand-new: default INDIVIDUAL role, no objectives, no coach onboarding
+		// Check if user is brand-new: default INDIVIDUAL role, no goals, no coach onboarding
 		if (dbUser.role === 'INDIVIDUAL' && !dbUser.coachOnboardingCompletedAt) {
-			const objectiveCount = await prisma.objective.count({
+			const goalCount = await prisma.goal.count({
 				where: { userId: dbUser.id }
 			});
 
-			if (objectiveCount === 0) {
+			if (goalCount === 0) {
 				return {
 					showRoleSelection: true,
 					userId: session.userId,
@@ -26,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
 
 		// Redirect individuals to their hub
 		if (dbUser.role === 'INDIVIDUAL') {
-			throw redirect(303, '/individual');
+			throw redirect(303, '/individual/today');
 		}
 
 		// Redirect coaches to their hub
@@ -43,7 +43,7 @@ export const load: PageServerLoad = async (event) => {
 			throw redirect(303, '/admin/organizations');
 		}
 
-		// Stakeholders use tokenized feedback links — no authenticated hub to redirect to
+		// Reviewers use tokenized feedback links — no authenticated hub to redirect to
 	}
 
 	return {
@@ -92,6 +92,6 @@ export const actions: Actions = {
 			throw redirect(303, '/coach');
 		}
 
-		throw redirect(303, '/individual');
+		throw redirect(303, '/individual/today');
 	}
 };

@@ -24,8 +24,8 @@ snap "05-dashboard" "/individual/dashboard"
 snap "06-history" "/individual/history"
 
 echo ""
-echo "=== Capturing Stakeholder View ==="
-snap "10-stakeholder" "/stakeholder/feedback/preview?preview=true"
+echo "=== Capturing Reviewer View ==="
+snap "10-reviewer" "/reviewer/feedback/preview?preview=true"
 
 echo ""
 echo "=== Now impersonate Marcus Thompson (coach) in the browser ==="

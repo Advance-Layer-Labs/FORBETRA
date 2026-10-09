@@ -29,7 +29,7 @@
 	<div class="flex gap-3">
 		<!-- eslint-disable svelte/no-navigation-without-resolve -->
 		<a
-			href="/individual"
+			href="/individual/today"
 			class="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
 		>
 			<ArrowLeft class="h-4 w-4" />

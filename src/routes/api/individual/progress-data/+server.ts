@@ -1,65 +1,72 @@
 import { json, error } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
-import { getActiveObjectiveWithCycle } from '$lib/server/individualContext';
+import { getActiveGoalWithJourney } from '$lib/server/individualContext';
 import {
 	computeMyLastRatings,
-	computeStakeholdersLastRatings,
+	computeReviewersLastRatings,
 	computeHeatMap,
 	computeVisualizationData,
-	computeCompletionMetrics
+	computeCompletionMetrics,
+	withCheckInWeeks
 } from '$lib/server/hubMetrics';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
-	const result = await getActiveObjectiveWithCycle(dbUser.id);
-	if (!result?.cycle) {
-		throw error(404, 'No active cycle');
+	const result = await getActiveGoalWithJourney(dbUser.id);
+	if (!result?.journey) {
+		throw error(404, 'No active journey');
 	}
 
-	const { objective, cycle, currentWeek } = result;
+	const { goal, journey, currentWeek } = result;
 	if (!currentWeek) {
 		throw error(404, 'No active week');
 	}
 
-	const reflections = cycle.reflections ?? [];
-	const checkInFrequency = cycle.checkInFrequency ?? '3x';
-	const stakeholderRefs = objective.stakeholders.map((s) => ({ id: s.id, name: s.name }));
-
-	const [allFeedbacks] = await Promise.all([
+	const [checkInRows, allFeedbacks, reviewers] = await Promise.all([
+		prisma.checkIn.findMany({
+			where: { journeyId: journey.id },
+			orderBy: { submittedAt: 'asc' },
+			select: { id: true, effortScore: true, performanceScore: true, submittedAt: true }
+		}),
 		prisma.feedback.findMany({
-			where: { reflection: { cycleId: cycle.id } },
+			where: { journeyId: journey.id },
 			select: {
-				stakeholderId: true,
+				reviewerId: true,
+				weekNumber: true,
 				effortScore: true,
 				performanceScore: true,
-				submittedAt: true,
-				reflection: { select: { weekNumber: true } }
+				submittedAt: true
 			},
 			orderBy: { submittedAt: 'desc' }
+		}),
+		prisma.reviewer.findMany({
+			where: { individualId: dbUser.id, OR: [{ goalId: null }, { goalId: goal.id }] },
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true }
 		})
 	]);
 
-	const myLastRatings = computeMyLastRatings(reflections);
-	const stakeholdersLastRatings = computeStakeholdersLastRatings(allFeedbacks);
-	const summary = computeCompletionMetrics(reflections, currentWeek, checkInFrequency);
+	const checkIns = withCheckInWeeks(journey.startDate, checkInRows, result.timeZone);
+	const myLastRatings = computeMyLastRatings(checkIns);
+	const reviewersLastRatings = computeReviewersLastRatings(allFeedbacks);
+	const summary = computeCompletionMetrics(checkIns, currentWeek);
 	const { weeks: heatMapWeeks, totalWeeks } = computeHeatMap(
-		reflections,
+		checkIns,
 		currentWeek,
-		cycle.startDate,
-		cycle.endDate ?? null
+		journey.lengthWeeks
 	);
 	const visualizationData =
 		heatMapWeeks.length > 0
-			? computeVisualizationData(heatMapWeeks, allFeedbacks, stakeholderRefs)
+			? computeVisualizationData(heatMapWeeks, allFeedbacks, reviewers)
 			: null;
 
 	return json({
 		myLastRatings,
-		stakeholdersLastRatings,
-		summary: { ...summary, totalStakeholders: objective.stakeholders.length },
+		reviewersLastRatings,
+		summary: { ...summary, totalReviewers: reviewers.length },
 		heatMapWeeks,
 		totalWeeks,
 		visualizationData

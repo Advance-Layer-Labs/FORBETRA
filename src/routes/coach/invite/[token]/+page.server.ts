@@ -2,10 +2,7 @@ import prisma from '$lib/server/prisma';
 import { getOptionalAuth } from '$lib/server/auth';
 import { fail } from '@sveltejs/kit';
 import { createHash } from 'crypto';
-import { sendEmail } from '$lib/notifications/email';
-import { emailTemplates } from '$lib/notifications/emailTemplates';
-import { trySendSms } from '$lib/notifications/sms';
-import { smsTemplates } from '$lib/notifications/smsTemplates';
+import { notifyCoachClientAccepted } from '$lib/notifications/notifyCoach';
 import type { Actions, PageServerLoad } from './$types';
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -149,6 +146,7 @@ export const actions: Actions = {
 			where: { tokenHash },
 			select: {
 				id: true,
+				email: true,
 				coachId: true,
 				expiresAt: true,
 				acceptedAt: true,
@@ -172,8 +170,21 @@ export const actions: Actions = {
 			return fail(400, { error: 'This invitation has been cancelled.' });
 		}
 
+		if (status === 'accepted' && invite.individualId === dbUser.id) {
+			return { success: true };
+		}
+
 		if (status === 'accepted' && invite.individualId && invite.individualId !== dbUser.id) {
 			return fail(400, { error: 'This invitation has already been accepted by another user.' });
+		}
+
+		const invitedEmail = invite.email.trim().toLowerCase();
+		const signedInEmail = dbUser.email.trim().toLowerCase();
+		if (invitedEmail && signedInEmail !== invitedEmail) {
+			return fail(403, {
+				error:
+					'This invitation was sent to a different email address. Sign in with that address to accept it.'
+			});
 		}
 
 		await prisma.$transaction(async (tx) => {
@@ -213,37 +224,11 @@ export const actions: Actions = {
 			});
 		});
 
-		// Notify the coach that their invite was accepted
-		try {
-			const coach = await prisma.user.findUnique({
-				where: { id: invite.coachId },
-				select: { email: true, name: true, phone: true }
-			});
-
-			if (coach) {
-				const template = emailTemplates.coachClientAccepted({
-					coachName: coach.name ?? 'Coach',
-					clientName: dbUser.name ?? dbUser.email,
-					clientEmail: dbUser.email
-				});
-				await sendEmail({
-					to: coach.email,
-					subject: template.subject,
-					html: template.html,
-					text: template.text
-				});
-
-				// Send SMS to coach
-				await trySendSms(
-					coach.phone,
-					smsTemplates.coachClientAccepted({
-						clientName: dbUser.name ?? dbUser.email
-					})
-				);
-			}
-		} catch (error) {
-			console.warn('Failed to send coach notification email', error);
-		}
+		await notifyCoachClientAccepted({
+			coachId: invite.coachId,
+			clientName: dbUser.name ?? dbUser.email,
+			clientEmail: dbUser.email
+		});
 
 		return {
 			success: true

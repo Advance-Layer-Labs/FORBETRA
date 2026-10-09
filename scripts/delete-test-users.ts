@@ -24,7 +24,7 @@ async function deleteTestUsers() {
 			const user = await prisma.user.findUnique({
 				where: { email: email.toLowerCase() },
 				include: {
-					objectives: true,
+					goals: true,
 					coachNotesAuthored: true,
 					coachNotesReceived: true
 				}
@@ -39,42 +39,38 @@ async function deleteTestUsers() {
 
 			// Delete related records first to avoid foreign key constraints
 			await prisma.$transaction(async (tx) => {
-				// Get all cycles for this user's objectives
-				const objectiveIds = user.objectives.map((o) => o.id);
-				const cycles = await tx.cycle.findMany({
-					where: { objectiveId: { in: objectiveIds } }
+				// Get all journeys for this user's goals
+				const goalIds = user.goals.map((o) => o.id);
+				const journeys = await tx.journey.findMany({
+					where: { goalId: { in: goalIds } }
 				});
-				const cycleIds = cycles.map((c) => c.id);
+				const journeyIds = journeys.map((journey) => journey.id);
 
-				// Get all reflections linked to cycles
-				const reflections = await tx.reflection.findMany({
-					where: { cycleId: { in: cycleIds } }
+				const checkInCount = await tx.checkIn.count({
+					where: { journeyId: { in: journeyIds } }
 				});
-				const reflectionIds = reflections.map((r) => r.id);
 
-				console.log(`   🗑️  Deleting ${reflectionIds.length} feedback records...`);
-				// Delete feedback linked to reflections
+				console.log(`   Deleting feedback for ${journeyIds.length} journeys...`);
 				await tx.feedback.deleteMany({
-					where: { reflectionId: { in: reflectionIds } }
+					where: { journeyId: { in: journeyIds } }
 				});
 
-				console.log(`   🗑️  Deleting ${reflectionIds.length} reflection records...`);
-				// Delete reflections
-				await tx.reflection.deleteMany({
-					where: { cycleId: { in: cycleIds } }
+				console.log(`   Deleting ${checkInCount} check-ins...`);
+				await tx.checkIn.deleteMany({
+					where: { journeyId: { in: journeyIds } }
 				});
 
-				console.log(`   🗑️  Deleting ${cycleIds.length} cycle records...`);
-				// Delete cycles
-				await tx.cycle.deleteMany({ where: { objectiveId: { in: objectiveIds } } });
+				console.log(`   🗑️  Deleting ${journeyIds.length} journey records...`);
+				// Delete journeys
+				await tx.journey.deleteMany({ where: { goalId: { in: goalIds } } });
 
-				console.log(`   🗑️  Deleting subgoals...`);
-				// Delete subgoals linked to objectives
-				await tx.subgoal.deleteMany({ where: { objectiveId: { in: objectiveIds } } });
+				console.log(`   🗑️  Deleting focusAreas...`);
+				// Delete focusAreas linked to goals
+				await tx.focusArea.deleteMany({ where: { goalId: { in: goalIds } } });
 
-				console.log(`   🗑️  Deleting ${objectiveIds.length} objective records...`);
-				// Delete objectives
-				await tx.objective.deleteMany({ where: { userId: user.id } });
+				console.log(`   🗑️  Deleting ${goalIds.length} goal records...`);
+				// Delete goals
+				await tx.goal.deleteMany({ where: { userId: user.id } });
 
 				console.log(`   🗑️  Deleting coach notes...`);
 				// Delete coach notes
@@ -95,8 +91,8 @@ async function deleteTestUsers() {
 					where: { OR: [{ coachId: user.id }, { individualId: user.id }] }
 				});
 
-				console.log(`   🗑️  Deleting stakeholders...`);
-				await tx.stakeholder.deleteMany({
+				console.log(`   🗑️  Deleting reviewers...`);
+				await tx.reviewer.deleteMany({
 					where: { OR: [{ individualId: user.id }, { invitedById: user.id }] }
 				});
 

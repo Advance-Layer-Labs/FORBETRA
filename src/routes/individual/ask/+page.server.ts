@@ -1,19 +1,12 @@
-import prisma from '$lib/server/prisma';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent }) => {
-	const { dbUserId, dbUserName } = await parent();
-
-	const activeCycle = await prisma.cycle.findFirst({
-		where: {
-			userId: dbUserId,
-			status: 'ACTIVE'
-		},
-		select: { id: true }
-	});
+	const { dbUserName, journey, checkIns, feedback } = await parent();
 
 	return {
 		userName: dbUserName || 'there',
-		hasActiveCycle: !!activeCycle
+		hasActiveCycle: journey.status === 'ACTIVE',
+		checkInCount: checkIns.length,
+		feedbackCount: feedback.length
 	};
 };

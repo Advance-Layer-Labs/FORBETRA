@@ -1,29 +1,29 @@
-export interface SubgoalTemplate {
+export interface FocusAreaTemplate {
 	label: string;
 	description: string;
 }
 
-export interface StakeholderGuidance {
+export interface ReviewerGuidance {
 	whyItMatters: string;
 	recommendedApproach: string;
 	recommendedRoles: string[];
-	exampleStakeholders: string[];
+	exampleReviewers: string[];
 }
 
-export interface ObjectiveTemplate {
+export interface GoalTemplate {
 	id: string;
 	title: string;
 	description: string;
 	contextSummary: string;
-	subgoals: SubgoalTemplate[];
-	stakeholderGuidance: StakeholderGuidance;
+	focusAreas: FocusAreaTemplate[];
+	reviewerGuidance: ReviewerGuidance;
 }
 
 export interface OnboardingContext {
 	id: string;
 	title: string;
 	description: string;
-	objectives: ObjectiveTemplate[];
+	goals: GoalTemplate[];
 }
 
 export const onboardingContexts: OnboardingContext[] = [
@@ -32,7 +32,7 @@ export const onboardingContexts: OnboardingContext[] = [
 		title: 'Business / Executive Context',
 		description:
 			'Great for senior leaders and operators who want to build visible leadership capabilities while staying aligned with organizational goals.',
-		objectives: [
+		goals: [
 			{
 				id: 'business-executive-presence',
 				title: 'Improve executive presence',
@@ -40,7 +40,7 @@ export const onboardingContexts: OnboardingContext[] = [
 					'Build credibility and calm confidence in high-visibility meetings, presentations, and decision moments.',
 				contextSummary:
 					'Tighten how you show up—visibly and vocally—so peers and reports experience clarity, steadiness, and conviction.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Show composed body language',
 						description:
@@ -57,18 +57,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Receive positive feedback from peers or reports on clarity, confidence, and composure in high-stakes discussions.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
-						'Stakeholders who regularly see you communicate can quickly flag what lands well and what distracts from your message.',
+						'Reviewers who regularly see you communicate can quickly flag what lands well and what distracts from your message.',
 					recommendedApproach:
-						'Invite 3–5 stakeholders who join executive updates or critical meetings so they can observe your delivery and share concrete stories.',
+						'Invite 3–5 reviewers who join executive updates or critical meetings so they can observe your delivery and share concrete stories.',
 					recommendedRoles: [
 						'Direct manager or skip-level leader',
 						'Trusted peer in leadership meetings',
 						'Direct report who monitors team morale',
 						'HR partner, coach, or communications lead'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'COO or Chief of Staff',
 						'Peer VP or director',
 						'Lead direct report for a major program',
@@ -83,7 +83,7 @@ export const onboardingContexts: OnboardingContext[] = [
 					'Connect day-to-day execution to longer-range bets, making strategic trade-offs explicit for your teams.',
 				contextSummary:
 					'Keep your planning cadence anchored in long-term priorities so decisions feel grounded instead of reactive.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Run structured strategic reviews',
 						description:
@@ -100,18 +100,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Present a clear link between daily priorities and organizational strategy in team planning meetings.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
-						'Stakeholders surface blind spots in your thinking and ensure strategic messages travel across functions.',
+						'Reviewers surface blind spots in your thinking and ensure strategic messages travel across functions.',
 					recommendedApproach:
-						'Select 3–5 stakeholders who influence planning cycles so they can assess whether your strategy shows up in real workflows.',
+						'Select 3–5 reviewers who influence planning journeys so they can assess whether your strategy shows up in real workflows.',
 					recommendedRoles: [
 						'Executive sponsor',
 						'Cross-functional partner (e.g., Finance, Product, Operations)',
 						'Strategy or biz-ops leader',
 						'Direct report who drives planning cadence'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'CFO or senior finance partner',
 						'Head of Product or Operations counterpart',
 						'Strategy director or chief of staff',
@@ -126,7 +126,7 @@ export const onboardingContexts: OnboardingContext[] = [
 					'Strengthen clarity, accountability, and growth for your team by delegating meaningful work with the right support.',
 				contextSummary:
 					'Shift from “doing” to “developing” others while keeping outcomes crisp and trackable.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Delegate high-impact work',
 						description:
@@ -143,18 +143,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Conduct monthly debriefs with direct reports to review outcomes, give recognition, and identify development opportunities.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
-						'Stakeholders who rely on your team can validate whether delegation strengthens delivery and talent growth.',
+						'Reviewers who rely on your team can validate whether delegation strengthens delivery and talent growth.',
 					recommendedApproach:
-						'Choose 3–5 stakeholders who experience the downstream impact of delegation so they can reflect on empowerment gains.',
+						'Choose 3–5 reviewers who experience the downstream impact of delegation so they can reflect on empowerment gains.',
 					recommendedRoles: [
 						'Direct manager',
 						'Key direct report receiving delegated work',
 						'Peer or partner team lead',
 						'People/HR partner focused on talent development'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'VP or senior leader supervising your function',
 						'Senior IC or team lead you delegate to',
 						'Cross-functional project owner',
@@ -169,7 +169,7 @@ export const onboardingContexts: OnboardingContext[] = [
 		title: 'Military / Operational Context',
 		description:
 			'Designed for leaders honing operational readiness, unit cohesion, and decision speed in complex environments.',
-		objectives: [
+		goals: [
 			{
 				id: 'military-situational-awareness',
 				title: 'Enhance situational awareness',
@@ -177,7 +177,7 @@ export const onboardingContexts: OnboardingContext[] = [
 					'Sharpen your ability to scan, interpret, and broadcast mission-critical changes under pressure.',
 				contextSummary:
 					'Improve sensing and communication so your element reacts to the right signals at the right time.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Identify mission-relevant changes',
 						description:
@@ -194,18 +194,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Reduce the number of missed or delayed responses to changing mission factors over consecutive training evaluations.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
-						'Operational stakeholders confirm whether your awareness translates into actionable briefings and team responsiveness.',
+						'Operational reviewers confirm whether your awareness translates into actionable briefings and team responsiveness.',
 					recommendedApproach:
-						'Loop in 3–5 stakeholders who monitor or depend on your situational calls so they can log concrete feedback after exercises.',
+						'Loop in 3–5 reviewers who monitor or depend on your situational calls so they can log concrete feedback after exercises.',
 					recommendedRoles: [
 						'Commanding officer or XO',
 						'Platoon sergeant or senior enlisted advisor',
 						'Ops/intelligence partner observing the mission',
 						'Peer leader from a sister unit'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'Company commander',
 						'Platoon sergeant',
 						'Intelligence NCO or S2 liaison',
@@ -220,7 +220,7 @@ export const onboardingContexts: OnboardingContext[] = [
 					'Forge dependable relationships and transparent communication across your unit.',
 				contextSummary:
 					'Center your leadership on shared values, recognition, and structured reflection so the team stays aligned.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Run weekly check-ins',
 						description:
@@ -237,18 +237,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Recognize at least one team member weekly for contributions that reinforce shared values or mission success.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
 						'Trust is best evaluated by the people you lead and those who rely on your unit under stress.',
 					recommendedApproach:
-						'Invite 3–5 stakeholders who observe morale and collaboration daily so they can document tangible shifts in cohesion.',
+						'Invite 3–5 reviewers who observe morale and collaboration daily so they can document tangible shifts in cohesion.',
 					recommendedRoles: [
 						'Command team (commander/XO)',
 						'Peer squad or platoon leaders',
 						'Unit training or readiness NCO',
 						'Mission partner from another section'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'Company first sergeant',
 						'Peer platoon leader',
 						'Unit readiness NCO',
@@ -260,10 +260,10 @@ export const onboardingContexts: OnboardingContext[] = [
 				id: 'military-initiative',
 				title: 'Strengthen initiative and independent judgment',
 				description:
-					'Make timely calls within commander’s intent while learning from each decision cycle.',
+					'Make timely calls within commander’s intent while learning from each decision journey.',
 				contextSummary:
 					'Build confidence choosing a course of action when guidance is limited, then codify the lessons.',
-				subgoals: [
+				focusAreas: [
 					{
 						label: 'Act within commander’s intent',
 						description:
@@ -280,18 +280,18 @@ export const onboardingContexts: OnboardingContext[] = [
 							'Receive positive evaluation feedback from superiors on initiative, confidence, and judgment accuracy.'
 					}
 				],
-				stakeholderGuidance: {
+				reviewerGuidance: {
 					whyItMatters:
 						'Leaders above and alongside you can validate whether your calls align with intent and timing requirements.',
 					recommendedApproach:
-						'Select 3–5 stakeholders who oversee or depend on your decisions so they can review mission logs and offer precise coaching.',
+						'Select 3–5 reviewers who oversee or depend on your decisions so they can review mission logs and offer precise coaching.',
 					recommendedRoles: [
 						'Commander or battalion staff supervisor',
 						'Senior enlisted advisor',
 						'Peer leader sharing mission space',
 						'Observer/controller or evaluator'
 					],
-					exampleStakeholders: [
+					exampleReviewers: [
 						'Battalion S3 or operations officer',
 						'Company first sergeant or senior NCO',
 						'Peer platoon commander',

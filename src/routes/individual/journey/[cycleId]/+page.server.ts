@@ -6,9 +6,9 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
-	const { cycleId } = event.params;
+	const { cycleId: journeyId } = event.params;
 
-	const story = await loadGrowthStory(prisma, cycleId, dbUser.id);
+	const story = await loadGrowthStory(prisma, journeyId, dbUser.id);
 
 	if (!story) {
 		throw error(404, 'Growth story not found');

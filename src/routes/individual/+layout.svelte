@@ -15,14 +15,16 @@
 	const { children }: { children: Snippet } = $props();
 
 	const navItems = [
-		{ href: '/individual', label: 'Today', icon: Home },
+		{ href: '/individual/today', label: 'Home', icon: Home },
 		{ href: '/individual/progress', label: 'Progress', icon: TrendingUp },
 		{ href: '/individual/feedback', label: 'Feedback', icon: Users }
 	];
 
 	const isActive = (href: string) => {
 		const pathname = $page.url.pathname;
-		if (href === '/individual') return pathname === '/individual';
+		if (href === '/individual/today') {
+			return pathname === '/individual/today' || pathname === '/individual/checkin';
+		}
 		return pathname === href || pathname.startsWith(href + '/');
 	};
 </script>
@@ -91,6 +93,17 @@
 					<span>{item.label}</span>
 				</a>
 			{/each}
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
+			<!-- eslint-disable svelte/no-navigation-without-resolve -->
+			<a
+				href="/individual/settings"
+				class="flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px] font-semibold transition-colors
+					{$page.url.pathname === '/individual/settings' ? 'text-accent' : 'text-text-muted'}"
+				aria-current={$page.url.pathname === '/individual/settings' ? 'page' : undefined}
+			>
+				<Settings class="h-5 w-5" />
+				<span>Settings</span>
+			</a>
 			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</nav>
 	</div>

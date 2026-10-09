@@ -1,115 +1,99 @@
-# Email Notifications Implementation Summary
+# Notification implementation
 
-## ✅ What's Been Implemented
+Email and SMS are sent inline from route actions and cron jobs. There is no queue and no in-app inbox.
 
-### 1. **Database Schema**
+- Email: [`src/lib/notifications/email.ts`](../src/lib/notifications/email.ts). Postmark when `POSTMARK_API_KEY` is set, otherwise SendGrid. `EMAIL_MODE=mock` logs instead of sending. Development defaults to mock.
+- SMS: [`src/lib/notifications/sms.ts`](../src/lib/notifications/sms.ts) via Twilio. `SMS_MODE=mock` logs instead of sending. `trySendSms` returns `false` when the phone is missing or the provider throws.
+- Templates: [`emailTemplates.ts`](../src/lib/notifications/emailTemplates.ts) and [`smsTemplates.ts`](../src/lib/notifications/smsTemplates.ts).
 
-- Added `reminderDays` field to `User` model (stores 'wednesday_friday' or 'tuesday_thursday')
-- **Action Required**: Run migration: `npx prisma migrate dev --name add_reminder_days`
+Reviewers have no account. Their public links live under `/stakeholder/*`. The data model is `Reviewer`.
 
-### 2. **SendGrid Integration**
+## Individual preferences
 
-- Installed `@sendgrid/mail` package
-- Implemented `sendEmail()` function with SendGrid integration
-- Email function works in both development (logs) and production (sends via SendGrid)
+Stored on `User`:
 
-### 3. **Email Templates**
+- `deliveryMethod`: `email`, `sms`, or `both`. A null or unknown value is treated as `email`, the same default the settings screen shows. SMS is not sent until the person chooses `sms` or `both`.
+- `notificationTime`: `HH:mm`, default `09:00`.
+- `timezone`: IANA zone, default `UTC`.
 
-Created comprehensive email templates in `src/lib/notifications/emailTemplates.ts`:
+Check-in reminders use the local weekday and the local hour of `notificationTime`. Journey day 3 is also counted on that local calendar. There is no `reminderDays` field.
 
-- ✅ Welcome email for individuals
-- ✅ Welcome email for stakeholders
-- ✅ Feedback invite emails
-- ✅ Stakeholder feedback received notification (to individual)
-- ✅ Base reminder emails (Monday/Wednesday/Friday or Tuesday/Thursday)
-- ✅ Overdue reminder emails
-- ✅ Stakeholder feedback reminder emails
+`/api/jobs/remind-base` and `/api/jobs/remind-prompts` run every hour (`0 * * * *`) so a saved hour in any timezone can match. Each job still sends at most once per local day for a given user.
 
-### 4. **Email Notifications Wired Up**
+## Individuals
 
-#### Welcome Emails
+| Event | Channel | Respects `deliveryMethod` |
+| --- | --- | --- |
+| Welcome after onboarding | Email, and SMS when allowed | Yes |
+| Weekly check-in nudge (journey day 3, local weekday, saved hour) | Email and/or SMS | Yes |
+| Missing check-in on other local weekdays (max 2 per week; stored in `NotificationCap` when Upstash is absent) | Email and/or SMS | Yes |
+| Journey completed | Email and/or SMS | Yes |
+| Reviewer submitted feedback | Email and/or SMS | Yes |
+| Reviewer asked for a new link | Email and/or SMS | Yes |
+| Streak milestone | Email and/or SMS | Yes |
+| Monthly summary | Email and/or SMS | Yes |
+| Scorecard perception-gap shift | Email and/or SMS | Yes |
 
-- ✅ Individual welcome email sent on onboarding completion
-- ✅ Stakeholder welcome email sent when added (onboarding, dashboard, individual/stakeholders pages)
+Weekly AI insights are stored for the app. They are not emailed. Coach notes appear on Today. They are not emailed.
 
-#### Feedback Invites
+## Reviewers
 
-- ✅ Feedback invite emails sent when individual submits reflection
-- ✅ Updated in: `individual/stakeholders`, `dashboard`, `individual/dashboard`
+Reviewers do not have `deliveryMethod`. Email always goes out. SMS goes out when `Reviewer.phone` is set, and the UI reports SMS only when `trySendSms` succeeds.
 
-#### Stakeholder Feedback Notifications
+| Event | Template |
+| --- | --- |
+| Added as a reviewer | `welcomeReviewer` |
+| Individual requests feedback | `feedbackInvite` |
+| Weekday reminder for an open invite, or a due reviewer whose invite expired | `reminderReviewerFeedback` |
+| Submitted feedback | `reviewerThankYou` |
+| Monthly impact summary | `reviewerImpactSummary` |
 
-- ✅ Individual receives email when stakeholder submits feedback
-- ✅ Directs them to insights page to build app habit
+Checking in does not invite reviewers. The individual sends the request from Reviewers or Feedback. The reminder job adds a new link and leaves any earlier open link valid. It also nudges a reviewer whose last unused invite has expired and who is still due. Reviewer emails do not link to account settings. The 2-per-week cap is enforced in Redis when Upstash is set, and in the `NotificationCap` table otherwise.
 
-#### Reminder Emails
+## Coaches
 
-- ✅ Base reminders: Monday/Wednesday/Friday or Tuesday/Thursday @ 9am
-- ✅ Overdue reminders: Mon-Fri @ 2pm (existing job now sends emails)
-- ✅ Stakeholder feedback reminders: Mon-Fri @ 3pm (existing job now sends emails)
+| Event | Recipient | Channel |
+| --- | --- | --- |
+| Coach creates or resends a client invite | Invitee | `coachInvitation` email, plus SMS when a phone is on the invite |
+| Client accepts `/coach/invite/[token]`, or signup auto-links a pending invite | Coach | `coachClientAccepted` email, and SMS when the coach's `deliveryMethod` allows it |
+| Reviewer submits feedback for a linked client | Every active coach | `coachReviewerFeedbackReceived` email, and SMS when that coach's `deliveryMethod` allows it |
 
-### 5. **Cron Jobs**
+Accepting an invite that this same client already accepted does not send again. Signup auto-accept in `hooks.server.ts` sends the same coach notification as the invite page.
 
-Updated `vercel.json` with new base reminder job:
+Coach prep, client check-ins, and portfolio alerts stay in the app. They are not emailed. Coach settings store `deliveryMethod` (default email). Coach SMS is sent only for `sms` or `both`.
 
-- `/api/jobs/remind-base` - Runs Mon-Fri @ 9am
-- `/api/jobs/remind-prompts` - Runs Mon-Fri @ 2pm (overdue reminders)
-- `/api/jobs/remind-feedback` - Runs Mon-Fri @ 3pm (stakeholder reminders)
+Inbound texts hit `POST /api/webhooks/twilio`. STOP sets `deliveryMethod` to email for the matching phone. START sets it to both. The request must carry a valid Twilio signature.
 
-### 6. **Onboarding Updates**
+## Cron
 
-- ✅ Stores `reminderDays` preference in User model during onboarding
-- ✅ Sends welcome emails to stakeholders added during onboarding
+| Path | Schedule (UTC) | Who |
+| --- | --- | --- |
+| `/api/jobs/remind-base` | Every hour | Individuals, at their saved local hour |
+| `/api/jobs/remind-prompts` | Every hour | Individuals, at their saved local hour, except journey day 3 |
+| `/api/jobs/remind-feedback` | Weekdays 15:00 | Reviewers with an open or expired invite |
+| `/api/jobs/complete-cycles` | Daily 01:00 | Individuals whose journey ended |
+| `/api/jobs/individual-monthly-summary` | 1st of month 10:00 | Individuals with recent activity |
+| `/api/jobs/stakeholder-impact` | 1st of month 10:00 | Reviewers |
+| `/api/jobs/notify-scorecard-shifts` | Sundays 21:00 | Individuals |
+| `/api/jobs/generate-insights` | Sundays 20:00 | In-app insights only |
+| `/api/jobs/coach-prep` | Mondays 07:00 | In-app coach prep only |
 
-## 🔧 Environment Variables Required
-
-Add these to your Vercel project (or `.env` for local):
+## Environment
 
 ```bash
-# SendGrid (Twilio Email)
-SENDGRID_API_KEY=your_sendgrid_api_key_here
-SENDGRID_FROM_EMAIL=noreply@forbetra.com  # Or your verified sender email
+POSTMARK_API_KEY=
+SENDGRID_API_KEY=
+SENDGRID_FROM_EMAIL=noreply@forbetra.com
+EMAIL_MODE=send
+EMAIL_PROVIDER=postmark
 
-# Job Authentication
-JOB_SECRET_TOKEN=your_secret_token_here  # For securing cron endpoints
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_MESSAGING_SERVICE_SID=
+SMS_MODE=send
 
-# App URL (optional, defaults to app.forbetra.com)
-PUBLIC_APP_URL=your-app-domain.com  # Or VERCEL_URL will be used automatically
+CRON_SECRET=
+PUBLIC_APP_URL=https://app.forbetra.com
 ```
 
-## 📋 Next Steps
-
-1. **Run Database Migration**
-
-   ```bash
-   cd forbetra
-   npx prisma migrate dev --name add_reminder_days
-   ```
-
-2. **Set Up SendGrid**
-   - Get API key from Twilio SendGrid dashboard
-   - Verify sender email address
-   - Add environment variables to Vercel
-
-3. **Test Email Sending**
-   - Test in development (will log to console)
-   - Test in production with real SendGrid credentials
-   - Verify all email templates render correctly
-
-4. **Verify Cron Jobs**
-   - Base reminders: Mon-Fri @ 9am
-   - Overdue reminders: Mon-Fri @ 2pm
-   - Stakeholder reminders: Mon-Fri @ 3pm
-
-## 📝 Notes
-
-- All email sending is wrapped in try-catch blocks to prevent request failures if email service is down
-- Email templates include both HTML and plain text versions
-- Reminder preference is stored per user and used to determine which days to send base reminders
-- Welcome emails are sent once (individuals on onboarding complete, stakeholders when added)
-
-## 🐛 Known Issues / Future Improvements
-
-- Base reminder job uses server timezone - may need timezone handling per user
-- Welcome emails for stakeholders during onboarding use setTimeout (could be improved with queue)
-- Email templates could be moved to a template engine for easier editing
+`JOB_SECRET_TOKEN` is accepted as a fallback for cron auth when `CRON_SECRET` is unset.

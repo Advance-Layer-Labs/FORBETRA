@@ -123,7 +123,7 @@
 	function downloadCSV() {
 		const headers = [
 			'Name',
-			'Objective',
+			'Goal',
 			'Effort',
 			'Performance',
 			'Stability',
@@ -133,7 +133,7 @@
 		];
 		const rows = sortedComparison.map((row) => [
 			row.name,
-			row.objective ?? '',
+			row.goal ?? '',
 			row.avgEffort !== null ? row.avgEffort.toFixed(1) : '',
 			row.avgProgress !== null ? row.avgProgress.toFixed(1) : '',
 			row.stability !== null ? String(row.stability) : '',
@@ -219,7 +219,7 @@
 				<AlertTriangle class="h-4 w-4 text-text-muted" />
 				<p class="text-xs font-medium text-text-tertiary">
 					Total Alerts <InfoTip
-						text="AI-detected patterns that may need coaching attention. Sorted by severity."
+						text="Missed check-ins and score trends that may need coaching attention. Sorted by severity."
 					/>
 				</p>
 			</div>
@@ -227,7 +227,6 @@
 			<div class="mt-1 flex gap-2 text-xs">
 				<span class="font-semibold text-error">High: {data.analytics.highPriorityAlerts}</span>
 				<span class="text-warning">Med: {data.analytics.mediumPriorityAlerts}</span>
-				<span class="text-text-secondary">Low: {data.analytics.lowPriorityAlerts}</span>
 			</div>
 		</div>
 		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
@@ -307,7 +306,7 @@
 								<th
 									class="px-3 py-2 text-left text-xs font-semibold tracking-wider text-text-tertiary uppercase"
 								>
-									Objective
+									Goal
 								</th>
 								<th
 									class="px-3 py-2 text-center text-xs font-semibold tracking-wider text-text-tertiary uppercase"
@@ -317,14 +316,18 @@
 											: 'descending'
 										: 'none'}
 								>
-									<button
-										type="button"
-										class="flex items-center gap-1"
-										onclick={() => toggleSort('avgEffort')}
-									>
-										<span title="Average self-rated effort (last 4 weeks)">Effort</span
-										>{sortIndicator('avgEffort')}
-									</button>
+									<div class="flex items-center justify-center gap-1">
+										<button
+											type="button"
+											class="flex items-center gap-1"
+											onclick={() => toggleSort('avgEffort')}
+										>
+											Effort{sortIndicator('avgEffort')}
+										</button>
+										<InfoTip
+											text="How much attention they gave this goal, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
+										/>
+									</div>
 								</th>
 								<th
 									class="px-3 py-2 text-center text-xs font-semibold tracking-wider text-text-tertiary uppercase"
@@ -334,14 +337,18 @@
 											: 'descending'
 										: 'none'}
 								>
-									<button
-										type="button"
-										class="flex items-center gap-1"
-										onclick={() => toggleSort('avgProgress')}
-									>
-										<span title="Average self-rated performance (last 4 weeks)">Performance</span
-										>{sortIndicator('avgProgress')}
-									</button>
+									<div class="flex items-center justify-center gap-1">
+										<button
+											type="button"
+											class="flex items-center gap-1"
+											onclick={() => toggleSort('avgProgress')}
+										>
+											Performance{sortIndicator('avgProgress')}
+										</button>
+										<InfoTip
+											text="How effective that work was, averaged over the last 4 weeks. 0 is none, 10 is exceptional."
+										/>
+									</div>
 								</th>
 								<th
 									class="px-3 py-2 text-center text-xs font-semibold tracking-wider text-text-tertiary uppercase"
@@ -351,14 +358,16 @@
 											: 'descending'
 										: 'none'}
 								>
-									<button
-										type="button"
-										class="flex items-center gap-1"
-										onclick={() => toggleSort('stability')}
-									>
-										<span title="How steady scores are week-to-week (0-100)">Consistency</span
-										>{sortIndicator('stability')}
-									</button>
+									<div class="flex items-center justify-center gap-1">
+										<button
+											type="button"
+											class="flex items-center gap-1"
+											onclick={() => toggleSort('stability')}
+										>
+											Consistency{sortIndicator('stability')}
+										</button>
+										<InfoTip text="How steady the scores are from week to week." />
+									</div>
 								</th>
 								<th
 									class="px-3 py-2 text-center text-xs font-semibold tracking-wider text-text-tertiary uppercase"
@@ -368,15 +377,16 @@
 											: 'descending'
 										: 'none'}
 								>
-									<button
-										type="button"
-										class="flex items-center gap-1"
-										onclick={() => toggleSort('trajectory')}
-									>
-										<span title="Score trend over recent weeks (+/-)">Trend</span>{sortIndicator(
-											'trajectory'
-										)}
-									</button>
+									<div class="flex items-center justify-center gap-1">
+										<button
+											type="button"
+											class="flex items-center gap-1"
+											onclick={() => toggleSort('trajectory')}
+										>
+											Trend{sortIndicator('trajectory')}
+										</button>
+										<InfoTip text="Week-to-week direction. Positive means the scores are rising." />
+									</div>
 								</th>
 								<th
 									class="px-3 py-2 text-center text-xs font-semibold tracking-wider text-text-tertiary uppercase"
@@ -433,9 +443,7 @@
 										class="sticky left-0 z-10 bg-surface-raised px-3 py-2.5 font-semibold text-accent hover:underline"
 										>{row.name}</td
 									>
-									<td class="max-w-[200px] truncate px-3 py-2.5 text-text-secondary"
-										>{row.objective}</td
-									>
+									<td class="max-w-[200px] truncate px-3 py-2.5 text-text-secondary">{row.goal}</td>
 									<td
 										class="px-3 py-2.5 text-center font-semibold {row.avgEffort !== null &&
 										row.avgEffort >= 7

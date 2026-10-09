@@ -1,128 +1,88 @@
 import prisma from '$lib/server/prisma';
 import { sendEmail } from '$lib/notifications/email';
 import { emailTemplates } from '$lib/notifications/emailTemplates';
+import {
+	daysBetweenInTimeZone,
+	isLocalWeekday,
+	isUsersNotificationHour,
+	wantsEmail,
+	wantsSms
+} from '$lib/notifications/preferences';
 import { trySendSms } from '$lib/notifications/sms';
 import { smsTemplates } from '$lib/notifications/smsTemplates';
-import { computeWeekNumber } from '$lib/server/coachUtils';
-import { rateLimit } from '$lib/server/rateLimit';
+import { currentWeekNumber } from '$lib/server/domain/week';
+import { hasCheckInForWeek, weeklyCheckInStreak } from '$lib/server/checkInStreak';
+import { allowNotification } from '$lib/server/notificationCap';
+import { getAppUrl } from '$lib/server/appUrl';
 
-export const remindOverduePrompts = async () => {
-	const objectives = await prisma.objective.findMany({
-		where: { active: true },
+/** Same day the weekly check-in nudge uses, so the two jobs do not both fire. */
+const BASE_REMINDER_DAY = 3;
+
+export const remindOverduePrompts = async (now = new Date()) => {
+	const journeys = await prisma.journey.findMany({
+		where: { status: 'ACTIVE', goal: { active: true } },
 		include: {
 			user: true,
-			cycles: {
-				where: { status: 'ACTIVE' },
-				orderBy: { startDate: 'desc' },
-				take: 1,
-				include: {
-					reflections: true
-				}
-			}
+			goal: { select: { title: true } },
+			checkIns: { select: { submittedAt: true } }
 		}
 	});
 
-	for (const objective of objectives) {
-		const cycle = objective.cycles[0];
-		if (!cycle) continue;
+	const appUrl = getAppUrl();
 
-		const currentWeek = computeWeekNumber(cycle.startDate);
-		const submittedTypes = new Set(
-			cycle.reflections
-				.filter((reflection) => reflection.weekNumber === currentWeek)
-				.map((reflection) => reflection.reflectionType)
+	for (const journey of journeys) {
+		const timeZone = journey.user.timezone;
+		if (!isLocalWeekday(now, timeZone)) continue;
+		if (!isUsersNotificationHour(now, journey.user)) continue;
+
+		const daysIn = daysBetweenInTimeZone(journey.startDate, now, timeZone);
+		if (daysIn >= 0 && daysIn % 7 === BASE_REMINDER_DAY) continue;
+
+		const currentWeek = currentWeekNumber(journey.startDate, now, timeZone);
+		if (currentWeek > journey.lengthWeeks) continue;
+		if (hasCheckInForWeek(journey.startDate, journey.checkIns, currentWeek, timeZone)) continue;
+
+		// Limit overdue reminders to max 2 per user per week (persisted via Redis/rateLimit)
+		const allowed = await allowNotification(
+			`overdue-remind:${journey.user.id}`,
+			2,
+			7 * 24 * 60 * 60 * 1000
 		);
-
-		// Determine expected reflection types based on check-in frequency
-		const freq = cycle.checkInFrequency ?? '3x';
-		let expectedTypes: readonly ('RATING_A' | 'RATING_B')[];
-		if (freq === '1x') {
-			expectedTypes = ['RATING_A'] as const;
-		} else {
-			expectedTypes = ['RATING_A', 'RATING_B'] as const;
+		if (!allowed) {
+			console.info(
+				`[job:remind-overdue-prompts] Weekly limit reached for ${journey.user.email}, skipping`
+			);
+			continue;
 		}
 
-		const overdue: string[] = [];
-		expectedTypes.forEach((type) => {
-			if (!submittedTypes.has(type)) {
-				overdue.push(type.toLowerCase());
-			}
-		});
+		const currentStreak = weeklyCheckInStreak(
+			journey.startDate,
+			journey.checkIns,
+			currentWeek,
+			timeZone
+		);
 
-		if (overdue.length > 0) {
-			// Limit overdue reminders to max 2 per user per week (persisted via Redis/rateLimit)
-			const allowed = await rateLimit(
-				`overdue-remind:${objective.user.id}`,
-				2,
-				7 * 24 * 60 * 60 * 1000
-			);
-			if (!allowed) {
-				console.info(
-					`[job:remind-overdue-prompts] Weekly limit reached for ${objective.user.email}, skipping`
-				);
-				continue;
-			}
-
-			const delivery = objective.user.deliveryMethod ?? 'both';
-
-			// Compute current streak for motivational messaging
-			let currentStreak = 0;
+		if (wantsEmail(journey.user.deliveryMethod)) {
 			try {
-				const completedSet = new Set(
-					cycle.reflections.map((r) => `${r.weekNumber}-${r.reflectionType}`)
+				const template = emailTemplates.reminderOverdue({
+					individualName: journey.user.name || undefined,
+					goalTitle: journey.goal.title,
+					currentStreak,
+					appUrl
+				});
+				await sendEmail({ to: journey.user.email, ...template });
+				console.info('[job:remind-overdue-prompts] Sent reminder to', journey.user.email);
+			} catch (error) {
+				console.error(
+					'[job:remind-overdue-prompts] Failed to send reminder to',
+					journey.user.email,
+					error
 				);
-				const streakExpected: Array<{ week: number; type: string }> = [];
-				for (let w = 1; w <= currentWeek; w++) {
-					if (freq === '1x') {
-						streakExpected.push({ week: w, type: 'RATING_A' });
-					} else {
-						streakExpected.push({ week: w, type: 'RATING_A' });
-						streakExpected.push({ week: w, type: 'RATING_B' });
-					}
-				}
-				for (let i = streakExpected.length - 1; i >= 0; i--) {
-					const expected = streakExpected[i];
-					if (completedSet.has(`${expected.week}-${expected.type}`)) {
-						currentStreak++;
-					} else {
-						break;
-					}
-				}
-			} catch {
-				// Streak computation is non-critical
 			}
+		}
 
-			const appUrl =
-				process.env.PUBLIC_APP_URL || process.env.VERCEL_URL
-					? `https://${process.env.PUBLIC_APP_URL || process.env.VERCEL_URL}`
-					: 'https://app.forbetra.com';
-
-			if (delivery !== 'sms') {
-				try {
-					const template = emailTemplates.reminderOverdue({
-						individualName: objective.user.name || undefined,
-						objectiveTitle: objective.title,
-						currentStreak,
-						appUrl
-					});
-					await sendEmail({
-						to: objective.user.email,
-						...template
-					});
-					console.info('[job:remind-overdue-prompts] Sent reminder to', objective.user.email);
-				} catch (error) {
-					console.error(
-						'[job:remind-overdue-prompts] Failed to send reminder to',
-						objective.user.email,
-						error
-					);
-				}
-			}
-
-			// Send SMS reminder
-			if (delivery !== 'email') {
-				await trySendSms(objective.user.phone, smsTemplates.reminderOverdue({ appUrl }));
-			}
+		if (wantsSms(journey.user.deliveryMethod)) {
+			await trySendSms(journey.user.phone, smsTemplates.reminderOverdue({ appUrl }));
 		}
 	}
 };

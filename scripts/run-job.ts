@@ -1,11 +1,11 @@
 #!/usr/bin/env ts-node
 
 import { remindOverduePrompts } from '$jobs/remind-overdue-prompts';
-import { remindStakeholderFeedback } from '$jobs/remind-stakeholder-feedback';
+import { remindReviewerFeedback } from '$jobs/remind-stakeholder-feedback';
 
 const jobs = {
 	'remind-overdue-prompts': remindOverduePrompts,
-	'remind-stakeholder-feedback': remindStakeholderFeedback
+	'remind-reviewer-feedback': remindReviewerFeedback
 };
 
 const jobName = process.argv[2];

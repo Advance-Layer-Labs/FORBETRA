@@ -6,7 +6,7 @@ import { generateCoachPrep, generateCoachPrepStreaming } from '$lib/server/ai/ge
 import { rateLimit } from '$lib/server/rateLimit';
 
 export const POST: RequestHandler = async (event) => {
-	const { dbUser } = requireRole(event, 'COACH');
+	const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
 
 	if (!(await rateLimit(`insight:${dbUser.id}`, 5, 60_000))) {
 		return json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
@@ -33,12 +33,12 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'You do not have access to this client' }, { status: 403 });
 	}
 
-	// Find active cycle for individual
-	const objective = await prisma.objective.findFirst({
+	// Find active journey for individual
+	const goal = await prisma.goal.findFirst({
 		where: { userId: individualId, active: true },
 		orderBy: { createdAt: 'desc' },
 		include: {
-			cycles: {
+			journeys: {
 				where: { status: 'ACTIVE' },
 				orderBy: { startDate: 'desc' },
 				take: 1
@@ -46,16 +46,16 @@ export const POST: RequestHandler = async (event) => {
 		}
 	});
 
-	if (!objective || objective.cycles.length === 0) {
-		return json({ error: 'No active cycle found for this client' }, { status: 400 });
+	if (!goal || goal.journeys.length === 0) {
+		return json({ error: 'No active journey found for this client' }, { status: 400 });
 	}
 
-	const cycle = objective.cycles[0];
+	const journey = goal.journeys[0];
 
 	// Check if client wants streaming
 	const acceptHeader = event.request.headers.get('accept') ?? '';
 	if (acceptHeader.includes('text/event-stream')) {
-		const result = await generateCoachPrepStreaming(dbUser.id, individualId, cycle.id);
+		const result = await generateCoachPrepStreaming(dbUser.id, individualId, journey.id);
 
 		if (!result) {
 			return json({ error: 'Failed to generate coach prep' }, { status: 500 });
@@ -98,7 +98,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Non-streaming fallback
-	const insightId = await generateCoachPrep(dbUser.id, individualId, cycle.id);
+	const insightId = await generateCoachPrep(dbUser.id, individualId, journey.id);
 
 	if (!insightId) {
 		return json({ error: 'Failed to generate coach prep' }, { status: 500 });

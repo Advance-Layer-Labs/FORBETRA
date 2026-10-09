@@ -1,261 +1,128 @@
-import { redirect } from '@sveltejs/kit';
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
+import { withCheckInWeeks } from '$lib/server/hubMetrics';
 import type { PageServerLoad } from './$types';
+
+type WeeklyScores = { effortScores: number[]; performanceScores: number[] };
+
+const avg1 = (values: number[]) =>
+	values.length > 0 ? Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(1)) : null;
+
+function weeklyAverages(
+	rows: Array<{ weekNumber: number; effortScore: number; performanceScore: number }>
+) {
+	const map = new Map<number, WeeklyScores>();
+	for (const row of rows) {
+		const entry = map.get(row.weekNumber) ?? { effortScores: [], performanceScores: [] };
+		entry.effortScores.push(row.effortScore);
+		entry.performanceScores.push(row.performanceScore);
+		map.set(row.weekNumber, entry);
+	}
+	return Array.from(map.entries())
+		.sort(([a], [b]) => a - b)
+		.map(([weekNumber, scores]) => ({
+			weekNumber,
+			effortScore: avg1(scores.effortScores),
+			performanceScore: avg1(scores.performanceScores)
+		}));
+}
 
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, 'INDIVIDUAL');
 
-	const objective = await prisma.objective.findFirst({
-		where: { userId: dbUser.id, active: true },
-		orderBy: { createdAt: 'desc' },
-		include: {
-			stakeholders: {
-				orderBy: { createdAt: 'asc' },
-				select: { id: true, name: true }
-			},
-			cycles: {
-				orderBy: { startDate: 'desc' },
-				take: 2,
-				include: {
-					reflections: {
-						select: {
-							id: true,
-							reflectionType: true,
-							weekNumber: true,
-							submittedAt: true,
-							effortScore: true,
-							performanceScore: true,
-							notes: true
-						}
-					}
-				}
-			}
-		}
+	const { goal, journey, checkIns, feedback } = await event.parent();
+
+	// Prior-journey individual weekly averages, rendered as a dimmed dashed line
+	// in PerformanceEffortChart so the user can compare against last time.
+	const priorCycle = await prisma.journey.findFirst({
+		where: { goalId: goal.id, id: { not: journey.id }, startDate: { lt: journey.startDate } },
+		orderBy: { startDate: 'desc' },
+		include: { checkIns: { orderBy: { submittedAt: 'asc' } } }
 	});
 
-	if (!objective) {
-		throw redirect(303, '/onboarding');
-	}
+	const priorIndividualData = priorCycle
+		? weeklyAverages(withCheckInWeeks(priorCycle.startDate, priorCycle.checkIns, dbUser.timezone))
+		: [];
 
-	const cycle = objective.cycles[0] ?? null;
-	const priorCycle = objective.cycles[1] ?? null;
+	const cycleReport = await prisma.insight.findFirst({
+		where: {
+			userId: dbUser.id,
+			journeyId: journey.id,
+			status: 'COMPLETED',
+			type: 'JOURNEY_REPORT'
+		},
+		orderBy: { createdAt: 'desc' },
+		select: { id: true, content: true, createdAt: true, thumbs: true }
+	});
 
-	// Prior-cycle individual weekly averages (Item #10 of 9/10 plan).
-	// Rendered as a dimmed dashed line in PerformanceEffortChart so the user
-	// can see whether they're trending better than they did last time around.
-	let priorIndividualData: Array<{
-		weekNumber: number;
-		effortScore: number | null;
-		performanceScore: number | null;
-	}> = [];
-	if (priorCycle && priorCycle.reflections.length > 0) {
-		const priorMap = new Map<number, { effortScores: number[]; performanceScores: number[] }>();
-		for (const r of priorCycle.reflections) {
-			if (r.reflectionType !== 'RATING_A' && r.reflectionType !== 'RATING_B') continue;
-			const entry = priorMap.get(r.weekNumber) ?? { effortScores: [], performanceScores: [] };
-			if (r.effortScore !== null) entry.effortScores.push(r.effortScore);
-			if (r.performanceScore !== null) entry.performanceScores.push(r.performanceScore);
-			priorMap.set(r.weekNumber, entry);
-		}
-		priorIndividualData = Array.from(priorMap.entries())
-			.sort(([a], [b]) => a - b)
-			.map(([weekNumber, scores]) => ({
-				weekNumber,
-				effortScore:
-					scores.effortScores.length > 0
-						? Number(
-								(
-									scores.effortScores.reduce((s, v) => s + v, 0) / scores.effortScores.length
-								).toFixed(1)
-							)
-						: null,
-				performanceScore:
-					scores.performanceScores.length > 0
-						? Number(
-								(
-									scores.performanceScores.reduce((s, v) => s + v, 0) /
-									scores.performanceScores.length
-								).toFixed(1)
-							)
-						: null
-			}));
-	}
+	const individualWeeklyData = weeklyAverages(checkIns);
 
-	// --- 1. Latest cycle report (AI report) ---
-	let cycleReport: {
+	const reviewerWeeklyData = feedback.map((row) => ({
+		weekNumber: row.weekNumber,
+		reviewerId: row.reviewer.id,
+		reviewerName: row.reviewer.name,
+		effortScore: row.effortScore,
+		performanceScore: row.performanceScore
+	}));
+
+	type HistoryCheckIn = {
 		id: string;
-		content: string | null;
-		createdAt: Date;
-		thumbs: number | null;
-	} | null = null;
-
-	if (cycle) {
-		cycleReport = await prisma.insight.findFirst({
-			where: { userId: dbUser.id, cycleId: cycle.id, status: 'COMPLETED', type: 'CYCLE_REPORT' },
-			orderBy: { createdAt: 'desc' },
-			select: { id: true, content: true, createdAt: true, thumbs: true }
-		});
-	}
-
-	// --- 2. Visualization data (individual scores + stakeholder scores) ---
-	const reflectionTrendMap = new Map<
-		number,
-		{ weekNumber: number; effortScores: number[]; performanceScores: number[] }
-	>();
-
-	if (cycle) {
-		cycle.reflections.forEach((reflection) => {
-			const weekEntry = reflectionTrendMap.get(reflection.weekNumber) ?? {
-				weekNumber: reflection.weekNumber,
-				effortScores: [],
-				performanceScores: []
-			};
-			if (reflection.reflectionType === 'RATING_A' || reflection.reflectionType === 'RATING_B') {
-				if (reflection.effortScore !== null) weekEntry.effortScores.push(reflection.effortScore);
-				if (reflection.performanceScore !== null)
-					weekEntry.performanceScores.push(reflection.performanceScore);
-			}
-			reflectionTrendMap.set(reflection.weekNumber, weekEntry);
-		});
-	}
-
-	const individualWeeklyData = Array.from(reflectionTrendMap.values())
-		.sort((a, b) => a.weekNumber - b.weekNumber)
-		.map((week) => ({
-			weekNumber: week.weekNumber,
-			effortScore:
-				week.effortScores.length > 0
-					? Number(
-							(week.effortScores.reduce((s, v) => s + v, 0) / week.effortScores.length).toFixed(1)
-						)
-					: null,
-			performanceScore:
-				week.performanceScores.length > 0
-					? Number(
-							(
-								week.performanceScores.reduce((s, v) => s + v, 0) / week.performanceScores.length
-							).toFixed(1)
-						)
-					: null
-		}));
-
-	const stakeholderWeeklyData: Array<{
-		weekNumber: number;
-		stakeholderId: string;
-		stakeholderName: string;
-		effortScore: number | null;
-		performanceScore: number | null;
-	}> = [];
-
-	if (cycle) {
-		const allFeedbacks = await prisma.feedback.findMany({
-			where: { reflection: { cycleId: cycle.id } },
-			include: {
-				reflection: { select: { weekNumber: true } },
-				stakeholder: { select: { id: true, name: true } }
-			}
-		});
-
-		allFeedbacks.forEach((feedback) => {
-			if (feedback.reflection) {
-				stakeholderWeeklyData.push({
-					weekNumber: feedback.reflection.weekNumber,
-					stakeholderId: feedback.stakeholder.id,
-					stakeholderName: feedback.stakeholder.name,
-					effortScore: feedback.effortScore,
-					performanceScore: feedback.performanceScore
-				});
-			}
-		});
-	}
-
-	// --- 3. History: reflections grouped by week with feedback ---
-	type HistoryReflection = {
-		id: string;
-		type: string;
-		effortScore: number | null;
-		performanceScore: number | null;
+		effortScore: number;
+		performanceScore: number;
 		notes: string | null;
 		checkInDate: string;
-		feedbacks: Array<{
-			stakeholderName: string;
-			effortScore: number | null;
-			performanceScore: number | null;
-			comment: string | null;
-			behavioralObservation: string | null;
-			suggestion: string | null;
-		}>;
+	};
+	type HistoryFeedback = {
+		id: string;
+		reviewerName: string;
+		effortScore: number | null;
+		performanceScore: number | null;
+		comment: string | null;
+		behavioralObservation: string | null;
+		suggestion: string | null;
 	};
 
-	type HistoryWeek = {
-		weekNumber: number;
-		reflections: HistoryReflection[];
-	};
-
-	let weeks: HistoryWeek[] = [];
-
-	if (cycle) {
-		const reflections = await prisma.reflection.findMany({
-			where: { cycleId: cycle.id, userId: objective.userId },
-			orderBy: [{ weekNumber: 'desc' }, { checkInDate: 'desc' }],
-			select: {
-				id: true,
-				reflectionType: true,
-				weekNumber: true,
-				effortScore: true,
-				performanceScore: true,
-				notes: true,
-				checkInDate: true,
-				feedbacks: {
-					select: {
-						id: true,
-						effortScore: true,
-						performanceScore: true,
-						comment: true,
-						behavioralObservation: true,
-						suggestion: true,
-						submittedAt: true,
-						stakeholder: { select: { name: true } }
-					}
-				}
-			}
-		});
-
-		const weekMap = new Map<number, HistoryReflection[]>();
-
-		for (const r of reflections) {
-			if (!weekMap.has(r.weekNumber)) weekMap.set(r.weekNumber, []);
-			weekMap.get(r.weekNumber)!.push({
-				id: r.id,
-				type: r.reflectionType,
-				effortScore: r.effortScore,
-				performanceScore: r.performanceScore,
-				notes: r.notes,
-				checkInDate: r.checkInDate.toISOString(),
-				feedbacks: r.feedbacks.map((f) => ({
-					stakeholderName: f.stakeholder.name,
-					effortScore: f.effortScore,
-					performanceScore: f.performanceScore,
-					comment: f.comment,
-					behavioralObservation: f.behavioralObservation,
-					suggestion: f.suggestion
-				}))
-			});
+	const weekMap = new Map<number, { checkIns: HistoryCheckIn[]; feedbacks: HistoryFeedback[] }>();
+	const bucketFor = (weekNumber: number) => {
+		let bucket = weekMap.get(weekNumber);
+		if (!bucket) {
+			bucket = { checkIns: [], feedbacks: [] };
+			weekMap.set(weekNumber, bucket);
 		}
-
-		weeks = Array.from(weekMap.entries())
-			.map(([weekNumber, reflections]) => ({ weekNumber, reflections }))
-			.sort((a, b) => b.weekNumber - a.weekNumber);
+		return bucket;
+	};
+	for (const row of [...checkIns].reverse()) {
+		bucketFor(row.weekNumber).checkIns.push({
+			id: row.id,
+			effortScore: row.effortScore,
+			performanceScore: row.performanceScore,
+			notes: row.notes,
+			checkInDate: row.submittedAt.toISOString()
+		});
+	}
+	for (const row of feedback) {
+		bucketFor(row.weekNumber).feedbacks.push({
+			id: row.id,
+			reviewerName: row.reviewer.name,
+			effortScore: row.effortScore,
+			performanceScore: row.performanceScore,
+			comment: row.comment,
+			behavioralObservation: row.behavioralObservation,
+			suggestion: row.suggestion
+		});
 	}
 
+	const weeks = Array.from(weekMap.entries())
+		.map(([weekNumber, data]) => ({ weekNumber, ...data }))
+		.sort((a, b) => b.weekNumber - a.weekNumber);
+
 	return {
-		objective: { id: objective.id, title: objective.title },
+		goal: { id: goal.id, title: goal.title },
 		cycleReport,
 		visualizationData: {
 			individual: individualWeeklyData,
-			stakeholders: stakeholderWeeklyData,
-			stakeholderList: objective.stakeholders.map((s) => ({ id: s.id, name: s.name })),
+			reviewers: reviewerWeeklyData,
+			reviewerList: goal.reviewers.map((s) => ({ id: s.id, name: s.name })),
 			priorIndividual: priorIndividualData,
 			priorCycleLabel: priorCycle?.label ?? null
 		},

@@ -1,4 +1,7 @@
-import { sendStakeholderImpactSummaries } from '$jobs/send-stakeholder-impact-summaries';
 import { createCronJobHandler } from '$lib/server/cronAuth';
+import { resolveJob } from '../resolveJob';
 
-export const GET = createCronJobHandler('stakeholder-impact', sendStakeholderImpactSummaries);
+export const GET = createCronJobHandler(
+	'reviewer-impact',
+	resolveJob('sendReviewerImpactSummaries')
+);

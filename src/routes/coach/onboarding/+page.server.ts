@@ -57,17 +57,33 @@ export const actions: Actions = {
 		const message = String(formData.get('message') ?? '').trim();
 
 		// Parse optional pre-fill payload
-		const objectiveTitle = String(formData.get('prefillObjectiveTitle') ?? '').trim();
-		const stakeholdersJson = String(formData.get('prefillStakeholders') ?? '').trim();
+		const goalTitle = String(formData.get('prefillGoalTitle') ?? '').trim();
+		const reviewersJson = String(formData.get('prefillReviewers') ?? '').trim();
+
+		let reviewers: { name: string; email: string }[] = [];
+		try {
+			if (reviewersJson) {
+				const parsed = JSON.parse(reviewersJson);
+				if (Array.isArray(parsed)) {
+					reviewers = parsed.flatMap((row) => {
+						if (!row || typeof row !== 'object') return [];
+						const reviewerName = String((row as { name?: unknown }).name ?? '').trim();
+						const reviewerEmail = String((row as { email?: unknown }).email ?? '').trim();
+						if (!reviewerName || !reviewerEmail) return [];
+						return [{ name: reviewerName, email: reviewerEmail }];
+					});
+				}
+			}
+		} catch {
+			/* intentionally empty */
+		}
 
 		let payload: Record<string, unknown> | null = null;
-		if (objectiveTitle.length > 0) {
-			payload = { objectiveTitle };
-			try {
-				if (stakeholdersJson) payload.stakeholders = JSON.parse(stakeholdersJson);
-			} catch {
-				/* intentionally empty */
-			}
+		if (goalTitle.length > 0 || reviewers.length > 0) {
+			payload = {
+				...(goalTitle.length > 0 ? { goal: { title: goalTitle } } : {}),
+				...(reviewers.length > 0 ? { reviewers } : {})
+			};
 		}
 
 		if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

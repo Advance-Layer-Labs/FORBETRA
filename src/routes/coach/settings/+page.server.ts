@@ -14,6 +14,7 @@ export const load: PageServerLoad = async (event) => {
 			email: dbUser.email,
 			phone: dbUser.phone ?? '',
 			timezone: dbUser.timezone ?? '',
+			deliveryMethod: dbUser.deliveryMethod ?? 'email',
 			role: dbUser.role
 		}
 	};
@@ -27,6 +28,8 @@ export const actions: Actions = {
 		const name = formData.get('name')?.toString().trim() ?? '';
 		const phone = formData.get('phone')?.toString().trim() ?? '';
 		const timezone = formData.get('timezone')?.toString().trim() ?? '';
+		const deliveryMethod = formData.get('deliveryMethod')?.toString().trim() ?? 'email';
+		const method = deliveryMethod === 'sms' || deliveryMethod === 'both' ? deliveryMethod : 'email';
 
 		if (!name) {
 			return fail(400, { error: 'Display name is required.' });
@@ -42,13 +45,18 @@ export const actions: Actions = {
 			});
 		}
 
+		if ((method === 'sms' || method === 'both') && !phone) {
+			return fail(400, { error: 'Add a phone number to receive SMS.' });
+		}
+
 		try {
 			const updatedUser = await prisma.user.update({
 				where: { id: dbUser.id },
 				data: {
 					name: name || null,
 					phone: phone ? normalizePhone(phone) : null,
-					timezone: timezone || null
+					timezone: timezone || null,
+					deliveryMethod: method
 				}
 			});
 

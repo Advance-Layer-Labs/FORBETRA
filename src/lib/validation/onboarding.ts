@@ -1,80 +1,54 @@
 import { z } from 'zod';
 
-const subgoalSchema = z.object({
-	label: z
-		.string()
-		.trim()
-		.min(3, 'Sub-objective label must be at least 3 characters')
-		.max(200, 'Keep the sub-objective label concise'),
-	description: z
-		.string()
-		.trim()
-		.max(500, 'Keep the sub-objective details under 500 characters')
-		.optional()
-});
+const goalTitle = z
+	.string()
+	.trim()
+	.min(3, 'Goal title must be at least 3 characters')
+	.max(200, 'Keep the goal title concise');
 
-const stakeholderSchema = z.object({
-	name: z
-		.string()
-		.trim()
-		.min(1, 'Stakeholder name is required')
-		.max(120, 'Stakeholder name too long'),
-	email: z
-		.string()
-		.trim()
-		.min(1, 'Stakeholder email is required')
-		.email('Stakeholder email must be valid'),
-	relationship: z.string().trim().max(120, 'Relationship description too long').optional()
-});
+const goalDescription = z
+	.string()
+	.trim()
+	.max(1000, 'Keep the description under 1000 characters')
+	.optional();
 
+/** First-run gate: name the goal. Journey length, reviewers, and focus areas are not collected here. */
 export const onboardingSchema = z.object({
-	objectiveTitle: z
-		.string()
-		.trim()
-		.min(3, 'Objective title must be at least 3 characters')
-		.max(200, 'Keep the objective title concise'),
-	objectiveDescription: z
-		.string()
-		.trim()
-		.max(1000, 'Keep the description under 1000 characters')
-		.optional(),
-	subgoals: z
-		.array(subgoalSchema)
-		.min(0)
-		.max(5, 'Keep it to five sub-objectives or fewer')
-		.default([]),
-	stakeholders: z
-		.array(stakeholderSchema)
-		.max(10, 'Add up to ten stakeholders')
-		.optional()
-		.default([]),
-	cycleLabel: z.string().trim().max(80, 'Cycle label is too long').optional(),
-	cycleStartDate: z
+	goalTitle,
+	goalDescription
+});
+
+export const newJourneySchema = z.object({
+	goalTitle,
+	goalDescription,
+	journeyLabel: z.string().trim().max(80, 'Journey label is too long').optional(),
+	journeyStartDate: z
 		.string()
 		.refine((value) => value.length > 0, 'Start date is required')
 		.refine((value) => !Number.isNaN(Date.parse(value)), 'Provide a valid start date')
 		.optional()
 		.default(new Date().toISOString().slice(0, 10)),
-	cycleDurationWeeks: z
-		.number()
-		.int()
-		.min(4, 'Pick at least 4 weeks')
-		.max(26, 'Keep cycles to 26 weeks or fewer')
-		.optional()
-		.default(12),
-	checkInFrequency: z
+	lengthWeeks: z.union([z.literal(6), z.literal(12), z.literal(16)]).default(12)
+});
+
+const focusAreaSchema = z.object({
+	label: z
 		.string()
-		.min(1, 'Select at least one check-in day')
-		.optional()
-		.default('mon,wed,fri'),
-	stakeholderCadence: z
+		.trim()
+		.min(3, 'Focus area label must be at least 3 characters')
+		.max(200, 'Keep the focus area label concise'),
+	description: z
 		.string()
-		.refine(
-			(val) => ['weekly', 'biweekly'].includes(val) || /^custom:\d+$/.test(val),
-			'Stakeholder cadence must be weekly, biweekly, or custom:N'
-		)
+		.trim()
+		.max(500, 'Keep the focus area details under 500 characters')
 		.optional()
-		.default('weekly')
+});
+
+export const focusAreasSchema = z.object({
+	focusAreas: z
+		.array(focusAreaSchema)
+		.min(1, 'Add at least one focus area')
+		.max(5, 'Keep it to five focus areas or fewer')
 });
 
 export type OnboardingFormData = z.infer<typeof onboardingSchema>;

@@ -10,14 +10,9 @@
 		ShieldCheck,
 		Lock
 	} from 'lucide-svelte';
-	import { coachAlertCount } from '$lib/stores/coachAlerts.svelte';
 	import InfoTip from '$lib/components/InfoTip.svelte';
 
 	const { data }: { data: PageData } = $props();
-
-	$effect(() => {
-		coachAlertCount.value = data.analytics.totalAlerts;
-	});
 
 	const greeting = $derived.by(() => {
 		const hour = new Date().getHours();
@@ -66,7 +61,7 @@
 			/>
 		</a>
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
-	{:else if data.rosterSummary.active > 0}
+	{:else if data.allOnTrack}
 		<div class="rounded-xl border border-success/20 bg-success/5 px-4 py-3 text-sm text-success">
 			<p class="text-center font-medium">
 				{#if data.portfolio.feedbackRate !== null && data.portfolio.feedbackRate >= 90}
@@ -123,7 +118,7 @@
 					<PenLine class="h-3.5 w-3.5" />
 					<p class="text-2xs font-semibold tracking-wider uppercase">
 						Check-ins <InfoTip
-							text="Total client self-reflections submitted this week across your portfolio"
+							text="Total client self-checkIns submitted this week across your portfolio"
 						/>
 					</p>
 				</div>
@@ -208,8 +203,8 @@
 								>Needs attention</span
 							>
 						</div>
-						{#if client.objective}
-							<p class="text-sm text-text-muted">{client.objective}</p>
+						{#if client.goal}
+							<p class="text-sm text-text-muted">{client.goal}</p>
 						{/if}
 					</div>
 					<div class="flex items-center gap-3">
@@ -253,8 +248,8 @@
 								>
 							{/if}
 						</div>
-						{#if client.objective}
-							<p class="text-sm text-text-muted">{client.objective}</p>
+						{#if client.goal}
+							<p class="text-sm text-text-muted">{client.goal}</p>
 						{/if}
 					</div>
 					<div class="flex items-center gap-3">

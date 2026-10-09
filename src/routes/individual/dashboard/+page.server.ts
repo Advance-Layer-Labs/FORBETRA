@@ -5,5 +5,5 @@ import type { PageServerLoad } from './$types';
 // Kept as a 308 permanent redirect so any external bookmark or stale link
 // lands somewhere useful.
 export const load: PageServerLoad = async () => {
-	throw redirect(308, '/individual');
+	throw redirect(308, '/individual/today');
 };

@@ -117,7 +117,7 @@
 					<a
 						href="/individual"
 						class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-						>Hub</a
+						>Journeys</a
 					>
 				</li>
 				<li aria-hidden="true" class="text-text-muted">/</li>
@@ -229,8 +229,8 @@
 		{#if data.visualizationData.individual.length > 0}
 			<PerformanceEffortChart
 				individualData={data.visualizationData.individual}
-				stakeholderData={data.visualizationData.stakeholders}
-				stakeholders={data.visualizationData.stakeholderList}
+				reviewerData={data.visualizationData.reviewers}
+				reviewers={data.visualizationData.reviewerList}
 				priorIndividualData={data.visualizationData.priorIndividual}
 				priorCycleLabel={data.visualizationData.priorCycleLabel}
 			/>
@@ -275,7 +275,7 @@
 								</span>
 								<span class="text-sm font-semibold text-text-primary">Week {week.weekNumber}</span>
 								<span class="text-xs text-text-muted">
-									{week.reflections.length} check-in{week.reflections.length !== 1 ? 's' : ''}
+									{week.checkIns.length} check-in{week.checkIns.length !== 1 ? 's' : ''}
 								</span>
 							</div>
 							<ChevronDown
@@ -287,7 +287,7 @@
 
 						{#if isExpanded}
 							<div class="space-y-3 px-6 pb-4">
-								{#each week.reflections as reflection (reflection.id)}
+								{#each week.checkIns as reflection (reflection.id)}
 									<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
 										<div class="mb-2 flex items-center justify-between">
 											<span
@@ -333,51 +333,50 @@
 										{#if reflection.notes}<p class="text-sm leading-relaxed text-text-secondary">
 												{reflection.notes}
 											</p>{/if}
-										{#if reflection.feedbacks.length > 0}
-											<div class="mt-3 border-t border-border-default pt-3">
-												<p
-													class="mb-2 text-xs font-semibold tracking-wider text-text-muted uppercase"
-												>
-													Reviewer Feedback
-												</p>
-												{#each reflection.feedbacks as fb (fb.stakeholderName)}
-													<div
-														class="mb-2 rounded-lg border border-border-default bg-surface-raised px-3 py-2"
-													>
-														<div class="flex items-center justify-between">
-															<span class="text-xs font-semibold text-text-secondary"
-																>{fb.stakeholderName}</span
-															>
-															<div class="flex gap-3">
-																{#if fb.effortScore !== null}<span
-																		class="text-xs text-text-tertiary"
-																		>E: <span class="font-bold">{fb.effortScore}</span></span
-																	>{/if}
-																{#if fb.performanceScore !== null}<span
-																		class="text-xs text-text-tertiary"
-																		>P: <span class="font-bold">{fb.performanceScore}</span></span
-																	>{/if}
-															</div>
-														</div>
-														{#if fb.comment}<p class="mt-1 text-xs text-text-secondary">
-																{fb.comment}
-															</p>{/if}
-														{#if fb.behavioralObservation}<p
-																class="mt-1 text-xs text-text-secondary"
-															>
-																<span class="font-medium text-text-tertiary">Observed:</span>
-																{fb.behavioralObservation}
-															</p>{/if}
-														{#if fb.suggestion}<p class="mt-1 text-xs text-text-secondary">
-																<span class="font-medium text-text-tertiary">Suggestion:</span>
-																{fb.suggestion}
-															</p>{/if}
-													</div>
-												{/each}
-											</div>
-										{/if}
 									</div>
 								{/each}
+								{#if week.feedbacks.length > 0}
+									<div class="rounded-xl border border-border-default bg-surface-subtle p-4">
+										<div>
+											<p
+												class="mb-2 text-xs font-semibold tracking-wider text-text-muted uppercase"
+											>
+												Reviewer Feedback
+											</p>
+											{#each week.feedbacks as fb (fb.id)}
+												<div
+													class="mb-2 rounded-lg border border-border-default bg-surface-raised px-3 py-2"
+												>
+													<div class="flex items-center justify-between">
+														<span class="text-xs font-semibold text-text-secondary"
+															>{fb.reviewerName}</span
+														>
+														<div class="flex gap-3">
+															{#if fb.effortScore !== null}<span class="text-xs text-text-tertiary"
+																	>E: <span class="font-bold">{fb.effortScore}</span></span
+																>{/if}
+															{#if fb.performanceScore !== null}<span
+																	class="text-xs text-text-tertiary"
+																	>P: <span class="font-bold">{fb.performanceScore}</span></span
+																>{/if}
+														</div>
+													</div>
+													{#if fb.comment}<p class="mt-1 text-xs text-text-secondary">
+															{fb.comment}
+														</p>{/if}
+													{#if fb.behavioralObservation}<p class="mt-1 text-xs text-text-secondary">
+															<span class="font-medium text-text-tertiary">Observed:</span>
+															{fb.behavioralObservation}
+														</p>{/if}
+													{#if fb.suggestion}<p class="mt-1 text-xs text-text-secondary">
+															<span class="font-medium text-text-tertiary">Suggestion:</span>
+															{fb.suggestion}
+														</p>{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>

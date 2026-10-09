@@ -108,13 +108,13 @@
 		href="/individual"
 		class="mb-6 inline-flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary"
 	>
-		<ArrowLeft class="h-4 w-4" /> Back to Hub
+		<ArrowLeft class="h-4 w-4" /> Back to journeys
 	</a>
 
 	<!-- Header -->
 	<div class="mb-8 text-center">
 		<h1 class="text-2xl font-bold text-text-primary">{firstName}'s Growth Story</h1>
-		<p class="mt-2 text-lg font-medium text-accent">"{story.objectiveTitle}"</p>
+		<p class="mt-2 text-lg font-medium text-accent">"{story.goalTitle}"</p>
 		<div class="mt-3 flex flex-wrap justify-center gap-3 text-sm text-text-secondary">
 			<span class="rounded-full bg-surface-subtle px-3 py-1">
 				{story.durationWeeks} week{story.durationWeeks !== 1 ? 's' : ''}

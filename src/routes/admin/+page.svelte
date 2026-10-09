@@ -10,11 +10,6 @@
 		);
 	};
 
-	const reflectionTypeLabels: Record<string, string> = {
-		RATING_A: 'Effort check-in',
-		RATING_B: 'Performance check-in'
-	};
-
 	const statCards = [
 		{
 			label: 'Total Users',
@@ -37,12 +32,12 @@
 			color: 'bg-warning-muted border-border-default text-warning'
 		},
 		{
-			label: 'Objectives',
-			value: data.stats.objectiveCount,
+			label: 'Goals',
+			value: data.stats.goalCount,
 			color: 'bg-accent-muted border-border-default text-accent'
 		},
 		{
-			label: 'Active Cycles',
+			label: 'Active Journeys',
 			value: data.stats.activeCycleCount,
 			color: 'bg-accent-muted border-border-default text-accent'
 		},
@@ -57,8 +52,8 @@
 			color: 'bg-warning-muted border-border-default text-warning'
 		},
 		{
-			label: 'Stakeholders',
-			value: data.stats.stakeholderCount,
+			label: 'Reviewers',
+			value: data.stats.reviewerCount,
 			color: 'bg-accent-muted border-border-default text-accent'
 		}
 	];
@@ -93,7 +88,7 @@
 		<div>
 			<h2 class="text-sm font-bold text-accent">Preview Panel</h2>
 			<p class="mt-0.5 text-xs text-text-secondary">
-				Test every user flow through the lens of each role — Individual, Stakeholder, Coach
+				Test every user flow through the lens of each role — Individual, Reviewer, Coach
 			</p>
 		</div>
 		<span class="text-text-tertiary">&rarr;</span>
@@ -137,14 +132,14 @@
 				Recent Check-ins
 			</h2>
 			<ul class="space-y-2 text-sm">
-				{#each data.recentActivity.reflections as refl (refl.id)}
+				{#each data.recentActivity.checkIns as refl (refl.id)}
 					<li class="rounded-lg bg-surface-raised px-3 py-2">
 						<div class="flex items-center gap-2">
 							<span class="min-w-0 flex-1 truncate font-medium text-text-primary"
 								>{refl.user?.name ?? 'Unknown'}</span
 							>
 							<span class="shrink-0 rounded bg-surface-subtle px-2 py-0.5 text-xs font-semibold"
-								>{reflectionTypeLabels[refl.reflectionType] ?? refl.reflectionType}</span
+								>Check-in</span
 							>
 						</div>
 						<p class="text-xs text-text-tertiary">
@@ -166,9 +161,11 @@
 				{#each data.recentActivity.feedback as fb (fb.id)}
 					<li class="rounded-lg bg-surface-raised px-3 py-2">
 						<p class="font-medium text-text-primary">
-							{fb.stakeholder?.name ?? 'Unknown'} &rarr; {fb.reflection?.user?.name ?? 'Unknown'}
+							{fb.reviewer?.name ?? 'Unknown'} &rarr; {fb.reviewer?.individual?.name ?? 'Unknown'}
 						</p>
-						<p class="text-xs text-text-tertiary">{formatDate(fb.submittedAt)}</p>
+						<p class="text-xs text-text-tertiary">
+							Week {fb.weekNumber} &middot; {formatDate(fb.submittedAt)}
+						</p>
 					</li>
 				{:else}
 					<li class="py-4 text-center text-text-tertiary">No feedback yet</li>

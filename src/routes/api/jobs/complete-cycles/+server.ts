@@ -1,4 +1,7 @@
-import { completeExpiredCycles } from '$jobs/complete-expired-cycles';
 import { createCronJobHandler } from '$lib/server/cronAuth';
+import { resolveJob } from '../resolveJob';
 
-export const GET = createCronJobHandler('complete-cycles', completeExpiredCycles);
+export const GET = createCronJobHandler(
+	'complete-journeys',
+	resolveJob('completeExpiredJourneys', 'completeExpiredCycles')
+);

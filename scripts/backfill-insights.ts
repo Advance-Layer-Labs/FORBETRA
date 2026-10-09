@@ -11,6 +11,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { weekNumberForDate } from '../src/lib/server/domain/week';
 
 const prisma = new PrismaClient();
 
@@ -26,16 +27,13 @@ async function backfillInsights() {
 	// Dynamic import to get SvelteKit module resolution
 	const { generateWeeklySynthesis } = await import('../src/lib/server/ai/generateInsight');
 
-	// Find all cycles with reflections
-	const cycles = await prisma.cycle.findMany({
+	// Find all journeys with checkIns
+	const journeys = await prisma.journey.findMany({
 		where: {
-			reflections: { some: {} }
+			checkIns: { some: {} }
 		},
 		include: {
-			reflections: {
-				select: { weekNumber: true },
-				distinct: ['weekNumber']
-			},
+			checkIns: { select: { submittedAt: true } },
 			insights: {
 				where: { type: 'WEEKLY_SYNTHESIS' },
 				select: { weekNumber: true }
@@ -47,14 +45,14 @@ async function backfillInsights() {
 	let skipped = 0;
 	let failed = 0;
 
-	for (const cycle of cycles) {
+	for (const journey of journeys) {
 		const existingWeeks = new Set(
-			cycle.insights.filter((i) => i.weekNumber !== null).map((i) => i.weekNumber!)
+			journey.insights.filter((i) => i.weekNumber !== null).map((i) => i.weekNumber!)
 		);
 
-		const weekNumbers = [...new Set(cycle.reflections.map((r) => r.weekNumber))].sort(
-			(a, b) => a - b
-		);
+		const weekNumbers = [
+			...new Set(journey.checkIns.map((checkIn) => weekNumberForDate(journey.startDate, checkIn.submittedAt)))
+		].sort((a, b) => a - b);
 
 		for (const week of weekNumbers) {
 			if (existingWeeks.has(week)) {
@@ -62,10 +60,10 @@ async function backfillInsights() {
 				continue;
 			}
 
-			console.log(`  Generating insight for cycle ${cycle.id}, week ${week}...`);
+			console.log(`  Generating insight for journey ${journey.id}, week ${week}...`);
 
 			try {
-				const insightId = await generateWeeklySynthesis(cycle.userId, cycle.id, week);
+				const insightId = await generateWeeklySynthesis(journey.userId, journey.id, week);
 				if (insightId) {
 					generated++;
 					console.log(`    Done (${insightId})`);

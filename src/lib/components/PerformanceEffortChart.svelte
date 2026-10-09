@@ -20,7 +20,7 @@
 		gridLine: 'rgba(255, 255, 255, 0.06)'
 	} as const;
 
-	const STAKEHOLDER_COLORS = [
+	const REVIEWER_COLORS = [
 		{ border: 'rgb(34, 197, 94)', bg: 'rgba(34, 197, 94, 0.05)' },
 		{ border: 'rgb(251, 146, 60)', bg: 'rgba(251, 146, 60, 0.05)' },
 		{ border: 'rgb(168, 85, 247)', bg: 'rgba(168, 85, 247, 0.05)' },
@@ -34,17 +34,17 @@
 			effortScore: number | null;
 			performanceScore: number | null;
 		}>;
-		stakeholderData?: Array<{
+		reviewerData?: Array<{
 			weekNumber: number;
-			stakeholderId: string;
-			stakeholderName: string;
+			reviewerId: string;
+			reviewerName: string;
 			effortScore: number | null;
 			performanceScore: number | null;
 		}>;
-		stakeholders?: Array<{ id: string; name: string }>;
+		reviewers?: Array<{ id: string; name: string }>;
 		selfLabel?: string;
-		// Prior-cycle individual averages — when present, rendered as a dimmed
-		// dashed line so the user can compare to their last cycle.
+		// Prior-journey individual averages — when present, rendered as a dimmed
+		// dashed line so the user can compare to their last journey.
 		priorIndividualData?: Array<{
 			weekNumber: number;
 			effortScore: number | null;
@@ -55,33 +55,33 @@
 
 	const props: Props = $props();
 	const individualData = props.individualData ?? [];
-	const stakeholderData = props.stakeholderData ?? [];
-	const stakeholders = props.stakeholders ?? [];
+	const reviewerData = props.reviewerData ?? [];
+	const reviewers = props.reviewers ?? [];
 	const selfLabel = props.selfLabel ?? 'My';
 	const priorIndividualData = props.priorIndividualData ?? [];
-	const priorCycleLabel = props.priorCycleLabel ?? 'Prior cycle';
+	const priorCycleLabel = props.priorCycleLabel ?? 'Prior journey';
 
-	let selectedStakeholderIds = new SvelteSet<string>();
+	let selectedReviewerIds = new SvelteSet<string>();
 	let effortCanvas = $state<HTMLCanvasElement | null>(null);
 	let perfCanvas = $state<HTMLCanvasElement | null>(null);
 	let effortChart = $state<Chart | null>(null);
 	let perfChart = $state<Chart | null>(null);
 
-	const filteredStakeholderData = $derived(
-		stakeholderData.filter((d) =>
-			selectedStakeholderIds.size === 0 ? true : selectedStakeholderIds.has(d.stakeholderId)
+	const filteredReviewerData = $derived(
+		reviewerData.filter((d) =>
+			selectedReviewerIds.size === 0 ? true : selectedReviewerIds.has(d.reviewerId)
 		)
 	);
 
-	const stakeholdersWithData = $derived(
-		stakeholders.filter((s) => stakeholderData.some((d) => d.stakeholderId === s.id))
+	const reviewersWithData = $derived(
+		reviewers.filter((s) => reviewerData.some((d) => d.reviewerId === s.id))
 	);
 
 	// Averages per week
 	const avgByWeek = $derived(
 		(() => {
 			const wm = new SvelteMap<number, { effort: number[]; perf: number[] }>();
-			filteredStakeholderData.forEach((d) => {
+			filteredReviewerData.forEach((d) => {
 				if (!wm.has(d.weekNumber)) wm.set(d.weekNumber, { effort: [], perf: [] });
 				const w = wm.get(d.weekNumber)!;
 				if (d.effortScore != null) w.effort.push(d.effortScore);
@@ -109,7 +109,7 @@
 		(() => {
 			const ws = new SvelteSet<number>();
 			individualData.forEach((d) => ws.add(d.weekNumber));
-			stakeholderData.forEach((d) => ws.add(d.weekNumber));
+			reviewerData.forEach((d) => ws.add(d.weekNumber));
 			const sorted = Array.from(ws).sort((a, b) => a - b);
 			if (sorted.length > 0 && sorted.length < 4) {
 				const max = sorted[sorted.length - 1];
@@ -123,7 +123,7 @@
 		(() => {
 			const ws = new SvelteSet<number>();
 			individualData.forEach((d) => ws.add(d.weekNumber));
-			stakeholderData.forEach((d) => ws.add(d.weekNumber));
+			reviewerData.forEach((d) => ws.add(d.weekNumber));
 			return ws.size > 0 && ws.size < 4;
 		})()
 	);
@@ -286,19 +286,19 @@
 					makeLine(
 						'Reviewer Avg',
 						avgSeries('avgEffort'),
-						CHART_COLORS.effort.stakeholder.border,
-						CHART_COLORS.effort.stakeholder.bg,
+						CHART_COLORS.effort.reviewer.border,
+						CHART_COLORS.effort.reviewer.bg,
 						2,
 						[5, 5]
 					)
 				);
 			}
-			if (selectedStakeholderIds.size > 0) {
-				stakeholdersWithData
-					.filter((s) => selectedStakeholderIds.has(s.id))
+			if (selectedReviewerIds.size > 0) {
+				reviewersWithData
+					.filter((s) => selectedReviewerIds.has(s.id))
 					.forEach((s, i) => {
-						const c = STAKEHOLDER_COLORS[i % STAKEHOLDER_COLORS.length];
-						const sd = stakeholderData.filter((d) => d.stakeholderId === s.id);
+						const c = REVIEWER_COLORS[i % REVIEWER_COLORS.length];
+						const sd = reviewerData.filter((d) => d.reviewerId === s.id);
 						datasets.push(
 							makeLine(s.name, weekSeries(sd, 'effortScore'), c.border, c.bg, 1.5, undefined, 2)
 						);
@@ -338,19 +338,19 @@
 					makeLine(
 						'Reviewer Avg',
 						avgSeries('avgPerf'),
-						CHART_COLORS.performance.stakeholder.border,
-						CHART_COLORS.performance.stakeholder.bg,
+						CHART_COLORS.performance.reviewer.border,
+						CHART_COLORS.performance.reviewer.bg,
 						2,
 						[5, 5]
 					)
 				);
 			}
-			if (selectedStakeholderIds.size > 0) {
-				stakeholdersWithData
-					.filter((s) => selectedStakeholderIds.has(s.id))
+			if (selectedReviewerIds.size > 0) {
+				reviewersWithData
+					.filter((s) => selectedReviewerIds.has(s.id))
 					.forEach((s, i) => {
-						const c = STAKEHOLDER_COLORS[i % STAKEHOLDER_COLORS.length];
-						const sd = stakeholderData.filter((d) => d.stakeholderId === s.id);
+						const c = REVIEWER_COLORS[i % REVIEWER_COLORS.length];
+						const sd = reviewerData.filter((d) => d.reviewerId === s.id);
 						datasets.push(
 							makeLine(
 								s.name,
@@ -404,17 +404,16 @@
 		perfChart?.destroy();
 	});
 
-	function toggleStakeholder(id: string) {
-		if (selectedStakeholderIds.has(id)) selectedStakeholderIds.delete(id);
-		else selectedStakeholderIds.add(id);
-		selectedStakeholderIds = new SvelteSet(selectedStakeholderIds);
+	function toggleReviewer(id: string) {
+		if (selectedReviewerIds.has(id)) selectedReviewerIds.delete(id);
+		else selectedReviewerIds.add(id);
 	}
 
 	const summaryCards = $derived([
 		{ label: 'Self Effort', ...stats.selfEffort, color: CHART_COLORS.effort.individual.border },
 		{ label: 'Self Perf', ...stats.selfPerf, color: CHART_COLORS.performance.individual.border },
-		{ label: 'Rev. Effort', ...stats.revEffort, color: CHART_COLORS.effort.stakeholder.border },
-		{ label: 'Rev. Perf', ...stats.revPerf, color: CHART_COLORS.performance.stakeholder.border }
+		{ label: 'Rev. Effort', ...stats.revEffort, color: CHART_COLORS.effort.reviewer.border },
+		{ label: 'Rev. Perf', ...stats.revPerf, color: CHART_COLORS.performance.reviewer.border }
 	]);
 </script>
 
@@ -435,7 +434,7 @@
 					<span class="flex items-center gap-1.5">
 						<span
 							class="inline-block h-0 w-3 border-t-[1.5px] border-dashed"
-							style="border-color:{CHART_COLORS.effort.stakeholder.border}"
+							style="border-color:{CHART_COLORS.effort.reviewer.border}"
 						></span>
 						Reviewers
 					</span>
@@ -469,7 +468,7 @@
 					<span class="flex items-center gap-1.5">
 						<span
 							class="inline-block h-0 w-3 border-t-[1.5px] border-dashed"
-							style="border-color:{CHART_COLORS.performance.stakeholder.border}"
+							style="border-color:{CHART_COLORS.performance.reviewer.border}"
 						></span>
 						Reviewers
 					</span>
@@ -492,16 +491,16 @@
 	{/if}
 
 	<!-- Reviewer Pills -->
-	{#if stakeholdersWithData.length > 0}
+	{#if reviewersWithData.length > 0}
 		<div class="flex flex-wrap items-center gap-2">
 			<span class="text-[11px] font-semibold tracking-wide text-text-tertiary uppercase"
 				>Reviewers</span
 			>
-			{#each stakeholdersWithData as s, i (s.id)}
-				{@const active = selectedStakeholderIds.has(s.id)}
+			{#each reviewersWithData as s, i (s.id)}
+				{@const active = selectedReviewerIds.has(s.id)}
 				<button
 					type="button"
-					onclick={() => toggleStakeholder(s.id)}
+					onclick={() => toggleReviewer(s.id)}
 					class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors
 						{active
 						? 'border-accent bg-accent-muted text-accent'
@@ -510,7 +509,7 @@
 					{#if active}
 						<span
 							class="mr-1 inline-block h-1.5 w-1.5 rounded-full"
-							style="background:{STAKEHOLDER_COLORS[i % STAKEHOLDER_COLORS.length].border}"
+							style="background:{REVIEWER_COLORS[i % REVIEWER_COLORS.length].border}"
 						></span>
 					{/if}
 					{s.name}

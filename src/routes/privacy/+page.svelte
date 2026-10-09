@@ -26,7 +26,7 @@
 					during registration.
 				</li>
 				<li>
-					<strong>Development Data:</strong> Objectives, focus areas, weekly check-in scores, and notes
+					<strong>Development Data:</strong> Goals, focus areas, weekly check-in scores, and notes
 					you enter into the platform.
 				</li>
 				<li>

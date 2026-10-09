@@ -1,10 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { LayoutData } from './$types';
 	import { page } from '$app/stores';
 	import { Home, Settings } from 'lucide-svelte';
 	import { coachAlertCount } from '$lib/stores/coachAlerts.svelte';
 
-	const { children }: { children: Snippet } = $props();
+	const { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+	$effect(() => {
+		coachAlertCount.value = data.totalAlerts;
+	});
 
 	const navItems = [{ href: '/coach', label: 'Dashboard', icon: Home }];
 

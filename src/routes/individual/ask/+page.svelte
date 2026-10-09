@@ -126,7 +126,7 @@
 
 	const suggestedQuestions = [
 		'What patterns do you see in my effort scores?',
-		'How does my self-assessment compare to my stakeholders?',
+		'How does my self-assessment compare to my reviewers?',
 		'What should I focus on next week?',
 		'Am I making progress toward my goal?'
 	];
@@ -145,7 +145,7 @@
 					<a
 						href="/individual"
 						class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-						>Hub</a
+						>Journeys</a
 					>
 				</li>
 				<li aria-hidden="true" class="text-text-muted">/</li>
@@ -168,10 +168,10 @@
 					Start a journey to ask questions about your development data.
 				</p>
 				<a
-					href="/individual"
+					href="/individual/new-cycle"
 					class="mt-4 inline-block rounded-lg bg-accent px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
 				>
-					Go to Dashboard
+					Start a journey
 				</a>
 			</div>
 		</div>

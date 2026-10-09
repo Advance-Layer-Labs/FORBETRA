@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { ChevronLeft, ChevronRight, MessageSquare } from 'lucide-svelte';
 	import Badge from '$lib/components/Badge.svelte';
+	import InfoTip from '$lib/components/InfoTip.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
@@ -50,7 +51,7 @@
 				<a
 					href="/individual"
 					class="rounded transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-					>Hub</a
+					>Journeys</a
 				>
 			</li>
 			<li aria-hidden="true" class="text-text-muted">/</li>
@@ -60,7 +61,7 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold text-text-primary">Scorecard</h1>
-			<p class="text-xs text-text-muted">{data.objectiveTitle}</p>
+			<p class="text-xs text-text-muted">{data.goalTitle}</p>
 			<p class="text-2xs mt-0.5 text-text-tertiary">Your self-perception vs. reviewer feedback</p>
 		</div>
 		<div class="flex items-center gap-2">
@@ -98,7 +99,10 @@
 		<span class="text-2xs font-semibold tracking-wider text-text-muted uppercase">Your Scores</span>
 		{#if data.myEffort !== null}
 			<div class="flex items-center gap-1.5">
-				<span class="text-2xs text-text-muted">Effort</span>
+				<span class="text-2xs flex items-center gap-1 text-text-muted">
+					Effort
+					<InfoTip text="How much attention you gave this goal. 0 is none, 10 is exceptional." />
+				</span>
 				<div
 					class="flex h-7 w-7 items-center justify-center rounded text-xs font-bold {effortBg(
 						data.myEffort
@@ -110,7 +114,10 @@
 		{/if}
 		{#if data.myPerformance !== null}
 			<div class="flex items-center gap-1.5">
-				<span class="text-2xs text-text-muted">Performance</span>
+				<span class="text-2xs flex items-center gap-1 text-text-muted">
+					Performance
+					<InfoTip text="How effective that work was. 0 is none, 10 is exceptional." />
+				</span>
 				<div
 					class="flex h-7 w-7 items-center justify-center rounded text-xs font-bold {perfBg(
 						data.myPerformance
@@ -125,7 +132,7 @@
 		{/if}
 	</div>
 
-	<!-- Stakeholder gap cards -->
+	<!-- Reviewer gap cards -->
 	{#if data.scorecard.length > 0}
 		{@const allAligned = data.scorecard.every((s) => s.maxAbsGap <= 1)}
 		{@const anyLarge = data.scorecard.some((s) => s.maxAbsGap > 2)}
@@ -161,7 +168,7 @@
 			<span>Reviewer</span>
 		</div>
 		<div class="grid gap-3 sm:grid-cols-2">
-			{#each data.scorecard as row (row.stakeholderId)}
+			{#each data.scorecard as row (row.reviewerId)}
 				<div
 					class="rounded-lg border p-4 {row.maxAbsGap > 2
 						? 'border-error/30'
@@ -169,23 +176,33 @@
 							? 'border-warning/30'
 							: 'border-border-default'} bg-surface-raised"
 				>
-					<!-- Stakeholder name + trend -->
+					<!-- Reviewer name + trend -->
 					<div class="mb-3 flex items-center justify-between">
-						<p class="text-sm font-semibold text-text-primary">{row.stakeholderName}</p>
+						<p class="text-sm font-semibold text-text-primary">{row.reviewerName}</p>
 						{#if row.effortGapTrend || row.performanceGapTrend}
-							{#if row.effortGapTrend === 'closing' || row.performanceGapTrend === 'closing'}
-								<Badge variant="success">Gap closing</Badge>
-							{:else if row.effortGapTrend === 'widening' || row.performanceGapTrend === 'widening'}
-								<Badge variant="error">Gap widening</Badge>
-							{:else}
-								<Badge>Gap stable</Badge>
-							{/if}
+							<div class="flex items-center gap-1">
+								{#if row.effortGapTrend === 'closing' || row.performanceGapTrend === 'closing'}
+									<Badge variant="success">Gap closing</Badge>
+								{:else if row.effortGapTrend === 'widening' || row.performanceGapTrend === 'widening'}
+									<Badge variant="error">Gap widening</Badge>
+								{:else}
+									<Badge>Gap stable</Badge>
+								{/if}
+								<InfoTip
+									text="Your score minus the reviewer’s. Closer to zero means you see it the same way. Closing means that difference is shrinking."
+								/>
+							</div>
 						{/if}
 					</div>
 
 					<!-- Gap visualization: Effort -->
 					<div class="mb-2">
-						<p class="text-2xs mb-1 font-medium text-text-tertiary">Effort</p>
+						<p class="text-2xs mb-1 flex items-center gap-1 font-medium text-text-tertiary">
+							Effort
+							<InfoTip
+								text="How much attention you gave this goal. 0 is none, 10 is exceptional."
+							/>
+						</p>
 						<div class="flex items-center gap-1">
 							{#if data.myEffort !== null}
 								<div
@@ -233,13 +250,13 @@
 									<div class="h-px flex-1 bg-border-default"></div>
 								</div>
 							{/if}
-							{#if row.stakeholderEffort !== null}
+							{#if row.reviewerEffort !== null}
 								<div
 									class="text-2xs flex h-7 w-7 shrink-0 items-center justify-center rounded font-bold {effortBg(
-										row.stakeholderEffort
+										row.reviewerEffort
 									)}"
 								>
-									{row.stakeholderEffort}
+									{row.reviewerEffort}
 								</div>
 							{:else}
 								<div
@@ -253,7 +270,10 @@
 
 					<!-- Gap visualization: Performance -->
 					<div>
-						<p class="text-2xs mb-1 font-medium text-text-tertiary">Performance</p>
+						<p class="text-2xs mb-1 flex items-center gap-1 font-medium text-text-tertiary">
+							Performance
+							<InfoTip text="How effective that work was. 0 is none, 10 is exceptional." />
+						</p>
 						<div class="flex items-center gap-1">
 							{#if data.myPerformance !== null}
 								<div
@@ -301,13 +321,13 @@
 									<div class="h-px flex-1 bg-border-default"></div>
 								</div>
 							{/if}
-							{#if row.stakeholderPerformance !== null}
+							{#if row.reviewerPerformance !== null}
 								<div
 									class="text-2xs flex h-7 w-7 shrink-0 items-center justify-center rounded font-bold {perfBg(
-										row.stakeholderPerformance
+										row.reviewerPerformance
 									)}"
 								>
-									{row.stakeholderPerformance}
+									{row.reviewerPerformance}
 								</div>
 							{:else}
 								<div
@@ -326,13 +346,13 @@
 								? row.effortGap
 								: row.performanceGap}
 						<p class="text-2xs mt-2 text-text-tertiary">
-							{#if biggestGap !== null && biggestGap > 0}You rate yourself higher than {row.stakeholderName}
+							{#if biggestGap !== null && biggestGap > 0}You rate yourself higher than {row.reviewerName}
 								— explore what they're not seeing.{:else}They see more than you give yourself credit
 								for.{/if}
 						</p>
 					{/if}
 
-					<!-- Stakeholder comment -->
+					<!-- Reviewer comment -->
 					{#if row.comment}
 						<div class="mt-3 border-t border-border-default pt-3">
 							<div class="flex items-start gap-2">

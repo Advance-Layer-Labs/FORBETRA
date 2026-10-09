@@ -428,19 +428,19 @@ User experience also includes what arrives in their inbox / on their phone. From
 
 | Cron                           | Schedule          | Audience     | Effect                                  |
 | ------------------------------ | ----------------- | ------------ | --------------------------------------- |
-| `/api/jobs/remind-base`        | Mon–Fri 9am       | Individuals  | Weekly check-in reminder                |
-| `/api/jobs/remind-prompts`     | Mon–Fri 2pm       | Individuals  | Overdue check-in nudge                  |
-| `/api/jobs/remind-feedback`    | Mon–Fri 3pm       | Stakeholders | "Time to give feedback"                 |
-| `/api/jobs/generate-insights`  | Sun 8pm           | Individuals  | New insights generated (in-app + email) |
-| `/api/jobs/coach-prep`         | Mon 7am           | Coaches      | "Your week's coach prep is ready"       |
-| `/api/jobs/complete-cycles`    | Daily 1am         | System       | Cycle end-state transitions             |
-| `/api/jobs/stakeholder-impact` | 1st of month 10am | Stakeholders | "Here's the impact your feedback had"   |
+| `/api/jobs/remind-base`        | Every hour        | Individuals  | Weekly check-in reminder at the saved local hour |
+| `/api/jobs/remind-prompts`     | Every hour        | Individuals  | Overdue check-in nudge at the saved local hour, except journey day 3 |
+| `/api/jobs/remind-feedback`    | Weekdays 3pm UTC  | Reviewers    | Reminder for an open or expired feedback link. Earlier links stay valid |
+| `/api/jobs/generate-insights`  | Sun 8pm UTC       | Individuals  | New insights stored in the app. Not emailed |
+| `/api/jobs/coach-prep`         | Mon 7am UTC       | Coaches      | Coach prep stored in the app. Not emailed |
+| `/api/jobs/complete-cycles`    | Daily 1am UTC     | Individuals  | Journey completion email and SMS         |
+| `/api/jobs/stakeholder-impact` | 1st of month 10am UTC | Reviewers | Monthly impact summary                |
 
 **Email + SMS templates live in `src/lib/notifications/`.** Each one is a UX surface — the user sees these more often than the in-app screens.
 
 **Questions:**
 
-- Is there an opportunity to consolidate the Mon-Fri 9am + 2pm nudges into one smart-timed message based on user activity? (Two reminders/day risks fatigue.)
+- Check-in reminders now fire at each person's saved hour, and the overdue nudge skips the weekly reminder day so the two do not land together.
 - The stakeholder-impact monthly summary is a relationship-builder. Could there be a similar monthly summary for the Individual ("here's what you accomplished") that ties the cycle together?
 
 ---
@@ -481,7 +481,7 @@ Pulled from the journey notes above, ranked by leverage:
 
 11. **Stakeholder invalid page dead-end.** §2.8. No recovery path; could offer "request new link".
 
-12. **Email/SMS reminder fatigue.** §8. Mon-Fri 9am + 2pm could double-tap users. Consider activity-aware scheduling.
+12. **Email/SMS reminder fatigue.** §8. Check-in reminders use the saved local hour. The overdue nudge skips journey day 3 so it does not stack on the weekly reminder.
 
 ---
 

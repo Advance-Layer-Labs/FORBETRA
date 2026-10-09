@@ -1,39 +1,78 @@
 import prisma from '$lib/server/prisma';
-import { computeWeekNumber } from '$lib/server/coachUtils';
+import { currentWeekNumber } from '$lib/server/domain/week';
 
-export async function getActiveObjectiveWithCycle(userId: string) {
-	const objective = await prisma.objective.findFirst({
-		where: { userId, active: true },
-		orderBy: { createdAt: 'desc' },
+export async function listJourneysForBoard(userId: string) {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { timezone: true }
+	});
+	const journeys = await prisma.journey.findMany({
+		where: { userId },
+		orderBy: { startDate: 'desc' },
 		include: {
-			subgoals: { where: { active: true }, orderBy: { createdAt: 'asc' } },
-			cycles: {
-				orderBy: { startDate: 'desc' },
-				take: 1,
-				include: {
-					reflections: {
-						select: {
-							id: true,
-							reflectionType: true,
-							weekNumber: true,
-							submittedAt: true,
-							effortScore: true,
-							performanceScore: true,
-							notes: true
-						}
-					}
+			goal: {
+				select: {
+					id: true,
+					title: true,
+					description: true,
+					active: true,
+					reviewers: { select: { id: true } },
+					focusAreas: { where: { active: true }, select: { id: true } }
 				}
 			},
-			stakeholders: {
-				orderBy: { createdAt: 'asc' }
-			}
+			_count: { select: { checkIns: true } }
 		}
 	});
 
-	if (!objective) return null;
+	return journeys.map((journey) => ({
+		id: journey.id,
+		label: journey.label,
+		status: journey.status,
+		startDate: journey.startDate.toISOString(),
+		endDate: journey.endDate?.toISOString() ?? null,
+		lengthWeeks: journey.lengthWeeks,
+		goalId: journey.goal.id,
+		goalTitle: journey.goal.title,
+		goalDescription: journey.goal.description,
+		goalActive: journey.goal.active,
+		checkInCount: journey._count.checkIns,
+		reviewerCount: journey.goal.reviewers.length,
+		focusAreaCount: journey.goal.focusAreas.length,
+		currentWeek: currentWeekNumber(journey.startDate, new Date(), user?.timezone)
+	}));
+}
 
-	const cycle = objective.cycles[0] ?? null;
-	const currentWeek = cycle ? computeWeekNumber(cycle.startDate) : null;
+/** Active journey first, then the newest by start date. A newer completed journey must not hide it. */
+export function pickCurrentJourney<T extends { status: string; startDate: Date }>(
+	journeys: T[]
+): T | null {
+	const byStart = (a: T, b: T) => b.startDate.getTime() - a.startDate.getTime();
+	const active = journeys.filter((journey) => journey.status === 'ACTIVE').sort(byStart);
+	if (active.length > 0) return active[0];
+	const rest = [...journeys].sort(byStart);
+	return rest[0] ?? null;
+}
 
-	return { objective, cycle, currentWeek };
+export async function getActiveGoalWithJourney(userId: string) {
+	const [goal, user] = await Promise.all([
+		prisma.goal.findFirst({
+			where: { userId, active: true },
+			orderBy: { createdAt: 'desc' },
+			include: {
+				focusAreas: { where: { active: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
+				journeys: { orderBy: { startDate: 'desc' }, take: 8 },
+				reviewers: { orderBy: { createdAt: 'asc' } }
+			}
+		}),
+		prisma.user.findUnique({
+			where: { id: userId },
+			select: { timezone: true }
+		})
+	]);
+
+	if (!goal) return null;
+	const journey = pickCurrentJourney(goal.journeys);
+	const timeZone = user?.timezone ?? null;
+	const currentWeek = journey ? currentWeekNumber(journey.startDate, new Date(), timeZone) : null;
+	return { goal, journey, currentWeek, timeZone };
 }
