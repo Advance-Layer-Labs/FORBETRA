@@ -107,6 +107,16 @@
 						<!-- eslint-enable svelte/no-navigation-without-resolve -->
 					</div>
 				</div>
+			{:else if data.user.role === 'COACH'}
+				<div
+					class="rounded-xl border border-warning/30 bg-warning-muted px-4 py-3 text-sm text-warning"
+				>
+					<p class="font-semibold">This link is for your client</p>
+					<p>
+						You're signed in as the coach. Send this invitation to your client instead of opening it
+						yourself.
+					</p>
+				</div>
 			{:else if data.user.role !== 'INDIVIDUAL'}
 				<div class="rounded-xl border border-error/50 bg-error-muted px-4 py-3 text-sm text-error">
 					<p class="font-semibold text-error">Role not supported</p>

@@ -21,9 +21,27 @@
 			''
 	);
 
-	function applyTemplate(title: string, description: string) {
+	let sourceTemplateId = $state('');
+	let templateTitle = $state('');
+
+	const goalTitleTooShort = $derived(goalTitle.trim().length > 0 && goalTitle.trim().length < 3);
+	const goalTitleError = $derived(
+		goalTitleTooShort ? 'Goal title must be at least 3 characters' : (errors.goalTitle?.[0] ?? '')
+	);
+	const showGoalCounter = $derived(goalTitle.length >= 150);
+
+	function applyTemplate(id: string, title: string, description: string) {
+		sourceTemplateId = id;
+		templateTitle = title;
 		goalTitle = title;
 		goalDescription = description;
+	}
+
+	function onGoalTitleInput() {
+		if (templateTitle && goalTitle !== templateTitle) {
+			sourceTemplateId = '';
+			templateTitle = '';
+		}
 	}
 </script>
 
@@ -80,11 +98,18 @@
 				minlength="3"
 				maxlength="200"
 				bind:value={goalTitle}
+				oninput={onGoalTitleInput}
+				aria-invalid={goalTitleError ? 'true' : undefined}
+				aria-describedby={goalTitleError ? 'goalTitle-error' : undefined}
 				placeholder="Have a stronger executive presence"
 				class="mt-2 w-full rounded-[10px] border border-border-default bg-surface-raised px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted focus:border-border-accent focus:outline-none"
 			/>
-			{#if errors.goalTitle}
-				<p class="mt-2 text-sm text-signal-attention">{errors.goalTitle[0]}</p>
+			<input type="hidden" name="sourceTemplateId" value={sourceTemplateId} />
+			{#if goalTitleError}
+				<p id="goalTitle-error" class="mt-2 text-sm text-signal-attention">{goalTitleError}</p>
+			{/if}
+			{#if showGoalCounter}
+				<p class="mt-1 text-right text-xs text-text-muted">{goalTitle.length} / 200</p>
 			{/if}
 		</div>
 
@@ -132,7 +157,7 @@
 							<li>
 								<button
 									type="button"
-									onclick={() => applyTemplate(goal.title, goal.description)}
+									onclick={() => applyTemplate(goal.id, goal.title, goal.description)}
 									class="w-full rounded-lg border border-border-default bg-surface-raised px-4 py-3 text-left text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
 								>
 									{goal.title}

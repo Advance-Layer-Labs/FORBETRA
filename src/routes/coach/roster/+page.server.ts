@@ -1,5 +1,6 @@
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
+import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { buildClientSummary } from '$lib/server/buildClientSummary';
 import { clientSelect, toSummaryInput } from '../clientData';
@@ -37,11 +38,22 @@ export const load: PageServerLoad = async (event) => {
 		})
 		.filter((value): value is NonNullable<typeof value> => value !== null);
 
+	const pendingInviteCount = await prisma.coachInvite.count({
+		where: {
+			coachId: dbUser.id,
+			acceptedAt: null,
+			cancelledAt: null,
+			expiresAt: { gt: new Date() }
+		}
+	});
+
 	return {
 		coach: {
-			name: dbUser.name ?? 'Coach'
+			name: dbUser.name ?? 'Coach',
+			practiceName: dbUser.practiceName
 		},
-		clients: clientSummaries
+		clients: clientSummaries,
+		pendingInviteCount
 	};
 };
 
@@ -53,7 +65,7 @@ export const actions: Actions = {
 		const restore = formData.get('archived') === 'true';
 
 		if (!individualId) {
-			return { success: false };
+			return fail(400, { action: 'archive' as const, error: 'Missing client.' });
 		}
 
 		await prisma.coachClient.updateMany({
@@ -61,6 +73,6 @@ export const actions: Actions = {
 			data: { archivedAt: restore ? null : new Date() }
 		});
 
-		return { success: true };
+		return { success: true, action: 'archive' as const, restored: restore };
 	}
 };

@@ -1,9 +1,10 @@
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
-import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
 import { buildClientSummary } from '$lib/server/buildClientSummary';
 import { clientSelect, toSummaryInput } from './clientData';
+import { cancelCoachInvite, resendCoachInvite } from '$lib/server/coachInvites';
 
 export const load: PageServerLoad = async (event) => {
 	const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
@@ -57,13 +58,27 @@ export const load: PageServerLoad = async (event) => {
 
 	const invitations = await prisma.coachInvite.findMany({
 		where: { coachId: dbUser.id },
+		orderBy: { createdAt: 'desc' },
 		select: {
 			id: true,
+			name: true,
+			email: true,
+			createdAt: true,
 			acceptedAt: true,
 			cancelledAt: true,
 			expiresAt: true
 		}
 	});
+
+	const now = new Date();
+	const pendingInvites = invitations
+		.filter((invite) => !invite.acceptedAt && !invite.cancelledAt && invite.expiresAt > now)
+		.map((invite) => ({
+			id: invite.id,
+			name: invite.name,
+			email: invite.email,
+			createdAt: invite.createdAt.toISOString()
+		}));
 
 	// Calculate summary metrics
 	const totalAlerts = clientSummaries.reduce((sum, client) => sum + client.alerts.length, 0);
@@ -101,6 +116,7 @@ export const load: PageServerLoad = async (event) => {
 			id: c.id,
 			name: c.name,
 			goal: c.goal?.title ?? null,
+			settingUp: !c.goal?.journey,
 			trajectory: c.goal?.insights?.trajectoryScore ?? null,
 			completionPct: c.goal?.journey ? Math.round(c.goal.journey.completion) : null
 		}));
@@ -132,16 +148,16 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		coach: {
-			name: dbUser.name ?? 'Coach'
+			name: dbUser.name ?? 'Coach',
+			practiceName: dbUser.practiceName
 		},
 		rosterSummary: {
 			total: coachClients.length,
 			active: coachClients.filter((entry) => entry.archivedAt === null).length,
 			archived: coachClients.filter((entry) => entry.archivedAt !== null).length,
-			pendingInvites: invitations.filter(
-				(invite) => !invite.acceptedAt && !invite.cancelledAt && invite.expiresAt > new Date()
-			).length
+			pendingInvites: pendingInvites.length
 		},
+		pendingInvites,
 		analytics: {
 			totalAlerts
 		},
@@ -154,6 +170,44 @@ export const load: PageServerLoad = async (event) => {
 		healthyClients,
 		allOnTrack:
 			activeSummaries.length > 0 &&
-			activeSummaries.every((client) => client.alerts.length === 0 && client.goal?.journey)
+			activeSummaries.every((client) => client.alerts.length === 0 && client.goal?.journey),
+		settingUpCount: activeSummaries.filter((client) => !client.goal?.journey).length
 	};
+};
+
+export const actions: Actions = {
+	cancelInvite: async (event) => {
+		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+		const formData = await event.request.formData();
+		const result = await cancelCoachInvite({
+			inviteId: String(formData.get('inviteId') ?? ''),
+			actorId: dbUser.id,
+			isAdmin: dbUser.role === 'ADMIN'
+		});
+		if (!result.ok)
+			return fail(result.status, { action: 'cancelInvite' as const, error: result.error });
+		return { success: true, action: 'cancelInvite' as const };
+	},
+	resendInvite: async (event) => {
+		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+		const formData = await event.request.formData();
+		const result = await resendCoachInvite({
+			inviteId: String(formData.get('inviteId') ?? ''),
+			actorId: dbUser.id,
+			isAdmin: dbUser.role === 'ADMIN',
+			coachName: dbUser.name ?? 'Your coach',
+			origin: event.url.origin,
+			practiceName: dbUser.practiceName,
+			practiceDescription: dbUser.practiceDescription
+		});
+		if (!result.ok)
+			return fail(result.status, { action: 'resendInvite' as const, error: result.error });
+		return {
+			success: true,
+			action: 'resendInvite' as const,
+			email: result.email,
+			emailFailed: result.emailFailed ?? false,
+			inviteUrl: result.emailFailed ? result.inviteUrl : undefined
+		};
+	}
 };

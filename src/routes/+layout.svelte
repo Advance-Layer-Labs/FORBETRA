@@ -20,6 +20,12 @@
 	const isRoleSelection = $derived(
 		($page.data as Record<string, unknown>).showRoleSelection === true
 	);
+	const isOnboarding = $derived(
+		$page.url.pathname === '/onboarding' ||
+			$page.url.pathname.startsWith('/onboarding/') ||
+			$page.url.pathname === '/coach/onboarding' ||
+			$page.url.pathname.startsWith('/coach/onboarding/')
+	);
 
 	const isActive = (href: string) => {
 		const pathname = $page.url.pathname;
@@ -90,7 +96,7 @@
 								Admin
 							</a>
 						{/if}
-						{#if !isRoleSelection && data.dbUser?.role !== 'ORG_ADMIN'}
+						{#if !isRoleSelection && !isOnboarding && data.dbUser?.role !== 'ORG_ADMIN'}
 							<a
 								href={resolve('/settings')}
 								class="{navClass(isActive('/settings'))} px-2 py-1 text-xs"

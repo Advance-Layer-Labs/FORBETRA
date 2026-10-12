@@ -284,6 +284,7 @@ export const load: PageServerLoad = async (event) => {
 		goal: {
 			id: goal.id,
 			title: goal.title,
+			description: goal.description,
 			focusAreas: goal.focusAreas.map((s) => ({ id: s.id, label: s.label }))
 		},
 		summary: {

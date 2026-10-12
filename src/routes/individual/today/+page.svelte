@@ -206,6 +206,15 @@
 				</p>
 			{/if}
 
+			{#if data.goal?.title}
+				<h2 class="text-lg font-semibold text-text-primary">{data.goal.title}</h2>
+				{#if data.goal.description}
+					<p class="mt-1 mb-4 text-sm leading-relaxed text-text-secondary">
+						{data.goal.description}
+					</p>
+				{/if}
+			{/if}
+
 			<!-- Week indicator -->
 			{#if data.currentWeek && data.totalWeeks}
 				<p class="mb-2 font-mono text-[11px] tracking-[0.06em] text-text-muted">
@@ -269,7 +278,7 @@
 						<div class="mt-8">
 							<p class="mb-3 text-sm text-text-secondary">
 								What shaped your week? <span class="text-text-tertiary"
-									>-- even one sentence helps your coach</span
+									>— even one sentence helps your coach</span
 								>
 							</p>
 							<textarea
@@ -305,6 +314,11 @@
 								Save check-in
 							{/if}
 						</button>
+						{#if !bothScoresSelected}
+							<p class="mt-2 text-center text-xs text-text-tertiary">
+								Set an effort and performance rating to save.
+							</p>
+						{/if}
 					</form>
 				</div>
 			{:else}
@@ -374,7 +388,7 @@
 			{:else if data.signals?.needsFirstReviewer}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
-					href="/individual/stakeholders"
+					href="/individual/reviewers"
 					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
 				>
 					<p class="text-[13px] text-text-secondary">
@@ -388,7 +402,7 @@
 			{:else if data.signals?.needsMoreReviewers}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
-					href="/individual/stakeholders"
+					href="/individual/reviewers"
 					class="group mt-8 block border-l-2 border-accent/25 py-3 pr-4 pl-4 transition-colors hover:border-accent"
 				>
 					<p class="text-[13px] text-text-secondary">
@@ -409,7 +423,7 @@
 						"{data.coachNudge.text}"
 					</p>
 					<p class="mt-2 text-[11px] text-text-muted">
-						-- Your coach, {data.coachNudge.coachName}
+						— Your coach, {data.coachNudge.coachName}
 					</p>
 				</div>
 			{/if}

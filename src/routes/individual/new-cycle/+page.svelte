@@ -514,9 +514,8 @@
 									Each reviewer has their own cadence, weekly or every other week. You can change it
 									any time on the
 									<!-- eslint-disable svelte/no-navigation-without-resolve -->
-									<a
-										href="/individual/stakeholders"
-										class="font-semibold text-accent hover:underline">Reviewers</a
+									<a href="/individual/reviewers" class="font-semibold text-accent hover:underline"
+										>Reviewers</a
 									>
 									<!-- eslint-enable svelte/no-navigation-without-resolve -->
 									page.

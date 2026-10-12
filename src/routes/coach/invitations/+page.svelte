@@ -20,19 +20,21 @@
 
 	const { data, form }: { data: PageData; form: ActionData | null } = $props();
 
-	let copiedInviteUrl = $state(false);
+	let copiedInviteUrl = $state('');
 
 	async function copyInviteUrl(url: string) {
 		try {
 			await navigator.clipboard.writeText(url);
-			copiedInviteUrl = true;
+			copiedInviteUrl = url;
 			setTimeout(() => {
-				copiedInviteUrl = false;
+				if (copiedInviteUrl === url) copiedInviteUrl = '';
 			}, 2000);
 		} catch {
 			addToast('Could not copy to clipboard.', 'error');
 		}
 	}
+
+	const bulkPlaceholder = 'alex@example.com\nAlex Jensen, alex@example.com';
 
 	const defaultInviteMessage =
 		`Hi there—I'd love for you to join me in Forbetra so we can track your progress together. ` +
@@ -98,29 +100,23 @@
 	};
 
 	// --- Filter tabs ---
-	type FilterTab = 'all' | 'pending' | 'accepted' | 'cancelled';
+	type FilterTab = 'all' | 'pending' | 'accepted' | 'cancelled' | 'expired';
 	let activeFilter = $state<FilterTab>('all');
 
 	const filteredInvitations = $derived.by(() => {
 		if (activeFilter === 'all') return data.invitations;
-		return data.invitations.filter((invite) => {
-			const status = getInviteStatus(invite);
-			if (activeFilter === 'cancelled') return status === 'cancelled' || status === 'expired';
-			return status === activeFilter;
-		});
+		return data.invitations.filter((invite) => getInviteStatus(invite) === activeFilter);
 	});
 
 	function countByFilter(filter: FilterTab): number {
 		if (filter === 'all') return data.invitations.length;
-		return data.invitations.filter((invite) => {
-			const status = getInviteStatus(invite);
-			if (filter === 'cancelled') return status === 'cancelled' || status === 'expired';
-			return status === filter;
-		}).length;
+		return data.invitations.filter((invite) => getInviteStatus(invite) === filter).length;
 	}
 
 	// --- Loading states ---
 	let submittingCreate = $state(false);
+	let submittingBulk = $state(false);
+	let bulkPeople = $state('');
 	let submittingCancel = $state<string | null>(null);
 	let submittingResend = $state<string | null>(null);
 	let smsEnabled = $state(false);
@@ -136,17 +132,29 @@
 		if (form.action === 'cancelInvite' && form.success) {
 			addToast('Invitation cancelled', 'success');
 		} else if (form.action === 'resendInvite' && form.success) {
-			addToast(`Invitation resent to ${form.email}`, 'success');
+			if (form.emailFailed) {
+				addToast(
+					'Invitation refreshed, but the email could not be sent. Copy the link below.',
+					'error'
+				);
+			} else {
+				addToast(`Invitation resent to ${form.email}`, 'success');
+			}
 		} else if (form.error) {
 			addToast(form.error, 'error');
 		}
 	});
 
+	const singleInviteValues = $derived(
+		form && 'values' in form && form.values && 'email' in form.values ? form.values : null
+	);
+
 	const filterTabs: { key: FilterTab; label: string }[] = [
 		{ key: 'all', label: 'All' },
 		{ key: 'pending', label: 'Pending' },
 		{ key: 'accepted', label: 'Accepted' },
-		{ key: 'cancelled', label: 'Cancelled' }
+		{ key: 'cancelled', label: 'Cancelled' },
+		{ key: 'expired', label: 'Expired' }
 	];
 </script>
 
@@ -222,6 +230,9 @@
 				<form
 					method="post"
 					action="?/cancelInvite"
+					onsubmit={(event) => {
+						if (!confirm('Cancel this invitation?')) event.preventDefault();
+					}}
 					use:enhance={() => {
 						submittingCancel = form?.existingInvite?.id ?? null;
 						return async ({ result, update }) => {
@@ -271,7 +282,7 @@
 						class="shrink-0 rounded-md border border-success/30 p-1.5 text-success transition-all hover:bg-success/20"
 						aria-label="Copy invite link"
 					>
-						{#if copiedInviteUrl}
+						{#if copiedInviteUrl === form.inviteUrl}
 							<Check class="h-4 w-4" />
 						{:else}
 							<Copy class="h-4 w-4" />
@@ -281,6 +292,85 @@
 				<p class="text-xs">
 					<Lightbulb class="inline h-3.5 w-3.5 text-text-muted" /> Expires in 30 days.
 				</p>
+			{/if}
+		</div>
+	{:else if form?.action === 'resendInvite' && form?.success && form.emailFailed && form.inviteUrl}
+		<div
+			class="space-y-3 rounded-xl border border-warning/30 bg-warning-muted px-4 py-3 text-sm text-warning"
+		>
+			<p class="font-semibold">Email could not be sent. Share the link below directly.</p>
+			<div
+				class="flex items-center gap-2 rounded-lg border border-warning/30 bg-surface-raised px-3 py-2"
+			>
+				<p class="flex-1 font-mono text-xs break-all text-text-primary">{form.inviteUrl}</p>
+				<button
+					type="button"
+					onclick={() => copyInviteUrl(form?.inviteUrl ?? '')}
+					class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning transition-all hover:bg-warning/20"
+					aria-label="Copy invite link"
+				>
+					{#if copiedInviteUrl === form.inviteUrl}
+						<Check class="h-4 w-4" />
+					{:else}
+						<Copy class="h-4 w-4" />
+					{/if}
+				</button>
+			</div>
+		</div>
+	{:else if form?.action === 'bulkInvite' && form.success}
+		<div
+			class="space-y-3 rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm"
+		>
+			<p class="font-semibold text-text-primary">
+				Sent {form.sent.length}. Skipped {form.skipped.length}. Failed {form.failed.length}.
+				{#if form.invalid.length > 0}
+					{form.invalid.length} line{form.invalid.length === 1 ? '' : 's'} could not be read.
+				{/if}
+			</p>
+			{#if form.skipped.length > 0}
+				<ul class="space-y-1 text-xs text-text-secondary">
+					{#each form.skipped as item (item.email)}
+						<li>
+							{item.email} —
+							{item.reason === 'accepted' ? 'already joined' : 'already invited'}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if form.failed.length > 0}
+				<ul class="space-y-2 text-xs text-warning">
+					{#each form.failed as item (item.email)}
+						<li class="space-y-1">
+							<p>{item.email} — {item.inviteUrl ? 'email could not be sent' : item.error}</p>
+							{#if item.inviteUrl}
+								<div
+									class="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2"
+								>
+									<p class="flex-1 font-mono break-all text-text-primary">{item.inviteUrl}</p>
+									<button
+										type="button"
+										onclick={() => copyInviteUrl(item.inviteUrl ?? '')}
+										class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning"
+										aria-label="Copy invite link for {item.email}"
+									>
+										{#if copiedInviteUrl === item.inviteUrl}
+											<Check class="h-4 w-4" />
+										{:else}
+											<Copy class="h-4 w-4" />
+										{/if}
+									</button>
+								</div>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if form.invalid.length > 0}
+				<ul class="space-y-1 text-xs text-error">
+					{#each form.invalid as line, index (index)}
+						<li>{line}</li>
+					{/each}
+				</ul>
 			{/if}
 		</div>
 	{:else if form?.error}
@@ -321,7 +411,7 @@
 						: 'border-border-default'}"
 					placeholder="alex@example.com"
 					required
-					value={form?.success ? '' : (form?.values?.email ?? '')}
+					value={form?.success || !singleInviteValues ? '' : singleInviteValues.email}
 					onblur={(e) => validateEmail(e.currentTarget.value)}
 					oninput={(e) => {
 						if (emailError) validateEmail(e.currentTarget.value);
@@ -338,7 +428,7 @@
 					name="name"
 					class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 					placeholder="Alex Jensen"
-					value={form?.success ? '' : (form?.values?.name ?? '')}
+					value={form?.success || !singleInviteValues ? '' : singleInviteValues.name}
 				/>
 			</label>
 		</div>
@@ -369,7 +459,7 @@
 						name="phone"
 						class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 						placeholder="+1 555 123 4567"
-						value={form?.success ? '' : (form?.values?.phone ?? '')}
+						value={form?.success || !singleInviteValues ? '' : singleInviteValues.phone}
 						required
 					/>
 				</label>
@@ -382,9 +472,9 @@
 				rows="3"
 				class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 				placeholder="Add context for why you're inviting them."
-				>{form?.success
+				>{form?.success || !singleInviteValues
 					? defaultInviteMessage
-					: (form?.values?.message ?? defaultInviteMessage)}</textarea
+					: (singleInviteValues.message ?? defaultInviteMessage)}</textarea
 			>
 		</label>
 		<!-- Pre-fill section -->
@@ -403,6 +493,7 @@
 			</button>
 			<p class="mt-1 text-xs text-text-muted">
 				Set their goal, focus areas, and reviewers. They'll review and confirm during onboarding.
+				e.g. "Enhance strategic thinking" + 2 reviewer slots.
 			</p>
 
 			{#if showPrefill}
@@ -551,6 +642,67 @@
 		</button>
 	</form>
 
+	<form
+		method="post"
+		action="?/bulkInvite"
+		use:enhance={() => {
+			submittingBulk = true;
+			return async ({ result, update }) => {
+				submittingBulk = false;
+				if (result.type === 'redirect' || result.type === 'error') {
+					addToast('Something went wrong. Please try again.', 'error');
+					return;
+				}
+				await update();
+				if (
+					result.type === 'success' &&
+					result.data &&
+					'sent' in result.data &&
+					Array.isArray(result.data.sent) &&
+					result.data.sent.length > 0
+				) {
+					bulkPeople = '';
+				}
+			};
+		}}
+		class="space-y-4 rounded-xl border border-border-default bg-surface-raised p-5"
+	>
+		<div>
+			<h2 class="text-sm font-semibold text-text-primary">Invite several</h2>
+			<p class="mt-1 text-xs text-text-muted">
+				One person per line. A name is optional: Alex Jensen, alex@example.com. Up to 25.
+			</p>
+		</div>
+		<label class="block space-y-1 text-sm">
+			<span class="font-semibold text-text-secondary">People</span>
+			<textarea
+				name="people"
+				rows="6"
+				required
+				bind:value={bulkPeople}
+				class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 font-mono text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+				placeholder={bulkPlaceholder}
+			></textarea>
+		</label>
+		<label class="block space-y-1 text-sm">
+			<span class="font-semibold text-text-secondary">Message (optional, sent to everyone)</span>
+			<textarea
+				name="message"
+				rows="3"
+				class="w-full rounded-lg border border-border-default bg-surface-raised px-3 py-2 text-sm text-text-primary transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+				placeholder="Add context for why you're inviting them."
+			></textarea>
+		</label>
+		<button
+			type="submit"
+			disabled={submittingBulk}
+			class="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-hover disabled:opacity-50"
+		>
+			<Send class="h-4 w-4" />
+			{submittingBulk ? 'Sending...' : 'Send invitations'}
+		</button>
+	</form>
+
 	<!-- Active Invitations -->
 	<div class="space-y-4">
 		<div class="flex items-center justify-between">
@@ -567,13 +719,13 @@
 		</div>
 
 		<!-- Filter tabs -->
-		<div class="flex gap-1 rounded-lg bg-surface-subtle p-1">
+		<div class="flex gap-1 overflow-x-auto rounded-lg bg-surface-subtle p-1">
 			{#each filterTabs as tab (tab.key)}
 				{@const count = countByFilter(tab.key)}
 				<button
 					type="button"
 					onclick={() => (activeFilter = tab.key)}
-					class="flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all {activeFilter ===
+					class="shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-all {activeFilter ===
 					tab.key
 						? 'bg-surface-raised text-text-primary'
 						: 'text-text-tertiary hover:text-text-secondary'}"
@@ -626,6 +778,9 @@
 								<form
 									method="post"
 									action="?/cancelInvite"
+									onsubmit={(event) => {
+										if (!confirm('Cancel this invitation?')) event.preventDefault();
+									}}
 									use:enhance={() => {
 										submittingCancel = invite.id;
 										return async ({ result, update }) => {

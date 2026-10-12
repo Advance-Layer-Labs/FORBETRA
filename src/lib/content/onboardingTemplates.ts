@@ -401,3 +401,30 @@ export const onboardingContexts: OnboardingContext[] = [
 		]
 	}
 ];
+
+export function findGoalTemplate(templateId: string | null | undefined): GoalTemplate | null {
+	const id = templateId?.trim();
+	if (!id) return null;
+	for (const context of onboardingContexts) {
+		const match = context.goals.find((goal) => goal.id === id);
+		if (match) return match;
+	}
+	return null;
+}
+
+const NEUTRAL_REVIEWER_PROMPT = {
+	intro: 'People who regularly see you in action: a coach, manager, teammate, peer, or mentor.',
+	roles: ['Coach or trainer', 'Manager', 'Teammate or peer', 'Mentor']
+};
+
+export function reviewerPromptForTemplate(templateId: string | null | undefined): {
+	intro: string;
+	roles: string[];
+} {
+	const template = findGoalTemplate(templateId);
+	if (!template) return NEUTRAL_REVIEWER_PROMPT;
+	return {
+		intro: template.reviewerGuidance.recommendedApproach,
+		roles: template.reviewerGuidance.recommendedRoles
+	};
+}

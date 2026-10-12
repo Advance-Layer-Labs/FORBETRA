@@ -98,7 +98,7 @@ export const smsTemplates = {
 
 	reviewerRequestedNewLink: (data: { reviewerName?: string; appUrl?: string }) => {
 		const name = data.reviewerName || 'A reviewer';
-		return `Forbetra: ${name} needs a new feedback link. Send one: ${data.appUrl || baseUrl}/individual/stakeholders\n\nReply STOP to opt out`;
+		return `Forbetra: ${name} needs a new feedback link. Send one: ${data.appUrl || baseUrl}/individual/reviewers\n\nReply STOP to opt out`;
 	},
 
 	coachReviewerFeedbackReceived: (data: {

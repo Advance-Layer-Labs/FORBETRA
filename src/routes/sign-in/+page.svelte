@@ -11,7 +11,7 @@
 
 <div class="flex justify-center p-8">
 	<SignIn
-		afterSignInUrl={redirectUrl}
+		fallbackRedirectUrl={redirectUrl}
 		signUpUrl="/sign-up?redirect={encodeURIComponent(redirectUrl)}"
 	/>
 </div>

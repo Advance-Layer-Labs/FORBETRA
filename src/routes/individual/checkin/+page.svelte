@@ -616,7 +616,7 @@
 
 				<!-- Submit Button with Enhanced Design -->
 				<div
-					class="flex flex-col gap-4 rounded-2xl border border-border-default bg-accent-muted p-6 sm:flex-row sm:items-center sm:justify-between"
+					class="flex flex-col gap-4 rounded-2xl border border-border-default bg-accent-muted p-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
 				>
 					<div class="flex-1">
 						{#if data.isLocked || data.previousEntry}
@@ -672,6 +672,11 @@
 							></div>
 						</button>
 					</div>
+					{#if !bothScoresSelected && data.isAvailable && !data.isLocked}
+						<p class="w-full text-xs text-text-tertiary">
+							Set an effort and performance rating to save.
+						</p>
+					{/if}
 				</div>
 			</form>
 		{/if}

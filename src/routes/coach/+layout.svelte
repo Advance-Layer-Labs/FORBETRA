@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 	import { page } from '$app/stores';
-	import { Home, Settings } from 'lucide-svelte';
+	import { BarChart3, Home, Mail, Settings, Users } from 'lucide-svelte';
 	import { coachAlertCount } from '$lib/stores/coachAlerts.svelte';
 
 	const { children, data }: { children: Snippet; data: LayoutData } = $props();
@@ -11,7 +11,17 @@
 		coachAlertCount.value = data.totalAlerts;
 	});
 
-	const navItems = [{ href: '/coach', label: 'Dashboard', icon: Home }];
+	const navItems = $derived([
+		{
+			href: data.onboardingComplete ? '/coach' : '/coach/onboarding',
+			label: 'Dashboard',
+			icon: Home
+		},
+		{ href: '/coach/roster', label: 'Clients', icon: Users },
+		{ href: '/coach/invitations', label: 'Invitations', icon: Mail },
+		{ href: '/coach/analytics', label: 'Analytics', icon: BarChart3 },
+		{ href: '/coach/settings', label: 'Settings', icon: Settings }
+	]);
 
 	const isActive = (href: string) => {
 		const pathname = $page.url.pathname;
@@ -24,17 +34,8 @@
 	<!-- Desktop Sidebar -->
 	<aside class="hidden w-48 shrink-0 border-r border-border-default bg-surface-raised lg:block">
 		<div class="sticky top-0 flex flex-col gap-1 p-4">
-			<div class="mb-4 flex items-center justify-between px-3">
+			<div class="mb-4 px-3">
 				<p class="text-xs font-bold tracking-widest text-text-tertiary uppercase">Forbetra</p>
-				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href="/coach/settings"
-					class="rounded-lg p-1 text-text-muted transition-colors hover:bg-surface-subtle hover:text-text-primary"
-					aria-label="Settings"
-				>
-					<Settings class="h-4 w-4" />
-				</a>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			</div>
 			<nav class="flex flex-col gap-0.5" aria-label="Navigation">
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -65,13 +66,12 @@
 
 	<!-- Main Content -->
 	<div class="flex flex-1 flex-col overflow-x-hidden">
-		<div class="flex-1 pb-16 lg:pb-0">
+		<div class="flex-1 pb-20 lg:pb-0">
 			{@render children()}
 		</div>
 
-		<!-- Mobile Bottom Bar (minimal) -->
 		<nav
-			class="fixed right-0 bottom-0 left-0 z-40 flex items-center justify-around border-t border-border-default bg-surface-raised px-2 pt-1.5 lg:hidden"
+			class="fixed right-0 bottom-0 left-0 z-40 flex items-center justify-around border-t border-border-default bg-surface-raised px-1 pt-1.5 lg:hidden"
 			style="padding-bottom: max(0.375rem, env(safe-area-inset-bottom));"
 			aria-label="Navigation"
 		>
@@ -79,7 +79,7 @@
 			{#each navItems as item (item.href)}
 				<a
 					href={item.href}
-					class="text-2xs flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 font-medium transition-colors
+					class="flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px] leading-tight font-medium transition-colors
 						{isActive(item.href) ? 'text-accent' : 'text-text-muted'}"
 					aria-current={isActive(item.href) ? 'page' : undefined}
 				>
@@ -93,17 +93,9 @@
 							</span>
 						{/if}
 					</span>
-					<span>{item.label}</span>
+					<span class="text-center">{item.label}</span>
 				</a>
 			{/each}
-			<a
-				href="/coach/settings"
-				class="text-2xs flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 font-medium transition-colors
-					{isActive('/coach/settings') ? 'text-accent' : 'text-text-muted'}"
-			>
-				<Settings class="h-5 w-5" />
-				<span>Settings</span>
-			</a>
 			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</nav>
 	</div>

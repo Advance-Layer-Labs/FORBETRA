@@ -1,19 +1,11 @@
 import prisma from '$lib/server/prisma';
 import { requireRole } from '$lib/server/auth';
 import { fail } from '@sveltejs/kit';
-import { randomBytes, createHash } from 'crypto';
-import { sendEmail, getEmailMode } from '$lib/notifications/email';
-import { emailTemplates } from '$lib/notifications/emailTemplates';
-import { trySendSms } from '$lib/notifications/sms';
-import { smsTemplates } from '$lib/notifications/smsTemplates';
+import { cancelCoachInvite, issueCoachInvite, resendCoachInvite } from '$lib/server/coachInvites';
+import { getEmailMode } from '$lib/notifications/email';
+import { parseBulkInviteList } from '$lib/coachBulkInvites';
 import { validatePhone, normalizePhone } from '$lib/utils/phone';
 import type { Actions, PageServerLoad } from './$types';
-import { Prisma } from '@prisma/client';
-import type { TokenType } from '@prisma/client';
-
-const generateTokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
-
-const createInviteToken = () => randomBytes(32).toString('hex');
 
 const INVITE_SELECT = {
 	id: true,
@@ -143,292 +135,163 @@ export const actions: Actions = {
 
 		const normalizedPhone = phone ? normalizePhone(phone) : null;
 
-		const existingInvite = await prisma.coachInvite.findFirst({
-			where: {
-				coachId: dbUser.id,
-				email
-			}
-		});
-
-		if (existingInvite && !existingInvite.cancelledAt && !existingInvite.acceptedAt) {
-			// Soft duplicate — let the UI offer Resend / Cancel
-			return {
-				action: 'createInvite' as const,
-				duplicate: true,
-				existingInvite: {
-					id: existingInvite.id,
-					email: existingInvite.email,
-					status: 'pending' as const,
-					createdAt: existingInvite.createdAt.toISOString(),
-					expiresAt: existingInvite.expiresAt.toISOString(),
-					cancelledAt: null,
-					acceptedAt: null
-				}
-			};
-		}
-
-		const tokenRaw = createInviteToken();
-		const tokenHash = generateTokenHash(tokenRaw);
-		const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
 		try {
-			const invite = await prisma.$transaction(async (tx) => {
-				if (existingInvite) {
-					await tx.token.deleteMany({
-						where: {
-							tokenHash: existingInvite.tokenHash,
-							type: 'COACH_INVITE'
-						}
-					});
-
-					const updatedInvite = await tx.coachInvite.update({
-						where: { id: existingInvite.id },
-						data: {
-							name: name.length > 0 ? name : existingInvite.name,
-							phone: normalizedPhone ?? existingInvite.phone,
-							message: message.length > 0 ? message : existingInvite.message,
-							payload: payload ?? Prisma.DbNull,
-							tokenHash,
-							expiresAt,
-							acceptedAt: null,
-							cancelledAt: null,
-							individualId: null
-						}
-					});
-
-					await tx.token.create({
-						data: {
-							type: 'COACH_INVITE' satisfies TokenType,
-							tokenHash,
-							userId: dbUser.id,
-							expiresAt
-						}
-					});
-
-					return updatedInvite;
-				}
-
-				const createdInvite = await tx.coachInvite.create({
-					data: {
-						coachId: dbUser.id,
-						email,
-						name: name.length > 0 ? name : null,
-						phone: normalizedPhone,
-						message: message.length > 0 ? message : null,
-						...(payload ? { payload } : {}),
-						tokenHash,
-						expiresAt
-					}
-				});
-
-				await tx.token.create({
-					data: {
-						type: 'COACH_INVITE' satisfies TokenType,
-						tokenHash,
-						userId: dbUser.id,
-						expiresAt
-					}
-				});
-
-				return createdInvite;
+			const result = await issueCoachInvite({
+				coachId: dbUser.id,
+				email,
+				name,
+				phone: normalizedPhone,
+				message,
+				payload,
+				origin: event.url.origin,
+				coachName: dbUser.name ?? 'Your coach',
+				practiceName: dbUser.practiceName,
+				practiceDescription: dbUser.practiceDescription,
+				sendSms: true,
+				reissueAccepted: true,
+				treatOpenAsDuplicate: true
 			});
 
-			const inviteUrl = new URL(`/coach/invite/${tokenRaw}`, event.url.origin).toString();
-
-			// Send invitation email
-			let emailFailed = false;
-			try {
-				const coachName = dbUser.name ?? 'Your coach';
-				const template = emailTemplates.coachInvitation({
-					coachName,
-					recipientName: name || undefined,
-					message: message || undefined,
-					inviteUrl
+			if (!result.ok) {
+				return fail(result.status, {
+					action: 'createInvite' as const,
+					error: result.error,
+					values: { email, name, phone, message }
 				});
-				await sendEmail({
-					to: email,
-					...template
-				});
-			} catch (error) {
-				emailFailed = true;
-				console.error('[email:error] Failed to send coach invitation email', error);
 			}
 
-			const smsSent = await trySendSms(
-				invite.phone,
-				smsTemplates.coachInvitation({
-					coachName: dbUser.name || undefined,
-					inviteUrl
-				})
-			);
+			if (result.outcome === 'pending') {
+				return {
+					action: 'createInvite' as const,
+					duplicate: true,
+					existingInvite: {
+						id: result.inviteId,
+						email: result.email,
+						status: 'pending' as const,
+						createdAt: result.createdAt.toISOString(),
+						expiresAt: result.expiresAt.toISOString(),
+						cancelledAt: null,
+						acceptedAt: null
+					}
+				};
+			}
+
+			if (result.outcome !== 'sent') {
+				return fail(400, {
+					action: 'createInvite' as const,
+					error: 'This person has already joined. They are on your client list.',
+					values: { email, name, phone, message }
+				});
+			}
 
 			return {
 				success: true,
 				action: 'createInvite' as const,
 				email,
-				inviteId: invite.id,
-				inviteUrl,
-				emailFailed,
-				smsSent
+				inviteId: result.inviteId,
+				inviteUrl: result.inviteUrl,
+				emailFailed: result.emailFailed,
+				smsSent: result.smsSent
 			};
 		} catch (error) {
-			if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-				return fail(400, {
-					action: 'createInvite' as const,
-					error:
-						'An invitation already exists for this email. Cancel or reuse the existing invite.',
-					values: { email, name, phone, message }
-				});
-			}
-
 			console.error('Failed to create coach invite', error);
 			throw error;
 		}
 	},
+	bulkInvite: async (event) => {
+		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+		const formData = await event.request.formData();
+		const people = String(formData.get('people') ?? '');
+		const message = String(formData.get('message') ?? '').trim();
+		const parsed = parseBulkInviteList(people);
+
+		if (!parsed.ok) {
+			return fail(400, {
+				action: 'bulkInvite' as const,
+				error: parsed.error,
+				values: { people, message }
+			});
+		}
+
+		const sent: { email: string }[] = [];
+		const skipped: { email: string; reason: 'pending' | 'accepted' }[] = [];
+		const failed: { email: string; inviteUrl?: string; error?: string }[] = [];
+
+		for (const person of parsed.people) {
+			const result = await issueCoachInvite({
+				coachId: dbUser.id,
+				email: person.email,
+				name: person.name,
+				message,
+				origin: event.url.origin,
+				coachName: dbUser.name ?? 'Your coach',
+				practiceName: dbUser.practiceName,
+				practiceDescription: dbUser.practiceDescription,
+				sendSms: false
+			});
+
+			if (!result.ok) {
+				failed.push({ email: person.email, error: result.error });
+				continue;
+			}
+			if (result.outcome === 'pending') {
+				skipped.push({ email: result.email, reason: 'pending' });
+			} else if (result.outcome === 'accepted') {
+				skipped.push({ email: result.email, reason: 'accepted' });
+			} else if (result.emailFailed) {
+				failed.push({ email: result.email, inviteUrl: result.inviteUrl });
+			} else {
+				sent.push({ email: result.email });
+			}
+		}
+
+		return {
+			success: true,
+			action: 'bulkInvite' as const,
+			sent,
+			skipped,
+			failed,
+			invalid: parsed.invalid
+		};
+	},
 	cancelInvite: async (event) => {
 		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
 		const formData = await event.request.formData();
-		const inviteId = String(formData.get('inviteId') ?? '');
-
-		if (!inviteId) {
-			return fail(400, {
-				action: 'cancelInvite' as const,
-				error: 'Missing invitation identifier.'
-			});
-		}
-
-		const invite = await prisma.coachInvite.findUnique({
-			where: { id: inviteId }
+		const result = await cancelCoachInvite({
+			inviteId: String(formData.get('inviteId') ?? ''),
+			actorId: dbUser.id,
+			isAdmin: dbUser.role === 'ADMIN'
 		});
 
-		if (!invite || (invite.coachId !== dbUser.id && dbUser.role !== 'ADMIN')) {
-			return fail(404, { action: 'cancelInvite' as const, error: 'Invitation not found.' });
+		if (!result.ok) {
+			return fail(result.status, { action: 'cancelInvite' as const, error: result.error });
 		}
-
-		if (invite.acceptedAt) {
-			return fail(400, {
-				action: 'cancelInvite' as const,
-				error: 'Invitation has already been accepted.'
-			});
-		}
-
-		if (invite.cancelledAt) {
-			return { success: true, action: 'cancelInvite' as const };
-		}
-
-		await prisma.$transaction(async (tx) => {
-			await tx.coachInvite.update({
-				where: { id: inviteId },
-				data: {
-					cancelledAt: new Date()
-				}
-			});
-
-			await tx.token.deleteMany({
-				where: {
-					tokenHash: invite.tokenHash,
-					type: 'COACH_INVITE'
-				}
-			});
-		});
 
 		return { success: true, action: 'cancelInvite' as const };
 	},
 	resendInvite: async (event) => {
 		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
 		const formData = await event.request.formData();
-		const inviteId = String(formData.get('inviteId') ?? '');
-
-		if (!inviteId) {
-			return fail(400, {
-				action: 'resendInvite' as const,
-				error: 'Missing invitation identifier.'
-			});
-		}
-
-		const invite = await prisma.coachInvite.findUnique({
-			where: { id: inviteId }
+		const result = await resendCoachInvite({
+			inviteId: String(formData.get('inviteId') ?? ''),
+			actorId: dbUser.id,
+			isAdmin: dbUser.role === 'ADMIN',
+			coachName: dbUser.name ?? 'Your coach',
+			origin: event.url.origin,
+			practiceName: dbUser.practiceName,
+			practiceDescription: dbUser.practiceDescription
 		});
 
-		if (!invite || (invite.coachId !== dbUser.id && dbUser.role !== 'ADMIN')) {
-			return fail(404, { action: 'resendInvite' as const, error: 'Invitation not found.' });
+		if (!result.ok) {
+			return fail(result.status, { action: 'resendInvite' as const, error: result.error });
 		}
-
-		if (invite.acceptedAt) {
-			return fail(400, {
-				action: 'resendInvite' as const,
-				error: 'Invitation has already been accepted.'
-			});
-		}
-
-		const tokenRaw = createInviteToken();
-		const tokenHash = generateTokenHash(tokenRaw);
-		const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-		await prisma.$transaction(async (tx) => {
-			// Remove old token
-			await tx.token.deleteMany({
-				where: {
-					tokenHash: invite.tokenHash,
-					type: 'COACH_INVITE'
-				}
-			});
-
-			// Update invite with new token, reset expiry, clear cancelledAt
-			await tx.coachInvite.update({
-				where: { id: inviteId },
-				data: {
-					tokenHash,
-					expiresAt,
-					cancelledAt: null
-				}
-			});
-
-			// Create new token row
-			await tx.token.create({
-				data: {
-					type: 'COACH_INVITE' satisfies TokenType,
-					tokenHash,
-					userId: dbUser.id,
-					expiresAt
-				}
-			});
-		});
-
-		const inviteUrl = new URL(`/coach/invite/${tokenRaw}`, event.url.origin).toString();
-
-		let emailFailed = false;
-		try {
-			const coachName = dbUser.name ?? 'Your coach';
-			const template = emailTemplates.coachInvitation({
-				coachName,
-				recipientName: invite.name || undefined,
-				message: invite.message || undefined,
-				inviteUrl
-			});
-			await sendEmail({
-				to: invite.email,
-				...template
-			});
-		} catch (error) {
-			emailFailed = true;
-			console.error('[email:error] Failed to resend coach invitation email', error);
-		}
-
-		// Resend SMS if phone on file
-		await trySendSms(
-			invite.phone,
-			smsTemplates.coachInvitation({
-				coachName: dbUser.name || undefined,
-				inviteUrl
-			})
-		);
 
 		return {
 			success: true,
 			action: 'resendInvite' as const,
-			email: invite.email,
-			emailFailed
+			email: result.email,
+			emailFailed: result.emailFailed ?? false,
+			inviteUrl: result.emailFailed ? result.inviteUrl : undefined
 		};
 	}
 };

@@ -1,18 +1,56 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
+	import { enhance } from '$app/forms';
 	import {
 		AlertTriangle,
-		ChevronRight,
-		Mail,
 		BarChart3,
+		Check,
+		ChevronRight,
+		Copy,
+		Lock,
+		Mail,
 		MessageSquare,
 		PenLine,
-		ShieldCheck,
-		Lock
+		ShieldCheck
 	} from 'lucide-svelte';
 	import InfoTip from '$lib/components/InfoTip.svelte';
+	import { addToast } from '$lib/stores/toasts.svelte';
+	import { formatSentAgo } from '$lib/utils/dates';
 
-	const { data }: { data: PageData } = $props();
+	const { data, form }: { data: PageData; form: ActionData | null } = $props();
+
+	let copiedInviteUrl = $state(false);
+	let toastShownForForm: typeof form = null;
+
+	async function copyInviteUrl(url: string) {
+		await navigator.clipboard.writeText(url);
+		copiedInviteUrl = true;
+		setTimeout(() => {
+			copiedInviteUrl = false;
+		}, 2000);
+	}
+
+	$effect(() => {
+		if (!form || form === toastShownForForm) return;
+		toastShownForForm = form;
+		if (form.action === 'cancelInvite' && form.success) {
+			addToast('Invitation cancelled', 'success');
+		} else if (form.action === 'resendInvite' && form.success) {
+			if (form.emailFailed) {
+				addToast(
+					'Invitation refreshed, but the email could not be sent. Copy the link below.',
+					'error'
+				);
+			} else {
+				addToast(
+					form.email ? `Invitation resent to ${form.email}` : 'Invitation resent',
+					'success'
+				);
+			}
+		} else if (form.error) {
+			addToast(form.error, 'error');
+		}
+	});
 
 	const greeting = $derived.by(() => {
 		const hour = new Date().getHours();
@@ -84,10 +122,22 @@
 				{/if}
 			</p>
 		</div>
+	{:else if data.rosterSummary.active > 0 && data.settingUpCount > 0}
+		<div
+			class="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm text-text-secondary"
+		>
+			<p class="text-center font-medium text-text-primary">
+				{data.settingUpCount} client{data.settingUpCount === 1 ? ' is' : 's are'} connected and still
+				setting up
+			</p>
+			<p class="mt-1 text-center text-xs text-text-muted">
+				Scores show up after they name a goal and complete a check-in.
+			</p>
+		</div>
 	{/if}
 
 	<!-- Portfolio Metrics -->
-	{#if data.rosterSummary.active > 0}
+	{#if data.rosterSummary.active > 0 && data.settingUpCount < data.rosterSummary.active}
 		<div class="anim-slide-up grid grid-cols-1 gap-3 sm:grid-cols-3" style="animation-delay: 50ms">
 			<div class="rounded-xl border border-border-default bg-surface-raised p-4 text-center">
 				<div class="flex items-center justify-center gap-1.5 text-text-muted">
@@ -159,9 +209,81 @@
 	<!-- Client List -->
 	<div class="anim-slide-up space-y-3" style="animation-delay: 150ms">
 		<h2 class="text-sm font-semibold text-text-secondary">Your Clients</h2>
-		{#if data.rosterSummary.active === 0}
+		{#if form?.error}
+			<p class="rounded-lg border border-error/30 bg-error-muted px-3 py-2 text-sm text-error">
+				{form.error}
+			</p>
+		{/if}
+		{#if form?.action === 'resendInvite' && form.success && form.emailFailed && form.inviteUrl}
+			<div
+				class="rounded-xl border border-warning/30 bg-warning-muted px-4 py-3 text-sm text-warning"
+			>
+				<p class="font-semibold">Email could not be sent. Share this link directly.</p>
+				<div
+					class="mt-2 flex items-center gap-2 rounded-lg border border-warning/30 bg-surface-raised px-3 py-2"
+				>
+					<p class="flex-1 font-mono text-xs break-all text-text-primary">{form.inviteUrl}</p>
+					<button
+						type="button"
+						onclick={() => copyInviteUrl(form?.inviteUrl ?? '')}
+						class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning transition-all hover:bg-warning/20"
+						aria-label="Copy invite link"
+					>
+						{#if copiedInviteUrl}
+							<Check class="h-4 w-4" />
+						{:else}
+							<Copy class="h-4 w-4" />
+						{/if}
+					</button>
+				</div>
+			</div>
+		{/if}
+		{#each data.pendingInvites as invite (invite.id)}
+			<div
+				class="flex flex-col gap-3 rounded-xl border border-border-default bg-surface-raised p-4 sm:flex-row sm:items-center sm:justify-between"
+			>
+				<div class="min-w-0">
+					<p class="font-medium text-text-primary">{invite.name || invite.email}</p>
+					<p class="text-sm text-text-muted">
+						invite pending (sent {formatSentAgo(invite.createdAt)})
+					</p>
+				</div>
+				<div class="flex shrink-0 gap-2">
+					<form method="POST" action="?/resendInvite" use:enhance>
+						<input type="hidden" name="inviteId" value={invite.id} />
+						<button
+							type="submit"
+							class="rounded-lg border border-border-default px-3 py-1.5 text-sm font-semibold text-text-secondary transition-colors hover:border-accent hover:text-text-primary"
+						>
+							Resend
+						</button>
+					</form>
+					<form
+						method="POST"
+						action="?/cancelInvite"
+						use:enhance
+						onsubmit={(event) => {
+							if (!confirm('Cancel this invitation?')) event.preventDefault();
+						}}
+					>
+						<input type="hidden" name="inviteId" value={invite.id} />
+						<button
+							type="submit"
+							class="rounded-lg border border-border-default px-3 py-1.5 text-sm font-semibold text-text-secondary transition-colors hover:border-error hover:text-error"
+						>
+							Cancel
+						</button>
+					</form>
+				</div>
+			</div>
+		{/each}
+		{#if data.rosterSummary.active === 0 && data.pendingInvites.length === 0}
 			<div class="rounded-xl border border-border-default bg-surface-raised p-8 text-center">
-				<p class="text-text-secondary">No clients yet. Invite your first client to get started.</p>
+				<p class="text-text-secondary">
+					{data.coach.practiceName
+						? `${data.coach.practiceName} is set up. Invite a client when you're ready.`
+						: "Your practice is set up. Invite a client when you're ready."}
+				</p>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
 					href="/coach/invitations"
@@ -236,7 +358,12 @@
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center gap-2">
 							<p class="font-medium text-text-primary">{client.name}</p>
-							{#if client.trajectory !== null && client.trajectory > 5}
+							{#if client.settingUp}
+								<span
+									class="text-2xs rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent"
+									>Setting up</span
+								>
+							{:else if client.trajectory !== null && client.trajectory > 5}
 								<span
 									class="text-2xs rounded-full bg-success/10 px-2 py-0.5 font-semibold text-success"
 									>Improving</span
@@ -349,7 +476,11 @@
 			</div>
 			<div class="min-w-0 flex-1">
 				<p class="font-semibold text-text-primary">Invite a client</p>
-				<p class="text-sm text-text-secondary">Send a coaching invitation to get started.</p>
+				<p class="text-sm text-text-secondary">
+					{data.rosterSummary.active === 0
+						? "Invite someone when you're ready."
+						: 'Send a coaching invitation.'}
+				</p>
 			</div>
 			<ChevronRight class="h-4 w-4 text-accent transition-transform group-hover:translate-x-0.5" />
 		</a>
