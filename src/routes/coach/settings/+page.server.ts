@@ -15,7 +15,10 @@ export const load: PageServerLoad = async (event) => {
 			phone: dbUser.phone ?? '',
 			timezone: dbUser.timezone ?? '',
 			deliveryMethod: dbUser.deliveryMethod ?? 'email',
-			role: dbUser.role
+			role: dbUser.role,
+			coachingFocus: dbUser.coachingFocus ?? '',
+			practiceName: dbUser.practiceName ?? '',
+			practiceDescription: dbUser.practiceDescription ?? ''
 		}
 	};
 };
@@ -30,6 +33,9 @@ export const actions: Actions = {
 		const timezone = formData.get('timezone')?.toString().trim() ?? '';
 		const deliveryMethod = formData.get('deliveryMethod')?.toString().trim() ?? 'email';
 		const method = deliveryMethod === 'sms' || deliveryMethod === 'both' ? deliveryMethod : 'email';
+		const coachingFocus = formData.get('coachingFocus')?.toString().trim() ?? '';
+		const practiceName = formData.get('practiceName')?.toString().trim() ?? '';
+		const practiceDescription = formData.get('practiceDescription')?.toString().trim() ?? '';
 
 		if (!name) {
 			return fail(400, { error: 'Display name is required.' });
@@ -49,6 +55,18 @@ export const actions: Actions = {
 			return fail(400, { error: 'Add a phone number to receive SMS.' });
 		}
 
+		if (coachingFocus && (coachingFocus.length < 2 || coachingFocus.length > 80)) {
+			return fail(400, { error: 'Coaching focus must be 2–80 characters.' });
+		}
+
+		if (practiceName && (practiceName.length < 2 || practiceName.length > 80)) {
+			return fail(400, { error: 'Practice name must be 2–80 characters.' });
+		}
+
+		if (practiceDescription.length > 160) {
+			return fail(400, { error: 'Practice description must be 160 characters or fewer.' });
+		}
+
 		try {
 			const updatedUser = await prisma.user.update({
 				where: { id: dbUser.id },
@@ -56,7 +74,10 @@ export const actions: Actions = {
 					name: name || null,
 					phone: phone ? normalizePhone(phone) : null,
 					timezone: timezone || null,
-					deliveryMethod: method
+					deliveryMethod: method,
+					coachingFocus: coachingFocus || null,
+					practiceName: practiceName || null,
+					practiceDescription: practiceDescription || null
 				}
 			});
 

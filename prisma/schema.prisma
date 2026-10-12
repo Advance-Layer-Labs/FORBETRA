@@ -71,6 +71,9 @@ model User {
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
   coachOnboardingCompletedAt DateTime?
+  coachingFocus              String?
+  practiceName               String?
+  practiceDescription        String?
   lastSeenAt                 DateTime?
   focusAreaPromptAt          DateTime?
 
@@ -96,9 +99,10 @@ model Goal {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  startDate   DateTime  @default(now())
+  title            String
+  description      String?
+  sourceTemplateId String?
+  startDate        DateTime  @default(now())
   endDate     DateTime?
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())

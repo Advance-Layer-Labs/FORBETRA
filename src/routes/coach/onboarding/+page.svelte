@@ -15,9 +15,39 @@
 
 	const { data, form }: { data: PageData; form: ActionData | null } = $props();
 
-	type Step = 'welcome' | 'invite';
-	const allSteps: Step[] = ['welcome', 'invite'];
-	let currentStep = $state<Step>('welcome');
+	type Step = 'welcome' | 'practice' | 'invite';
+	const allSteps: Step[] = ['welcome', 'practice', 'invite'];
+
+	function stepFromForm(value: ActionData | null): Step | null {
+		if (!value) return null;
+		if ('practiceSaved' in value && value.practiceSaved) return 'invite';
+		if ('practiceError' in value && value.practiceError) return 'practice';
+		if (('error' in value && value.error) || ('success' in value && value.success)) return 'invite';
+		return null;
+	}
+
+	let currentStep = $state<Step>(stepFromForm(form) ?? 'welcome');
+
+	const focusPresets = [
+		'Executive leadership',
+		'Operations',
+		'Military / operational',
+		'Youth sports'
+	];
+	let focusChoice = $state('');
+	let customFocus = $state('');
+	let practiceName = $state('');
+	let practiceDescription = $state('');
+	let hydratedPractice = $state(false);
+
+	const resolvedFocus = $derived(focusChoice === 'other' ? customFocus.trim() : focusChoice);
+	const practiceReady = $derived(
+		resolvedFocus.length >= 2 &&
+			resolvedFocus.length <= 80 &&
+			practiceName.trim().length >= 2 &&
+			practiceName.trim().length <= 80 &&
+			practiceDescription.trim().length <= 160
+	);
 
 	const currentStepIndex = $derived(allSteps.indexOf(currentStep));
 
@@ -62,15 +92,41 @@
 		copiedInviteUrl = true;
 	}
 
-	const stepLabels = ['Welcome', 'Invite Client'];
+	const stepLabels = ['Welcome', 'Your practice', 'Invite'];
+
+	$effect(() => {
+		if (hydratedPractice) return;
+		hydratedPractice = true;
+		const submitted =
+			form && 'values' in form && form.values && 'coachingFocus' in form.values
+				? form.values
+				: undefined;
+		const savedFocus = submitted?.coachingFocus || data.coach.coachingFocus;
+		if (focusPresets.includes(savedFocus)) {
+			focusChoice = savedFocus;
+		} else if (savedFocus) {
+			focusChoice = 'other';
+			customFocus = savedFocus;
+		}
+		practiceName = submitted?.practiceName || data.coach.practiceName;
+		practiceDescription = submitted?.practiceDescription || data.coach.practiceDescription;
+	});
 
 	// Leave onboarding once the invite email went out. If it failed, stay so the link can be copied.
+	let seenForm = $state<ActionData | null>(null);
 	$effect(() => {
-		if (form?.skipped) {
+		if (!form || form === seenForm) return;
+		seenForm = form;
+		if ('practiceSaved' in form && form.practiceSaved) currentStep = 'invite';
+		else if ('practiceError' in form && form.practiceError) currentStep = 'practice';
+		else if (('error' in form && form.error) || ('success' in form && form.success)) {
+			currentStep = 'invite';
+		}
+		if ('skipped' in form && form.skipped) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			goto('/coach');
 		}
-		if (form?.success && !form.emailFailed) {
+		if ('success' in form && form.success && !('emailFailed' in form && form.emailFailed)) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			goto('/coach');
 		}
@@ -145,9 +201,10 @@
 								1
 							</div>
 							<div>
-								<p class="text-sm font-semibold text-text-primary">Invite a client</p>
+								<p class="text-sm font-semibold text-text-primary">Name your practice</p>
 								<p class="text-xs text-text-secondary">
-									They set a goal, add reviewers, and start weekly check-ins.
+									A focus and a one-line description are yours alone — no one else has to show up
+									first.
 								</p>
 							</div>
 						</div>
@@ -158,12 +215,10 @@
 								2
 							</div>
 							<div>
-								<p class="text-sm font-semibold text-text-primary">
-									Your dashboard fills with data
-								</p>
+								<p class="text-sm font-semibold text-text-primary">Use the dashboard on your own</p>
 								<p class="text-xs text-text-secondary">
-									Self-ratings, reviewer scores, perception gaps, and AI-generated coaching prep —
-									all updated automatically.
+									The practice is set up even before a client joins. Invite someone when you have
+									one.
 								</p>
 							</div>
 						</div>
@@ -207,13 +262,128 @@
 				onclick={goNext}
 				class="inline-flex items-center gap-2 rounded-xl bg-accent px-8 py-3.5 font-semibold text-white transition-all hover:bg-accent-hover"
 			>
-				Invite Your First Client
+				Set up your practice
 				<span>&#8594;</span>
 			</button>
 		</div>
 	{/if}
 
-	<!-- Step 2: Invite Your First Client -->
+	<!-- Step 2: Your practice -->
+	{#if currentStep === 'practice'}
+		<div class="w-full space-y-8 text-center">
+			<div class="space-y-3">
+				<h1 class="text-3xl font-bold text-text-primary">Name your practice</h1>
+				<p class="mx-auto max-w-md text-base text-text-secondary">
+					This is your setup. A client invitation can wait until you have someone to invite.
+				</p>
+			</div>
+
+			{#if form && 'practiceError' in form && form.practiceError}
+				<div
+					class="mx-auto max-w-md rounded-xl border border-error/50 bg-error-muted p-4 text-sm text-error"
+				>
+					<p class="font-medium">{form.practiceError}</p>
+				</div>
+			{/if}
+
+			<form method="post" action="?/savePractice" class="mx-auto max-w-md space-y-5 text-left">
+				<fieldset>
+					<legend class="mb-2 text-sm font-semibold text-text-primary">Coaching focus</legend>
+					<div class="flex flex-wrap gap-2">
+						{#each focusPresets as preset (preset)}
+							<button
+								type="button"
+								onclick={() => (focusChoice = preset)}
+								class="rounded-full border px-3 py-1.5 text-sm transition-colors {focusChoice ===
+								preset
+									? 'border-accent bg-accent/15 text-accent'
+									: 'border-border-default text-text-secondary hover:border-border-strong'}"
+							>
+								{preset}
+							</button>
+						{/each}
+						<button
+							type="button"
+							onclick={() => (focusChoice = 'other')}
+							class="rounded-full border px-3 py-1.5 text-sm transition-colors {focusChoice ===
+							'other'
+								? 'border-accent bg-accent/15 text-accent'
+								: 'border-border-default text-text-secondary hover:border-border-strong'}"
+						>
+							Other
+						</button>
+					</div>
+					{#if focusChoice === 'other'}
+						<input
+							type="text"
+							bind:value={customFocus}
+							maxlength="80"
+							placeholder="Your focus"
+							class="mt-3 w-full rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+						/>
+					{/if}
+					<input type="hidden" name="coachingFocus" value={resolvedFocus} />
+				</fieldset>
+
+				<div>
+					<label for="practiceName" class="mb-1.5 block text-sm font-semibold text-text-primary">
+						Practice name
+					</label>
+					<input
+						id="practiceName"
+						name="practiceName"
+						type="text"
+						bind:value={practiceName}
+						required
+						minlength="2"
+						maxlength="80"
+						placeholder="e.g. Northside Leadership"
+						class="w-full rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+					/>
+				</div>
+
+				<div>
+					<label
+						for="practiceDescription"
+						class="mb-1.5 block text-sm font-semibold text-text-primary"
+					>
+						One-line description
+						<span class="text-xs font-normal text-text-tertiary"
+							>(optional — shown in client invitations)</span
+						>
+					</label>
+					<input
+						id="practiceDescription"
+						name="practiceDescription"
+						type="text"
+						bind:value={practiceDescription}
+						maxlength="160"
+						placeholder="e.g. Weekly coaching for operators who want clearer decisions"
+						class="w-full rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+					/>
+				</div>
+
+				<div class="flex flex-col gap-3 pt-2 sm:flex-row">
+					<button
+						type="button"
+						onclick={goBack}
+						class="rounded-xl border border-border-default px-6 py-3 text-sm font-semibold text-text-secondary transition-all hover:border-border-strong hover:bg-surface-subtle"
+					>
+						&#8592; Back
+					</button>
+					<button
+						type="submit"
+						disabled={!practiceReady}
+						class="flex-1 rounded-xl bg-accent px-8 py-3.5 font-semibold text-white transition-all hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						Continue
+					</button>
+				</div>
+			</form>
+		</div>
+	{/if}
+
+	<!-- Step 3: Invite a client (optional) -->
 	{#if currentStep === 'invite'}
 		<div class="w-full space-y-8 text-center">
 			<div class="space-y-3">
@@ -222,10 +392,10 @@
 				>
 					<Mail class="h-8 w-8 text-white" />
 				</div>
-				<h1 class="text-3xl font-bold text-text-primary">Invite Your First Client</h1>
+				<h1 class="text-3xl font-bold text-text-primary">Invite a client</h1>
 				<p class="mx-auto max-w-md text-base text-text-secondary">
-					Send an invitation to an individual you'd like to coach. They'll set up their own goal and
-					reviewers, and you'll see their data on your dashboard within minutes.
+					When you have someone to coach, send an invitation. You can also do this later from the
+					dashboard — the practice is already set up.
 				</p>
 				<p class="mx-auto max-w-md text-xs text-text-tertiary">
 					You can optionally pre-fill their goal and reviewers below.
@@ -355,7 +525,8 @@
 						<div>
 							<p class="text-sm font-semibold text-text-primary">Pre-fill client's setup</p>
 							<p class="text-xs text-text-tertiary">
-								Save them time by pre-filling their goal and reviewers
+								Save them time by pre-filling their goal and reviewers. e.g. "Enhance strategic
+								thinking" + 2 reviewer slots.
 							</p>
 						</div>
 						<button
@@ -461,14 +632,7 @@
 				</div>
 			</form>
 
-			<div class="flex items-center justify-center gap-4 pt-2">
-				<button
-					type="button"
-					onclick={goBack}
-					class="rounded-xl border border-border-default px-6 py-3 text-sm font-semibold text-text-secondary transition-all hover:border-border-strong hover:bg-surface-subtle"
-				>
-					&#8592; Back
-				</button>
+			<div class="mx-auto flex max-w-md flex-col gap-3 pt-2">
 				<form
 					method="post"
 					action="?/skip"
@@ -480,11 +644,18 @@
 				>
 					<button
 						type="submit"
-						class="text-sm font-medium text-text-tertiary underline decoration-text-muted underline-offset-4 transition-colors hover:text-text-secondary hover:decoration-text-tertiary"
+						class="w-full rounded-xl border border-border-strong bg-surface-raised px-8 py-3.5 font-semibold text-text-primary transition-all hover:border-accent hover:bg-surface-subtle"
 					>
-						Skip for now
+						I'll invite later
 					</button>
 				</form>
+				<button
+					type="button"
+					onclick={goBack}
+					class="text-sm font-medium text-text-tertiary transition-colors hover:text-text-secondary"
+				>
+					&#8592; Back
+				</button>
 			</div>
 		</div>
 	{/if}

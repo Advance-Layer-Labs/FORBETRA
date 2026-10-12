@@ -222,6 +222,10 @@
 						<Target class="h-4 w-4 text-accent" />
 						<span class="text-sm text-text-secondary">{data.client.goal.title}</span>
 					</div>
+				{:else}
+					<p class="mt-1.5 text-sm text-text-secondary">
+						{data.client.name} accepted. Scores appear after they name a goal and check in.
+					</p>
 				{/if}
 			</div>
 			{#if data.client.goal?.journey}
@@ -332,16 +336,20 @@
 
 	<!-- Section jump-nav -->
 	<nav aria-label="Jump to section" class="flex flex-wrap gap-1.5">
-		<a
-			href="#insights"
-			class="text-2xs rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
-			>Insights</a
-		>
-		<a
-			href="#scores"
-			class="text-2xs rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
-			>Scores</a
-		>
+		{#if data.client.goal}
+			<a
+				href="#insights"
+				class="text-2xs rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
+				>Insights</a
+			>
+		{/if}
+		{#if data.client.goal?.insights}
+			<a
+				href="#scores"
+				class="text-2xs rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
+				>Scores</a
+			>
+		{/if}
 		<a
 			href="#notes"
 			class="text-2xs inline-flex items-center gap-1 rounded-full border border-border-default bg-surface-raised px-2.5 py-1 font-medium text-text-muted transition-colors hover:border-accent/30 hover:text-accent"
@@ -396,82 +404,92 @@
 	{/if}
 
 	<!-- 1. AI Prep Summary -->
-	<div id="insights" class="scroll-anchor rounded-xl border border-accent/20 bg-surface-raised p-5">
-		<div class="mb-3 flex items-center justify-between">
-			<div class="flex items-center gap-2">
-				<Sparkles class="h-4 w-4 text-accent" />
-				<h2 class="font-semibold text-text-primary">AI Coaching Insights</h2>
-				{#if prepData}
-					<span class="text-xs text-text-tertiary">{formatRelativeDays(prepData.createdAt)}</span>
-					{#if data.prepFreshness?.isStale}
-						<span class="text-2xs rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
-							{data.prepFreshness.newDataSince} new update{data.prepFreshness.newDataSince !== 1
-								? 's'
-								: ''}
-						</span>
-					{/if}
-					{#if notesAddedSincePrep > 0}
-						<span class="text-2xs rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
-							{notesAddedSincePrep} note{notesAddedSincePrep !== 1 ? 's' : ''} added since last prep —
-							<button
-								type="button"
-								onclick={generatePrep}
-								class="font-semibold underline underline-offset-2 hover:no-underline"
-								>Refresh for latest</button
+	{#if data.client.goal}
+		<div
+			id="insights"
+			class="scroll-anchor rounded-xl border border-accent/20 bg-surface-raised p-5"
+		>
+			<div class="mb-3 flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<Sparkles class="h-4 w-4 text-accent" />
+					<h2 class="font-semibold text-text-primary">AI Coaching Insights</h2>
+					{#if prepData}
+						<span class="text-xs text-text-tertiary">{formatRelativeDays(prepData.createdAt)}</span>
+						{#if data.prepFreshness?.isStale}
+							<span
+								class="text-2xs rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning"
 							>
-						</span>
+								{data.prepFreshness.newDataSince} new update{data.prepFreshness.newDataSince !== 1
+									? 's'
+									: ''}
+							</span>
+						{/if}
+						{#if notesAddedSincePrep > 0}
+							<span
+								class="text-2xs rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning"
+							>
+								{notesAddedSincePrep} note{notesAddedSincePrep !== 1 ? 's' : ''} added since last prep
+								—
+								<button
+									type="button"
+									onclick={generatePrep}
+									class="font-semibold underline underline-offset-2 hover:no-underline"
+									>Refresh for latest</button
+								>
+							</span>
+						{/if}
 					{/if}
-				{/if}
-			</div>
-			<button
-				type="button"
-				disabled={generatingPrep}
-				onclick={generatePrep}
-				class="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-surface-raised px-3 py-1.5 text-xs font-semibold text-accent transition-all hover:border-accent hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
-			>
-				{#if generatingPrep}
-					<span
-						class="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent"
-					></span>
-					Generating (~15s)
-				{:else if prepData}
-					Refresh
-				{:else}
-					Generate
-				{/if}
-			</button>
-		</div>
-		{#if prepError}
-			<div class="flex items-start gap-2 rounded-lg border border-error/20 bg-error/5 px-3 py-2">
-				<p class="flex-1 text-xs text-error">{prepError}</p>
+				</div>
 				<button
 					type="button"
+					disabled={generatingPrep}
 					onclick={generatePrep}
-					class="shrink-0 text-xs font-semibold text-accent hover:underline">Retry</button
+					class="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-surface-raised px-3 py-1.5 text-xs font-semibold text-accent transition-all hover:border-accent hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
 				>
+					{#if generatingPrep}
+						<span
+							class="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent"
+						></span>
+						Generating (~15s)
+					{:else if prepData}
+						Refresh
+					{:else}
+						Generate
+					{/if}
+				</button>
 			</div>
-		{/if}
-		{#if prepData?.content}
-			<!-- eslint-disable svelte/no-at-html-tags -->
-			<div class="prose prose-sm max-w-none text-text-secondary">
-				{@html renderMarkdown(prepData.content)}
-			</div>
-			{#if data.allCoachNotes.length > 0 && notesAddedSincePrep === 0}
-				<p class="mt-3 text-xs text-text-tertiary">
-					{data.allCoachNotes.length} note{data.allCoachNotes.length !== 1 ? 's' : ''} included in this
-					prep.
-				</p>
+			{#if prepError}
+				<div class="flex items-start gap-2 rounded-lg border border-error/20 bg-error/5 px-3 py-2">
+					<p class="flex-1 text-xs text-error">{prepError}</p>
+					<button
+						type="button"
+						onclick={generatePrep}
+						class="shrink-0 text-xs font-semibold text-accent hover:underline">Retry</button
+					>
+				</div>
 			{/if}
-		{:else}
-			<div class="space-y-2">
-				<p class="text-sm text-text-tertiary">No prep generated yet. Click above to generate.</p>
-				<p class="text-xs text-text-muted">
-					AI prep analyzes your client's check-in scores, reviewer feedback, perception gaps, and
-					notes to generate tailored coaching conversation starters.
-				</p>
-			</div>
-		{/if}
-	</div>
+			{#if prepData?.content}
+				<!-- eslint-disable svelte/no-at-html-tags -->
+				<div class="prose prose-sm max-w-none text-text-secondary">
+					{@html renderMarkdown(prepData.content)}
+				</div>
+				{#if data.allCoachNotes.length > 0 && notesAddedSincePrep === 0}
+					<p class="mt-3 text-xs text-text-tertiary">
+						{data.allCoachNotes.length} note{data.allCoachNotes.length !== 1 ? 's' : ''} included in this
+						prep.
+					</p>
+				{/if}
+			{:else}
+				<div class="space-y-2">
+					<p class="text-sm text-text-tertiary">No prep generated yet. Click above to generate.</p>
+					<p class="text-xs text-text-muted">
+						AI prep analyzes your client's check-in scores, reviewer feedback, perception gaps, and
+						notes to generate tailored coaching conversation starters.
+					</p>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- 2. Recent Scores + Gap Highlights -->
 	{#if data.client.goal?.insights}

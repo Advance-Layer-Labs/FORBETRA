@@ -21,6 +21,8 @@ export type CoachInvitationData = {
 	recipientName?: string;
 	message?: string;
 	inviteUrl: string;
+	practiceName?: string;
+	practiceDescription?: string;
 };
 
 export type CoachClientAcceptedData = {
@@ -460,6 +462,15 @@ export const emailTemplates = {
 		const coach = escapeHtml(data.coachName);
 		const recipient = escapeHtml(data.recipientName || 'there');
 		const msg = data.message ? escapeHtml(data.message) : '';
+		const practiceName = data.practiceName ? escapeHtml(data.practiceName) : '';
+		const practiceDescription = data.practiceDescription
+			? escapeHtml(data.practiceDescription)
+			: '';
+		const practiceLine = practiceDescription
+			? `<p style="font-size: 16px;">${practiceDescription}</p>`
+			: '';
+		const practiceText = practiceDescription ? `${data.practiceDescription}\n\n` : '';
+		const fromPractice = practiceName ? ` from ${practiceName}` : '';
 		return {
 			subject: `${data.coachName} invited you to join Forbetra`,
 			html: `
@@ -476,7 +487,8 @@ export const emailTemplates = {
 				</div>
 				<div style="background: white; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
 					<p style="font-size: 16px; margin-top: 0;">Hi ${recipient},</p>
-					<p style="font-size: 16px;"><strong>${coach}</strong> has invited you to join Forbetra — a platform for structured personal development.</p>
+					<p style="font-size: 16px;"><strong>${coach}</strong>${fromPractice} has invited you to join Forbetra — a platform for structured personal development.</p>
+					${practiceLine}
 					${msg ? `<div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #6366f1;"><p style="margin: 0; font-size: 14px; color: #475569; font-style: italic;">"${msg}"</p><p style="margin: 8px 0 0 0; font-size: 13px; color: #64748b;">— ${coach}</p></div>` : ''}
 					<div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 24px 0;">
 						<p style="margin: 0; font-size: 14px; color: #64748b;"><strong>What to expect:</strong></p>
@@ -496,7 +508,7 @@ export const emailTemplates = {
 			</body>
 			</html>
 		`,
-			text: `${data.coachName} invited you to join Forbetra\n\nHi ${data.recipientName || 'there'},\n\n${data.coachName} has invited you to join Forbetra — a platform for structured personal development.\n\n${data.message ? `"${data.message}"\n— ${data.coachName}\n\n` : ''}What to expect:\n- Set a development goal and break it into observable behaviors\n- Track your effort and performance with weekly check-ins\n- Get feedback from reviewers who see your work\n- Receive AI-powered insights and coaching from ${data.coachName}\n\nAccept invitation: ${data.inviteUrl}\n\nThis invitation is valid for 30 days${textFooter()}`
+			text: `${data.coachName} invited you to join Forbetra\n\nHi ${data.recipientName || 'there'},\n\n${data.coachName}${data.practiceName ? ` from ${data.practiceName}` : ''} has invited you to join Forbetra — a platform for structured personal development.\n\n${practiceText}${data.message ? `"${data.message}"\n— ${data.coachName}\n\n` : ''}What to expect:\n- Set a development goal and break it into observable behaviors\n- Track your effort and performance with weekly check-ins\n- Get feedback from reviewers who see your work\n- Receive AI-powered insights and coaching from ${data.coachName}\n\nAccept invitation: ${data.inviteUrl}\n\nThis invitation is valid for 30 days${textFooter()}`
 		};
 	},
 
@@ -556,16 +568,16 @@ export const emailTemplates = {
 				<div style="background: white; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
 					<p style="font-size: 16px; margin-top: 0;">Hi ${coach},</p>
 					<p style="font-size: 16px;"><strong>${reviewer}</strong> just submitted feedback for your client <strong>${client}</strong>${week}.</p>
-					<p style="font-size: 16px;">Check your coaching dashboard to review updated insights and identify coaching opportunities.</p>
+					<p style="font-size: 16px;">Open your client list to review the latest insights and coaching opportunities.</p>
 					<div style="text-align: center; margin: 30px 0;">
-						<a href="${data.appUrl || baseUrl}/coach/roster" style="display: inline-block; background: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">View Dashboard</a>
+						<a href="${data.appUrl || baseUrl}/coach/roster" style="display: inline-block; background: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">View clients</a>
 					</div>
 				</div>
 			${emailFooter(`${baseUrl}/coach/settings`)}
 			</body>
 			</html>
 		`,
-			text: `Reviewer feedback received for ${data.individualName}${week}\n\nHi ${data.coachName},\n\n${data.reviewerName || 'A reviewer'} just submitted feedback for your client ${data.individualName}${week}.\n\nCheck your coaching dashboard to review updated insights and identify coaching opportunities.\n\nView dashboard: ${data.appUrl || baseUrl}/coach/roster${textFooter(`${baseUrl}/coach/settings`)}`
+			text: `Reviewer feedback received for ${data.individualName}${week}\n\nHi ${data.coachName},\n\n${data.reviewerName || 'A reviewer'} just submitted feedback for your client ${data.individualName}${week}.\n\nOpen your client list to review the latest insights and coaching opportunities.\n\nView clients: ${data.appUrl || baseUrl}/coach/roster${textFooter(`${baseUrl}/coach/settings`)}`
 		};
 	},
 
@@ -647,7 +659,7 @@ export const emailTemplates = {
 	reviewerRequestedNewLink: (data: EmailTemplateData) => {
 		const indName = escapeHtml(data.individualName || 'there');
 		const shName = escapeHtml(data.reviewerName || 'A reviewer');
-		const reviewersUrl = `${data.appUrl || baseUrl}/individual/stakeholders`;
+		const reviewersUrl = `${data.appUrl || baseUrl}/individual/reviewers`;
 		return {
 			subject: `${data.reviewerName || 'A reviewer'} requested a new feedback link`,
 			html: `

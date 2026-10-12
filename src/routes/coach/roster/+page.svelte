@@ -1,11 +1,23 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { Search, AlertTriangle, ChevronRight } from 'lucide-svelte';
 	import InfoTip from '$lib/components/InfoTip.svelte';
+	import { addToast } from '$lib/stores/toasts.svelte';
 	import { formatRelativeDays } from '$lib/utils/dates';
 
-	const { data }: { data: PageData } = $props();
+	const { data, form }: { data: PageData; form: ActionData | null } = $props();
+
+	let toastShownForForm: typeof form = null;
+	$effect(() => {
+		if (!form || form === toastShownForForm) return;
+		toastShownForForm = form;
+		if (form.action === 'archive' && form.success) {
+			addToast(form.restored ? 'Client restored' : 'Client archived', 'success');
+		} else if (form.error) {
+			addToast(form.error, 'error');
+		}
+	});
 
 	const activeCount = $derived(data.clients.filter((c) => !c.archived).length);
 	const archivedCount = $derived(data.clients.filter((c) => c.archived).length);
@@ -102,15 +114,28 @@
 	{#if filteredClients.length === 0}
 		<div class="rounded-xl border border-border-default bg-surface-raised p-8 text-center">
 			<p class="text-text-secondary">
-				{searchTerm ? 'No clients match your search.' : 'No clients yet.'}
+				{#if searchTerm}
+					No clients match your search.
+				{:else if archivedCount > 0 && !showArchived}
+					All clients are archived.
+				{:else if data.pendingInviteCount > 0}
+					No accepted clients yet. You have {data.pendingInviteCount} pending invite{data.pendingInviteCount ===
+					1
+						? ''
+						: 's'}.
+				{:else}
+					{data.coach.practiceName
+						? `${data.coach.practiceName} is set up. Invite a client when you're ready.`
+						: "Your practice is set up. Invite a client when you're ready."}
+				{/if}
 			</p>
-			{#if !searchTerm}
+			{#if !searchTerm && data.clients.length === 0}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
 					href="/coach/invitations"
 					class="mt-3 inline-block rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
 				>
-					Send an Invitation
+					{data.pendingInviteCount > 0 ? 'View invitations' : 'Send an Invitation'}
 				</a>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{/if}
@@ -183,7 +208,14 @@
 							{/if}
 						</div>
 					</div>
-					<form method="post" action="?/archive" use:enhance>
+					<form
+						method="post"
+						action="?/archive"
+						use:enhance
+						onsubmit={(event) => {
+							if (!client.archived && !confirm('Archive this client?')) event.preventDefault();
+						}}
+					>
 						<input type="hidden" name="individualId" value={client.id} />
 						<input type="hidden" name="archived" value={client.archived ? 'true' : 'false'} />
 						<button

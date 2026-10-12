@@ -204,7 +204,7 @@
 				{#if weekCovered}
 					{#if needsReviewer}
 						<a
-							href="/individual/stakeholders"
+							href="/individual/reviewers"
 							class="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-surface-base"
 						>
 							Add a reviewer
@@ -249,7 +249,7 @@
 			{#if needsReviewer && !weekCovered}
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				<a
-					href="/individual/stakeholders"
+					href="/individual/reviewers"
 					class="mt-6 block border-l-2 border-accent/30 py-2 pr-2 pl-4 text-sm text-text-secondary"
 				>
 					Add a reviewer so you can see the gap between your view and theirs.

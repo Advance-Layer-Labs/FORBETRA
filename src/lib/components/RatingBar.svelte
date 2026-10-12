@@ -287,6 +287,8 @@
 			<span class="rating-bar__value-label" class:rating-bar__value-label--fading={isCrossfading}>
 				{displayLabel}
 			</span>
+		{:else}
+			<span class="rating-bar__unset">Tap or press arrow keys to set</span>
 		{/if}
 	</div>
 </div>
@@ -429,6 +431,15 @@
 	}
 
 	/* ── Label group ── */
+	.rating-bar__unset {
+		margin-top: 6px;
+		max-width: 9rem;
+		text-align: center;
+		font-size: 11px;
+		line-height: 1.35;
+		color: var(--color-text-muted);
+	}
+
 	.rating-bar__label-group {
 		display: flex;
 		flex-direction: column;

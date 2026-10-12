@@ -39,14 +39,69 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		coach: {
 			name: dbUser.name ?? 'Coach',
-			email: dbUser.email
+			email: dbUser.email,
+			coachingFocus: dbUser.coachingFocus ?? '',
+			practiceName: dbUser.practiceName ?? '',
+			practiceDescription: dbUser.practiceDescription ?? ''
 		}
 	};
 };
 
+const practiceValues = (focus: string, practiceName: string, practiceDescription: string) => ({
+	coachingFocus: focus,
+	practiceName,
+	practiceDescription
+});
+
 export const actions: Actions = {
+	savePractice: async (event) => {
+		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+		const formData = await event.request.formData();
+		const coachingFocus = String(formData.get('coachingFocus') ?? '').trim();
+		const practiceName = String(formData.get('practiceName') ?? '').trim();
+		const practiceDescription = String(formData.get('practiceDescription') ?? '').trim();
+		const values = practiceValues(coachingFocus, practiceName, practiceDescription);
+
+		if (coachingFocus.length < 2 || coachingFocus.length > 80) {
+			return fail(400, {
+				practiceError: 'Choose a coaching focus (2–80 characters).',
+				values
+			});
+		}
+
+		if (practiceName.length < 2 || practiceName.length > 80) {
+			return fail(400, {
+				practiceError: 'Name your practice (2–80 characters).',
+				values
+			});
+		}
+
+		if (practiceDescription.length > 160) {
+			return fail(400, {
+				practiceError: 'Keep the description to 160 characters.',
+				values
+			});
+		}
+
+		await prisma.user.update({
+			where: { id: dbUser.id },
+			data: {
+				coachingFocus,
+				practiceName,
+				practiceDescription: practiceDescription.length > 0 ? practiceDescription : null
+			}
+		});
+
+		return { practiceSaved: true };
+	},
 	createInvite: async (event) => {
 		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+
+		if (!dbUser.practiceName || !dbUser.coachingFocus) {
+			return fail(400, {
+				practiceError: 'Name your practice before inviting a client.'
+			});
+		}
 
 		const formData = await event.request.formData();
 		const email = String(formData.get('email') ?? '')
@@ -194,7 +249,9 @@ export const actions: Actions = {
 					coachName,
 					recipientName: name || undefined,
 					message: message || undefined,
-					inviteUrl
+					inviteUrl,
+					practiceName: dbUser.practiceName || undefined,
+					practiceDescription: dbUser.practiceDescription || undefined
 				});
 				await sendEmail({
 					to: email,
@@ -227,6 +284,12 @@ export const actions: Actions = {
 
 	skip: async (event) => {
 		const { dbUser } = requireRole(event, ['COACH', 'ADMIN']);
+
+		if (!dbUser.practiceName || !dbUser.coachingFocus) {
+			return fail(400, {
+				practiceError: 'Name your practice before continuing.'
+			});
+		}
 
 		await prisma.user.update({
 			where: { id: dbUser.id },

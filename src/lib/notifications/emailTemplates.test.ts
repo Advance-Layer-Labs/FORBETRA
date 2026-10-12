@@ -44,6 +44,18 @@ describe('emailTemplates', () => {
 		expect(result.subject).not.toMatch(/Wednesday|Friday/);
 	});
 
+	it('coachInvitation includes the practice line when provided', () => {
+		const result = emailTemplates.coachInvitation({
+			coachName: 'Coach',
+			inviteUrl: 'https://test.com',
+			practiceName: 'Northside',
+			practiceDescription: 'Weekly coaching for operators'
+		});
+		expect(result.html).toContain('Northside');
+		expect(result.html).toContain('Weekly coaching for operators');
+		expect(result.text).toContain('Weekly coaching for operators');
+	});
+
 	it('reviewerFeedbackReceived produces valid output', () => {
 		const result = emailTemplates.reviewerFeedbackReceived({
 			individualName: 'Carol',
@@ -97,6 +109,18 @@ describe('emailTemplates', () => {
 				expect(template.text).not.toContain(banned);
 			}
 		}
+	});
+
+	it('links reviewer feedback to the client list', () => {
+		const result = emailTemplates.coachReviewerFeedbackReceived({
+			coachName: 'Coach',
+			individualName: 'Client',
+			appUrl: 'https://app.test'
+		});
+		expect(result.html).toContain('View clients');
+		expect(result.html).toContain('https://app.test/coach/roster');
+		expect(result.html).not.toContain('View Dashboard');
+		expect(result.text).toContain('View clients: https://app.test/coach/roster');
 	});
 
 	it('escapes HTML in user-provided names', () => {

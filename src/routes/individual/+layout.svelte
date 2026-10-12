@@ -36,22 +36,22 @@
 >
 <div class="flex min-h-screen bg-surface-base">
 	<!-- Desktop Sidebar -->
-	<aside class="hidden w-12 shrink-0 border-r border-border-default bg-surface-raised lg:block">
-		<div class="sticky top-0 flex flex-col items-center gap-1 py-4">
-			<nav class="flex flex-col items-center gap-1" aria-label="Navigation">
+	<aside class="hidden w-20 shrink-0 border-r border-border-default bg-surface-raised lg:block">
+		<div class="sticky top-0 flex h-screen flex-col items-center gap-1 px-1 py-4">
+			<nav class="flex w-full flex-col items-center gap-1" aria-label="Navigation">
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
 				{#each navItems as item (item.href)}
 					<a
 						href={item.href}
-						class="flex items-center justify-center rounded-lg p-2.5 transition-colors
+						class="flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-[10px] font-semibold transition-colors
 							{isActive(item.href)
 							? 'bg-accent-muted text-accent'
 							: 'text-text-secondary hover:bg-surface-subtle hover:text-text-primary'}"
 						aria-current={isActive(item.href) ? 'page' : undefined}
 						aria-label={item.label}
-						title={item.label}
 					>
 						<item.icon class="h-4 w-4 shrink-0" />
+						<span>{item.label}</span>
 					</a>
 				{/each}
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
@@ -59,11 +59,11 @@
 			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			<a
 				href="/settings"
-				class="mt-auto rounded-lg p-2.5 text-text-muted transition-colors hover:bg-surface-subtle hover:text-text-primary"
+				class="mt-auto flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-[10px] font-semibold text-text-muted transition-colors hover:bg-surface-subtle hover:text-text-primary"
 				aria-label="Settings"
-				title="Settings"
 			>
 				<Settings class="h-4 w-4" />
+				<span>Settings</span>
 			</a>
 			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</div>

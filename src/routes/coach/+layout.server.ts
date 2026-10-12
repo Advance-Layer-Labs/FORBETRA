@@ -12,8 +12,10 @@ export const load: LayoutServerLoad = async (event) => {
 		select: { id: true, individualId: true, createdAt: true, archivedAt: true }
 	});
 
+	const onboardingComplete = Boolean(dbUser.coachOnboardingCompletedAt);
+
 	if (coachClients.length === 0) {
-		return { totalAlerts: 0 };
+		return { totalAlerts: 0, onboardingComplete };
 	}
 
 	const individuals = await prisma.user.findMany({
@@ -32,5 +34,5 @@ export const load: LayoutServerLoad = async (event) => {
 		return sum + (summary?.alerts.length ?? 0);
 	}, 0);
 
-	return { totalAlerts };
+	return { totalAlerts, onboardingComplete };
 };

@@ -87,10 +87,21 @@
 		return `${value.toFixed(1)}/10`;
 	};
 
+	const hasScoreData = $derived(
+		data.clientComparison.some(
+			(row) =>
+				row.avgEffort !== null ||
+				row.avgProgress !== null ||
+				row.stability !== null ||
+				row.trajectory !== null ||
+				row.alignment !== null
+		)
+	);
+
 	const portfolioNarrative = $derived(
 		(() => {
 			const clients = data.clientComparison;
-			if (clients.length === 0) return null;
+			if (!hasScoreData) return null;
 
 			const parts: string[] = [];
 			const trendingUp = clients.filter((c) => c.trajectory !== null && c.trajectory > 0).length;
@@ -192,7 +203,7 @@
 				</div>
 			{/if}
 		</div>
-		{#if data.clientComparison.length > 0}
+		{#if hasScoreData}
 			<button
 				type="button"
 				onclick={downloadCSV}
@@ -213,72 +224,76 @@
 	</header>
 
 	<!-- Overall Analytics Cards -->
-	<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-			<div class="mb-1 flex items-center gap-1.5">
-				<AlertTriangle class="h-4 w-4 text-text-muted" />
-				<p class="text-xs font-medium text-text-tertiary">
-					Total Alerts <InfoTip
-						text="Missed check-ins and score trends that may need coaching attention. Sorted by severity."
-					/>
+	{#if hasScoreData}
+		<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
+				<div class="mb-1 flex items-center gap-1.5">
+					<AlertTriangle class="h-4 w-4 text-text-muted" />
+					<p class="text-xs font-medium text-text-tertiary">
+						Total Alerts <InfoTip
+							text="Missed check-ins and score trends that may need coaching attention. Sorted by severity."
+						/>
+					</p>
+				</div>
+				<p class="text-3xl font-bold text-text-primary tabular-nums">
+					{data.analytics.totalAlerts}
 				</p>
+				<div class="mt-1 flex gap-2 text-xs">
+					<span class="font-semibold text-error">High: {data.analytics.highPriorityAlerts}</span>
+					<span class="text-warning">Med: {data.analytics.mediumPriorityAlerts}</span>
+				</div>
 			</div>
-			<p class="text-3xl font-bold text-text-primary tabular-nums">{data.analytics.totalAlerts}</p>
-			<div class="mt-1 flex gap-2 text-xs">
-				<span class="font-semibold text-error">High: {data.analytics.highPriorityAlerts}</span>
-				<span class="text-warning">Med: {data.analytics.mediumPriorityAlerts}</span>
+			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
+				<div class="mb-1 flex items-center gap-1.5">
+					<BarChart3 class="h-4 w-4 text-text-muted" />
+					<p class="text-xs font-medium text-text-tertiary">
+						Avg. Consistency <InfoTip
+							text="How steady client scores are week-over-week. 70+ is strong stability."
+						/>
+					</p>
+				</div>
+				<p class="text-3xl font-bold text-text-primary tabular-nums">
+					{formatScore(data.analytics.avgStability)}
+				</p>
+				<p class="text-2xs mt-1 text-text-muted">Week-to-week score consistency</p>
+			</div>
+			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
+				<div class="mb-1 flex items-center gap-1.5">
+					<Target class="h-4 w-4 text-text-muted" />
+					<p class="text-xs font-medium text-text-tertiary">
+						Reviewer Response <InfoTip
+							text="Average reviewer response rate across clients this week. 80%+ means strong engagement."
+						/>
+					</p>
+				</div>
+				<p class="text-3xl font-bold text-text-primary tabular-nums">
+					{formatPercent(data.analytics.avgAlignment)}
+				</p>
+				<p class="text-2xs mt-1 text-text-muted">Reviewer response rate</p>
+			</div>
+			<div class="rounded-xl border border-border-default bg-surface-raised p-4">
+				<div class="mb-1 flex items-center gap-1.5">
+					<TrendingUp class="h-4 w-4 text-text-muted" />
+					<p class="text-xs font-medium text-text-tertiary">
+						Avg. Performance <InfoTip
+							text="Average self-rated performance across all clients (last 4 weeks). 7+ is strong."
+						/>
+					</p>
+				</div>
+				<p class="text-3xl font-bold text-text-primary tabular-nums">
+					{formatAverage(data.analytics.overallAvgProgress)}
+				</p>
+				{#if data.analytics.overallAvgEffort !== null}
+					<p class="mt-1 text-xs text-text-muted">
+						Effort: {formatAverage(data.analytics.overallAvgEffort)}
+					</p>
+				{/if}
 			</div>
 		</div>
-		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-			<div class="mb-1 flex items-center gap-1.5">
-				<BarChart3 class="h-4 w-4 text-text-muted" />
-				<p class="text-xs font-medium text-text-tertiary">
-					Avg. Consistency <InfoTip
-						text="How steady client scores are week-over-week. 70+ is strong stability."
-					/>
-				</p>
-			</div>
-			<p class="text-3xl font-bold text-text-primary tabular-nums">
-				{formatScore(data.analytics.avgStability)}
-			</p>
-			<p class="text-2xs mt-1 text-text-muted">Week-to-week score consistency</p>
-		</div>
-		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-			<div class="mb-1 flex items-center gap-1.5">
-				<Target class="h-4 w-4 text-text-muted" />
-				<p class="text-xs font-medium text-text-tertiary">
-					Reviewer Response <InfoTip
-						text="Average reviewer response rate across clients this week. 80%+ means strong engagement."
-					/>
-				</p>
-			</div>
-			<p class="text-3xl font-bold text-text-primary tabular-nums">
-				{formatPercent(data.analytics.avgAlignment)}
-			</p>
-			<p class="text-2xs mt-1 text-text-muted">Reviewer response rate</p>
-		</div>
-		<div class="rounded-xl border border-border-default bg-surface-raised p-4">
-			<div class="mb-1 flex items-center gap-1.5">
-				<TrendingUp class="h-4 w-4 text-text-muted" />
-				<p class="text-xs font-medium text-text-tertiary">
-					Avg. Performance <InfoTip
-						text="Average self-rated performance across all clients (last 4 weeks). 7+ is strong."
-					/>
-				</p>
-			</div>
-			<p class="text-3xl font-bold text-text-primary tabular-nums">
-				{formatAverage(data.analytics.overallAvgProgress)}
-			</p>
-			{#if data.analytics.overallAvgEffort !== null}
-				<p class="mt-1 text-xs text-text-muted">
-					Effort: {formatAverage(data.analytics.overallAvgEffort)}
-				</p>
-			{/if}
-		</div>
-	</div>
+	{/if}
 
 	<!-- Client Comparison Table -->
-	{#if data.clientComparison.length > 0}
+	{#if hasScoreData}
 		<section class="rounded-xl border border-border-default bg-surface-raised p-6">
 			<h2 class="mb-4 text-2xl font-bold text-text-primary">Client Comparison</h2>
 			<p class="mb-3 text-xs text-text-muted sm:hidden">Swipe to see all columns &rarr;</p>
@@ -518,18 +533,33 @@
 					<BarChart3 class="h-7 w-7 text-accent" />
 				</div>
 				<h3 class="mb-1 text-lg font-bold text-text-primary">Your analytics are waiting</h3>
-				<p class="mb-6 max-w-sm text-sm text-text-secondary">
-					Once your first client completes a check-in, you'll see trends, comparisons, and portfolio
-					insights here. The data gets richer every week.
-				</p>
-				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href="/coach/invitations"
-					class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-hover"
-				>
-					Invite Clients
-				</a>
-				<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{#if data.connectedClientCount > 0}
+					<p class="mb-6 max-w-sm text-sm text-text-secondary">
+						{data.connectedClientCount} client{data.connectedClientCount === 1 ? ' is' : 's are'}
+						connected and waiting on a first check-in. Trends and comparisons show up after that.
+					</p>
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						href="/coach/roster"
+						class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-hover"
+					>
+						View Clients
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{:else}
+					<p class="mb-6 max-w-sm text-sm text-text-secondary">
+						Once your first client completes a check-in, you'll see trends, comparisons, and
+						portfolio insights here. The data gets richer every week.
+					</p>
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						href="/coach/invitations"
+						class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-hover"
+					>
+						Invite Clients
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{/if}
 			</div>
 		</section>
 	{/if}

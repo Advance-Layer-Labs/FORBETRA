@@ -13,12 +13,18 @@
 	let phone = $state(data.user.phone ?? '');
 	let timezone = $state(data.user.timezone ?? '');
 	let deliveryMethod = $state(data.user.deliveryMethod ?? 'email');
+	let coachingFocus = $state(data.user.coachingFocus ?? '');
+	let practiceName = $state(data.user.practiceName ?? '');
+	let practiceDescription = $state(data.user.practiceDescription ?? '');
 	let extraTimezone = $state('');
 	let appliedEmptyTimezone = false;
 
 	$effect(() => {
 		name = data.user.name ?? '';
 		phone = data.user.phone ?? '';
+		coachingFocus = data.user.coachingFocus ?? '';
+		practiceName = data.user.practiceName ?? '';
+		practiceDescription = data.user.practiceDescription ?? '';
 		deliveryMethod = data.user.deliveryMethod ?? 'email';
 		const saved = data.user.timezone ?? '';
 		if (saved) {
@@ -162,6 +168,57 @@
 						name="phone"
 						type="tel"
 						bind:value={phone}
+						class="w-full rounded-xl border border-border-default bg-surface-subtle px-4 py-2.5 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+					/>
+				</div>
+			</div>
+		</div>
+
+		<div class="rounded-xl border border-border-default bg-surface-raised p-6">
+			<div class="mb-4 flex items-center gap-2">
+				<User class="h-4 w-4 text-accent" />
+				<h2 class="text-sm font-semibold tracking-wide text-text-tertiary uppercase">Practice</h2>
+			</div>
+			<div class="space-y-4">
+				<div>
+					<label for="coachingFocus" class="mb-1.5 block text-sm font-medium text-text-secondary"
+						>Coaching focus</label
+					>
+					<input
+						id="coachingFocus"
+						name="coachingFocus"
+						type="text"
+						bind:value={coachingFocus}
+						maxlength="80"
+						class="w-full rounded-xl border border-border-default bg-surface-subtle px-4 py-2.5 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+					/>
+				</div>
+				<div>
+					<label for="practiceName" class="mb-1.5 block text-sm font-medium text-text-secondary"
+						>Practice name</label
+					>
+					<input
+						id="practiceName"
+						name="practiceName"
+						type="text"
+						bind:value={practiceName}
+						maxlength="80"
+						class="w-full rounded-xl border border-border-default bg-surface-subtle px-4 py-2.5 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+					/>
+				</div>
+				<div>
+					<label
+						for="practiceDescription"
+						class="mb-1.5 block text-sm font-medium text-text-secondary"
+						>One-line description
+						<span class="font-normal text-text-muted">(shown in client invitations)</span></label
+					>
+					<input
+						id="practiceDescription"
+						name="practiceDescription"
+						type="text"
+						bind:value={practiceDescription}
+						maxlength="160"
 						class="w-full rounded-xl border border-border-default bg-surface-subtle px-4 py-2.5 text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
 					/>
 				</div>

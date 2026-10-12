@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { Prisma } from '@prisma/client';
-import { onboardingContexts } from '$lib/content/onboardingTemplates';
+import { findGoalTemplate, onboardingContexts } from '$lib/content/onboardingTemplates';
 import { requireRole } from '$lib/server/auth';
 import prisma from '$lib/server/prisma';
 import { journeyLengthWeeks, startJourney } from '$lib/server/domain';
@@ -157,6 +157,8 @@ export const actions: Actions = {
 		const formData = await event.request.formData();
 		const goalTitle = (formData.get('goalTitle') ?? '').toString();
 		const rawDescription = (formData.get('goalDescription') ?? '').toString().trim();
+		const rawTemplateId = (formData.get('sourceTemplateId') ?? '').toString().trim();
+		const sourceTemplateId = findGoalTemplate(rawTemplateId) ? rawTemplateId : null;
 		const values = {
 			goalTitle,
 			goalDescription: rawDescription
@@ -185,7 +187,8 @@ export const actions: Actions = {
 						where: { id: existingGoal.id },
 						data: {
 							title: data.goalTitle,
-							description: data.goalDescription || null
+							description: data.goalDescription || null,
+							sourceTemplateId
 						}
 					})
 				: await prisma.goal.create({
@@ -193,6 +196,7 @@ export const actions: Actions = {
 							userId: dbUser.id,
 							title: data.goalTitle,
 							description: data.goalDescription || null,
+							sourceTemplateId,
 							active: true
 						}
 					});

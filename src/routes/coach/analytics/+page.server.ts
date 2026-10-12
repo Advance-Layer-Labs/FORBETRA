@@ -146,7 +146,10 @@ export const load: PageServerLoad = async (event) => {
 		}))
 		.sort((a, b) => a.weekNumber - b.weekNumber);
 
+	const connectedClientCount = clientSummaries.filter((client) => !client.archived).length;
+
 	return {
+		connectedClientCount,
 		coach: {
 			name: dbUser.name ?? 'Coach'
 		},
