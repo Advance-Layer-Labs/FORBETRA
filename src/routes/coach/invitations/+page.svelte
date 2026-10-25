@@ -334,7 +334,9 @@
 					{/if}
 				{/if}
 				{#if form.invalid.length > 0}
-					{' '}{form.invalid.length} line{form.invalid.length === 1 ? '' : 's'} could not be read.
+					<span>
+						{form.invalid.length} line{form.invalid.length === 1 ? '' : 's'} could not be read.
+					</span>
 				{/if}
 			</p>
 			{#if form.skipped.length > 0}
