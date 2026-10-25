@@ -157,6 +157,12 @@
 							<div class="min-w-0 flex-1">
 								<div class="flex items-center gap-2">
 									<p class="font-medium text-text-primary">{client.name ?? client.email}</p>
+									{#if !client.archived && !client.goal?.journey}
+										<span
+											class="text-2xs rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent"
+											>Setting up</span
+										>
+									{/if}
 									{#if client.alerts && client.alerts.length > 0}
 										<span
 											class="flex items-center gap-0.5 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"

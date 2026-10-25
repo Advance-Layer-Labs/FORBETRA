@@ -428,3 +428,17 @@ export function reviewerPromptForTemplate(templateId: string | null | undefined)
 		roles: template.reviewerGuidance.recommendedRoles
 	};
 }
+
+export type ReviewerContext = 'business' | 'sports' | 'military' | 'neutral';
+
+export function reviewerContextForTemplate(templateId: string | null | undefined): ReviewerContext {
+	const id = templateId?.trim();
+	if (!id) return 'neutral';
+	for (const context of onboardingContexts) {
+		if (!context.goals.some((goal) => goal.id === id)) continue;
+		if (context.id === 'sports') return 'sports';
+		if (context.id === 'military-operational') return 'military';
+		if (context.id === 'business-executive') return 'business';
+	}
+	return 'neutral';
+}

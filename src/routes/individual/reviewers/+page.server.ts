@@ -10,7 +10,14 @@ import { smsTemplates } from '$lib/notifications/smsTemplates';
 import { createFeedbackToken } from '$lib/server/feedbackToken';
 import { isReviewerDue, upsertReviewer } from '$lib/server/domain';
 import { validatePhone, normalizePhone } from '$lib/utils/phone';
-import { reviewerPromptForTemplate } from '$lib/content/onboardingTemplates';
+import {
+	reviewerContextForTemplate,
+	reviewerPromptForTemplate
+} from '$lib/content/onboardingTemplates';
+import {
+	relationshipTooltipForContext,
+	relationshipsForContext
+} from '$lib/content/reviewerRelationships';
 
 const parseCadence = (value: FormDataEntryValue | null): ReviewerCadence =>
 	value === 'BIWEEKLY' ? 'BIWEEKLY' : 'WEEKLY';
@@ -67,12 +74,16 @@ export const load: PageServerLoad = async (event) => {
 		};
 	});
 
+	const reviewerContext = reviewerContextForTemplate(goal.sourceTemplateId);
+
 	return {
 		goal: {
 			id: goal.id,
 			title: goal.title
 		},
 		reviewerPrompt: reviewerPromptForTemplate(goal.sourceTemplateId),
+		relationshipOptions: relationshipsForContext(reviewerContext),
+		relationshipTooltip: relationshipTooltipForContext(reviewerContext),
 		reviewers
 	};
 };

@@ -4,7 +4,6 @@
 
 	import { CheckCircle, Copy, Check, Smartphone } from 'lucide-svelte';
 	import InfoTip from '$lib/components/InfoTip.svelte';
-	import { REVIEWER_RELATIONSHIPS } from '$lib/content/reviewerRelationships';
 
 	let copiedLink = $state<string | null>(null);
 	let submittingReviewerId = $state<string | null>(null);
@@ -414,9 +413,7 @@
 							<label for="reviewer-relationship" class="text-sm font-medium text-text-primary"
 								>Relationship <span class="font-normal text-text-tertiary">(optional)</span></label
 							>
-							<InfoTip
-								text="Skip-level is your manager’s manager. Cross-functional is someone on another team."
-							/>
+							<InfoTip text={data.relationshipTooltip} />
 						</div>
 						<select
 							id="reviewer-relationship"
@@ -427,7 +424,7 @@
 							<option value="" disabled selected={!reviewerFormValues.relationship}
 								>Select relationship</option
 							>
-							{#each REVIEWER_RELATIONSHIPS as relationship (relationship)}
+							{#each data.relationshipOptions as relationship (relationship)}
 								<option value={relationship}>{relationship}</option>
 							{/each}
 						</select>

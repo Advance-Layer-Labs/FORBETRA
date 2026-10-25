@@ -322,9 +322,21 @@
 			class="space-y-3 rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm"
 		>
 			<p class="font-semibold text-text-primary">
-				Sent {form.sent.length}. Skipped {form.skipped.length}. Failed {form.failed.length}.
+				{#if form.created.length > 0}
+					Created {form.created.length} invite{form.created.length === 1 ? '' : 's'}. Email didn't
+					go — copy the links below to share directly.
+				{/if}
+				{#if form.sent.length > 0 || form.skipped.length > 0 || form.failed.length > 0 || form.created.length === 0}
+					{form.created.length > 0 ? ' ' : ''}Sent {form.sent.length}. Skipped {form.skipped
+						.length}.
+					{#if form.failed.length > 0}
+						Failed {form.failed.length}.
+					{/if}
+				{/if}
 				{#if form.invalid.length > 0}
-					{form.invalid.length} line{form.invalid.length === 1 ? '' : 's'} could not be read.
+					<span>
+						{form.invalid.length} line{form.invalid.length === 1 ? '' : 's'} could not be read.
+					</span>
 				{/if}
 			</p>
 			{#if form.skipped.length > 0}
@@ -337,31 +349,36 @@
 					{/each}
 				</ul>
 			{/if}
-			{#if form.failed.length > 0}
+			{#if form.created.length > 0}
 				<ul class="space-y-2 text-xs text-warning">
-					{#each form.failed as item (item.email)}
+					{#each form.created as item (item.email)}
 						<li class="space-y-1">
-							<p>{item.email} — {item.inviteUrl ? 'email could not be sent' : item.error}</p>
-							{#if item.inviteUrl}
-								<div
-									class="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2"
+							<p>{item.email} — email could not be sent</p>
+							<div
+								class="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2"
+							>
+								<p class="flex-1 font-mono break-all text-text-primary">{item.inviteUrl}</p>
+								<button
+									type="button"
+									onclick={() => copyInviteUrl(item.inviteUrl)}
+									class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning"
+									aria-label="Copy invite link for {item.email}"
 								>
-									<p class="flex-1 font-mono break-all text-text-primary">{item.inviteUrl}</p>
-									<button
-										type="button"
-										onclick={() => copyInviteUrl(item.inviteUrl ?? '')}
-										class="shrink-0 rounded-md border border-warning/30 p-1.5 text-warning"
-										aria-label="Copy invite link for {item.email}"
-									>
-										{#if copiedInviteUrl === item.inviteUrl}
-											<Check class="h-4 w-4" />
-										{:else}
-											<Copy class="h-4 w-4" />
-										{/if}
-									</button>
-								</div>
-							{/if}
+									{#if copiedInviteUrl === item.inviteUrl}
+										<Check class="h-4 w-4" />
+									{:else}
+										<Copy class="h-4 w-4" />
+									{/if}
+								</button>
+							</div>
 						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if form.failed.length > 0}
+				<ul class="space-y-1 text-xs text-warning">
+					{#each form.failed as item (item.email)}
+						<li>{item.email} — {item.error}</li>
 					{/each}
 				</ul>
 			{/if}
@@ -808,6 +825,14 @@
 								<form
 									method="post"
 									action="?/resendInvite"
+									onsubmit={(event) => {
+										if (
+											status === 'cancelled' &&
+											!confirm('This will reactivate the cancelled invite and send a new link.')
+										) {
+											event.preventDefault();
+										}
+									}}
 									use:enhance={() => {
 										submittingResend = invite.id;
 										return async ({ result, update }) => {
@@ -827,7 +852,13 @@
 										disabled={submittingResend === invite.id}
 										class="font-semibold text-accent hover:text-accent-hover disabled:opacity-50"
 									>
-										{submittingResend === invite.id ? 'Resending...' : 'Resend'}
+										{submittingResend === invite.id
+											? status === 'pending'
+												? 'Resending...'
+												: 'Reissuing...'
+											: status === 'pending'
+												? 'Resend'
+												: 'Reissue invite'}
 									</button>
 								</form>
 							{/if}

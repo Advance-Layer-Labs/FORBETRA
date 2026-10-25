@@ -296,6 +296,6 @@ export const actions: Actions = {
 			data: { coachOnboardingCompletedAt: new Date() }
 		});
 
-		return { skipped: true };
+		throw redirect(303, '/coach');
 	}
 };
