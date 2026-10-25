@@ -215,7 +215,8 @@ export const actions: Actions = {
 
 		const sent: { email: string }[] = [];
 		const skipped: { email: string; reason: 'pending' | 'accepted' }[] = [];
-		const failed: { email: string; inviteUrl?: string; error?: string }[] = [];
+		const created: { email: string; inviteUrl: string }[] = [];
+		const failed: { email: string; error?: string }[] = [];
 
 		for (const person of parsed.people) {
 			const result = await issueCoachInvite({
@@ -239,7 +240,7 @@ export const actions: Actions = {
 			} else if (result.outcome === 'accepted') {
 				skipped.push({ email: result.email, reason: 'accepted' });
 			} else if (result.emailFailed) {
-				failed.push({ email: result.email, inviteUrl: result.inviteUrl });
+				created.push({ email: result.email, inviteUrl: result.inviteUrl });
 			} else {
 				sent.push({ email: result.email });
 			}
@@ -250,6 +251,7 @@ export const actions: Actions = {
 			action: 'bulkInvite' as const,
 			sent,
 			skipped,
+			created,
 			failed,
 			invalid: parsed.invalid
 		};

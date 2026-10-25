@@ -45,7 +45,7 @@
 		></nav>
 
 		<div
-			class="left-panel relative flex w-full flex-col items-center justify-center px-10 pt-32 pb-16 md:w-1/2 md:px-16"
+			class="left-panel relative flex w-full flex-col items-center justify-center px-4 pt-24 pb-12 sm:px-8 sm:pt-32 sm:pb-16 md:w-1/2 md:px-16"
 		>
 			<div
 				class="animate-gradientSlow pointer-events-none absolute inset-0 bg-[length:200%_200%] opacity-70"
@@ -58,11 +58,15 @@
 				aria-hidden="true"
 			></div>
 			<div
-				class="glass-raised relative z-10 w-full max-w-xl rounded-3xl border border-accent/30 p-12 md:mx-auto"
+				class="glass-raised relative z-10 w-full max-w-xl rounded-3xl border border-accent/30 p-6 sm:p-8 md:mx-auto md:p-12"
 			>
 				<div class="space-y-5">
 					<p class="text-xs tracking-[0.6em] text-text-muted uppercase">Grow With Purpose</p>
-					<h1 class="text-5xl font-semibold tracking-[0.18em] text-text-primary">FORBETRA</h1>
+					<h1
+						class="text-3xl font-semibold tracking-[0.08em] text-text-primary sm:text-4xl sm:tracking-[0.14em] md:text-5xl md:tracking-[0.18em]"
+					>
+						FORBETRA
+					</h1>
 					<div class="h-[2px] w-24 rounded-full bg-border-default"></div>
 					<p class="text-lg leading-relaxed text-text-tertiary">
 						Forbetra gives you a clear, structured way to work on what matters most — your
@@ -93,7 +97,10 @@
 						>
 							03
 						</span>
-						<p>Get honest, structured feedback from colleagues, managers, and coaches.</p>
+						<p>
+							Get honest, structured feedback from the people who regularly see you in action —
+							coaches, teammates, peers, managers.
+						</p>
 					</div>
 				</div>
 			</div>

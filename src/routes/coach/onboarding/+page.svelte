@@ -122,10 +122,6 @@
 		else if (('error' in form && form.error) || ('success' in form && form.success)) {
 			currentStep = 'invite';
 		}
-		if ('skipped' in form && form.skipped) {
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			goto('/coach');
-		}
 		if ('success' in form && form.success && !('emailFailed' in form && form.emailFailed)) {
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			goto('/coach');
@@ -633,15 +629,7 @@
 			</form>
 
 			<div class="mx-auto flex max-w-md flex-col gap-3 pt-2">
-				<form
-					method="post"
-					action="?/skip"
-					use:enhance={() => {
-						return async ({ update }) => {
-							await update();
-						};
-					}}
-				>
+				<form method="post" action="?/skip">
 					<button
 						type="submit"
 						class="w-full rounded-xl border border-border-strong bg-surface-raised px-8 py-3.5 font-semibold text-text-primary transition-all hover:border-accent hover:bg-surface-subtle"
